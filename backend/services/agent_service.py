@@ -104,7 +104,7 @@ class AgentService:
                 run_id, "completed", output_id=output_id
             )
         except Exception as exc:
-            error = str(exc)
+            error = self._safe_error_message(exc)
             self.metadata_store.append_agent_step(
                 run_id,
                 {"kind": "error", "title": "Agent run failed", "payload": {"error": error}},
@@ -135,3 +135,8 @@ class AgentService:
                 "Return markdown only and ground every claim in these sources.",
             ]
         )
+
+    def _safe_error_message(self, exc: Exception) -> str:
+        error = str(exc)
+        api_key = getattr(self.llm_service, "api_key", "")
+        return error.replace(api_key, "***") if api_key else error

@@ -35,8 +35,10 @@ class FakeLLMService:
 
 
 class FailingLLMService:
+    api_key = "secret-token"
+
     async def generate(self, prompt):
-        raise RuntimeError("LLM unavailable")
+        raise RuntimeError("LLM unavailable: secret-token")
 
 
 class AgentServiceTests(unittest.TestCase):
@@ -77,7 +79,8 @@ class AgentServiceTests(unittest.TestCase):
         failed = asyncio.run(service.execute_run(run["run_id"]))
 
         self.assertEqual(failed["status"], "failed")
-        self.assertEqual(failed["error"], "LLM unavailable")
+        self.assertEqual(failed["error"], "LLM unavailable: ***")
+        self.assertNotIn("secret-token", failed["steps"][-1]["payload"]["error"])
         self.assertEqual(failed["steps"][-1]["kind"], "error")
 
 
