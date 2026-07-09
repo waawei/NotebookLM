@@ -56,4 +56,25 @@ describe('settingsApi', () => {
     expect(setItem).not.toHaveBeenCalled()
     setItem.mockRestore()
   })
+
+  it('sends a temporary key only in the model discovery request', async () => {
+    const temporaryKey = 'temporary-browser-key'
+    httpClient.post.mockResolvedValue({ data: { models: ['a-model'] } })
+
+    const result = await settingsApi.listModels({
+      provider: 'openai_compatible',
+      base_url: 'https://gateway.test',
+      endpoint_mode: 'auto',
+      api_key: temporaryKey,
+    })
+
+    expect(httpClient.post).toHaveBeenCalledWith('/settings/models', {
+      provider: 'openai_compatible',
+      base_url: 'https://gateway.test',
+      endpoint_mode: 'auto',
+      api_key: temporaryKey,
+    })
+    expect(result).toEqual({ models: ['a-model'] })
+    expect(JSON.stringify(result)).not.toContain(temporaryKey)
+  })
 })

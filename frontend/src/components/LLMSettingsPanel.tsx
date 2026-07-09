@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { AlertCircle, CheckCircle2, RefreshCw, Server, ShieldCheck } from 'lucide-react'
-import { settingsApi, type SettingsConfigUpdate, type SettingsStatus, type SettingsTestResult } from '../services/api'
+import { AlertCircle, CheckCircle2, Eye, EyeOff, RefreshCw, Server, ShieldCheck } from 'lucide-react'
+import { settingsApi, type SettingsConfigUpdate, type SettingsEndpointMode, type SettingsStatus, type SettingsTestResult } from '../services/api'
 
 export default function LLMSettingsPanel() {
   const [status, setStatus] = useState<SettingsStatus | null>(null)
@@ -8,17 +8,22 @@ export default function LLMSettingsPanel() {
   const [model, setModel] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
   const [baseUrlTouched, setBaseUrlTouched] = useState(false)
+  const [endpointMode, setEndpointMode] = useState<SettingsEndpointMode>('auto')
   const [apiKey, setApiKey] = useState('')
+  const [showApiKey, setShowApiKey] = useState(false)
+  const [models, setModels] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isClearing, setIsClearing] = useState(false)
   const [isTesting, setIsTesting] = useState(false)
+  const [isLoadingModels, setIsLoadingModels] = useState(false)
   const [message, setMessage] = useState<SettingsTestResult | null>(null)
 
   const applyStatus = (nextStatus: SettingsStatus) => {
     setStatus(nextStatus)
     setProvider(nextStatus.provider)
     setModel(nextStatus.model)
+    setEndpointMode(nextStatus.endpoint_mode || 'auto')
     setBaseUrl('')
     setBaseUrlTouched(false)
   }
@@ -42,7 +47,7 @@ export default function LLMSettingsPanel() {
   const saveConfiguration = async () => {
     setIsSaving(true)
     setMessage(null)
-    const payload: SettingsConfigUpdate = { provider, model }
+    const payload: SettingsConfigUpdate = { provider, model, endpoint_mode: endpointMode }
     if (baseUrlTouched) payload.base_url = baseUrl.trim()
     if (apiKey) payload.api_key = apiKey
 
@@ -53,6 +58,7 @@ export default function LLMSettingsPanel() {
       setMessage({ ok: false, message: 'Unable to save LLM configuration. Check the values and try again.' })
     } finally {
       setApiKey('')
+      setShowApiKey(false)
       setIsSaving(false)
     }
   }
@@ -63,6 +69,7 @@ export default function LLMSettingsPanel() {
     try {
       applyStatus(await settingsApi.clear())
       setApiKey('')
+      setShowApiKey(false)
       setMessage({ ok: true, message: 'Local LLM configuration cleared. Environment defaults are active.' })
     } catch {
       setMessage({ ok: false, message: 'Unable to clear local LLM configuration.' })
@@ -80,7 +87,28 @@ export default function LLMSettingsPanel() {
       setMessage({ ok: false, message: 'Unable to test the LLM connection.' })
     } finally {
       setApiKey('')
+      setShowApiKey(false)
       setIsTesting(false)
+    }
+  }
+
+  const loadModels = async () => {
+    setIsLoadingModels(true)
+    setMessage(null)
+    const payload = { provider, endpoint_mode: endpointMode } as Parameters<typeof settingsApi.listModels>[0]
+    if (baseUrlTouched) payload.base_url = baseUrl.trim()
+    if (apiKey) payload.api_key = apiKey
+
+    try {
+      const result = await settingsApi.listModels(payload)
+      setModels(result.models)
+      setMessage({ ok: true, message: 'Available models updated. You can select one or enter a model manually.' })
+    } catch {
+      setMessage({ ok: false, message: 'Unable to load available models. Check the provider, endpoint, and API key.' })
+    } finally {
+      setApiKey('')
+      setShowApiKey(false)
+      setIsLoadingModels(false)
     }
   }
 
@@ -118,19 +146,28 @@ export default function LLMSettingsPanel() {
             </select>
           </label>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">Model
-            <input aria-label="Model" value={model} onChange={(event) => setModel(event.target.value)} required className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-950 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100" />
+            <input aria-label="Model" list="available-models" value={model} onChange={(event) => setModel(event.target.value)} required className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-950 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100" />
+            <datalist id="available-models">{models.map((availableModel) => <option key={availableModel} value={availableModel}>{availableModel}</option>)}</datalist>
+          </label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">Endpoint format
+            <select aria-label="Endpoint format" value={endpointMode} onChange={(event) => setEndpointMode(event.target.value as SettingsEndpointMode)} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-950 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
+              <option value="auto">Automatic /v1</option>
+              <option value="exact">Exact API base</option>
+            </select>
           </label>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">Base URL
             <input aria-label="Base URL" value={baseUrl} onChange={(event) => { setBaseUrl(event.target.value); setBaseUrlTouched(true) }} placeholder={status?.base_url_configured ? 'Custom URL configured; enter a replacement to change it' : 'Optional provider endpoint'} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-950 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100" />
+            <span className="mt-1 block text-xs font-normal text-gray-500 dark:text-gray-400">Automatic accepts the API root or /v1 (with or without a trailing slash). Exact preserves a documented custom API base. Do not enter /models or /chat/completions.</span>
           </label>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">API key
-            <input aria-label="API key" type="password" autoComplete="off" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={status?.api_key_configured ? 'Configured; enter a replacement only' : 'Required by most providers'} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-950 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100" />
+            <span className="mt-1 flex gap-2"><input aria-label="API key" type={showApiKey ? 'text' : 'password'} autoComplete="off" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={status?.api_key_configured ? 'Configured; enter a replacement only' : 'Required by most providers'} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-950 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100" /><button type="button" aria-label={showApiKey ? 'Hide API key' : 'Show API key'} onClick={() => setShowApiKey((visible) => !visible)} className="rounded-lg border border-gray-300 px-3 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800">{showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></span>
           </label>
         </div>
 
         <div className="mt-5 flex flex-wrap gap-3">
           <button onClick={() => void saveConfiguration()} disabled={isSaving || !model.trim()} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">{isSaving ? 'Saving…' : 'Save configuration'}</button>
           <button onClick={() => void testConnection()} disabled={isTesting} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800">{isTesting ? 'Testing…' : 'Test connection'}</button>
+          <button onClick={() => void loadModels()} disabled={isLoadingModels} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800">{isLoadingModels ? 'Loading models…' : 'Load available models'}</button>
           <button onClick={() => void clearConfiguration()} disabled={isClearing} className="rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950">{isClearing ? 'Clearing…' : 'Clear local configuration'}</button>
         </div>
 

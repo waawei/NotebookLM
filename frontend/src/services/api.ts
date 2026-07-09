@@ -137,8 +137,11 @@ export interface SettingsStatus {
   top_k: number
   embedding_model: string
   embedding_device: string
+  endpoint_mode: SettingsEndpointMode
   warnings: string[]
 }
+
+export type SettingsEndpointMode = 'auto' | 'exact'
 
 export interface SettingsTestResult {
   ok: boolean
@@ -150,6 +153,14 @@ export interface SettingsConfigUpdate {
   model: string
   base_url?: string
   api_key?: string
+  endpoint_mode?: SettingsEndpointMode
+}
+
+export interface SettingsModelDiscoveryRequest {
+  provider?: string
+  base_url?: string
+  api_key?: string
+  endpoint_mode?: SettingsEndpointMode
 }
 
 export interface SkillItem {
@@ -385,6 +396,11 @@ export const settingsApi = {
 
   testLlm: async (): Promise<SettingsTestResult> => {
     const response = await api.post('/settings/test-llm')
+    return response.data
+  },
+
+  listModels: async (data: SettingsModelDiscoveryRequest): Promise<{ models: string[] }> => {
+    const response = await api.post('/settings/models', data)
     return response.data
   },
 }
