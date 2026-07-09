@@ -86,6 +86,19 @@ class SettingsApiTests(unittest.TestCase):
         self.assertNotIn("api_key", response.model_dump())
         self.assertNotIn("do-not-return", str(response))
 
+    def test_save_omits_an_unchanged_base_url(self):
+        asyncio.run(
+            settings.save_llm_configuration(
+                settings.LLMConfigUpdate(
+                    provider="openai",
+                    model="gpt-test",
+                    api_key="do-not-return",
+                )
+            )
+        )
+
+        self.assertNotIn("base_url", self.configuration_service.saved[0])
+
     def test_clear_returns_safe_status(self):
         response = asyncio.run(settings.clear_llm_configuration())
 

@@ -148,7 +148,7 @@ export interface SettingsTestResult {
 export interface SettingsConfigUpdate {
   provider: string
   model: string
-  base_url: string
+  base_url?: string
   api_key?: string
 }
 

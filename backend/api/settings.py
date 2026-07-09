@@ -28,7 +28,7 @@ class SettingsStatus(BaseModel):
 class LLMConfigUpdate(BaseModel):
     provider: str
     model: str
-    base_url: str = ""
+    base_url: Optional[str] = None
     api_key: Optional[str] = Field(default=None, repr=False)
 
 
