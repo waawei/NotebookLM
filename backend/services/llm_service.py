@@ -1,91 +1,70 @@
 """
-LLM 服务 - 支持通义千问和 OpenAI
+LLM service for OpenAI-compatible chat completions.
 """
 
-from typing import Optional
 from openai import OpenAI
 
 from core.config import settings
 
 
 class LLMService:
-    """大语言模型服务"""
+    """Large language model client wrapper."""
 
     def __init__(self):
-        self.provider = settings.LLM_PROVIDER
+        self.provider = settings.LLM_PROVIDER.lower()
         self.model = settings.LLM_MODEL
         self.api_key = settings.LLM_API_KEY
         self.base_url = settings.LLM_BASE_URL
         self.temperature = settings.LLM_TEMPERATURE
         self.max_tokens = settings.LLM_MAX_TOKENS
+        self.client = self._create_client()
 
-        # 初始化客户端
+    def _create_client(self) -> OpenAI:
         if self.provider == "dashscope":
-            # 通义千问
-            self.client = OpenAI(
+            return OpenAI(
                 api_key=self.api_key,
-                base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
+                base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
             )
-        elif self.provider == "openai":
-            # OpenAI 或自定义 API
+
+        if self.provider == "openai":
             if self.base_url:
-                # 使用自定义 base_url（如 muyuan.do）
-                self.client = OpenAI(
-                    api_key=self.api_key,
-                    base_url=self.base_url
-                )
-            else:
-                # 使用官方 OpenAI
-                self.client = OpenAI(api_key=self.api_key)
-        else:
-            raise ValueError(f"Unsupported LLM provider: {self.provider}")
+                return OpenAI(api_key=self.api_key, base_url=self.base_url)
+            return OpenAI(api_key=self.api_key)
+
+        if self.provider == "openai_compatible":
+            if not self.base_url:
+                raise ValueError("LLM_BASE_URL is required for openai_compatible provider")
+            return OpenAI(api_key=self.api_key, base_url=self.base_url)
+
+        raise ValueError(f"Unsupported LLM provider: {self.provider}")
 
     async def generate(self, prompt: str) -> str:
-        """
-        生成回答
-
-        Args:
-            prompt: 完整的 Prompt
-
-        Returns:
-            answer: LLM 生成的回答
-        """
+        """Generate a full answer."""
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "user", "content": prompt}
+                    {"role": "user", "content": prompt},
                 ],
                 temperature=self.temperature,
-                max_tokens=self.max_tokens
+                max_tokens=self.max_tokens,
             )
-
-            answer = response.choices[0].message.content
-            return answer
-
+            return response.choices[0].message.content or ""
         except Exception as e:
             print(f"LLM call failed: {e}")
             raise e
 
     async def generate_stream(self, prompt: str):
-        """
-        流式生成回答（用于打字机效果）
-
-        Args:
-            prompt: 完整的 Prompt
-
-        Yields:
-            chunk: 生成的文本片段
-        """
+        """Generate an answer as text chunks."""
         try:
             stream = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "user", "content": prompt}
+                    {"role": "user", "content": prompt},
                 ],
                 temperature=self.temperature,
                 max_tokens=self.max_tokens,
-                stream=True
+                stream=True,
             )
 
             for chunk in stream:
@@ -95,3 +74,7 @@ class LLMService:
         except Exception as e:
             print(f"LLM streaming call failed: {e}")
             raise e
+
+    async def test_connection(self) -> str:
+        """Run a minimal completion to validate configured credentials."""
+        return await self.generate("Reply with exactly: OK")

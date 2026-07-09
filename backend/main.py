@@ -1,25 +1,20 @@
 """
-NotebookLM Clone - FastAPI 主入口
+NotebookLM Clone FastAPI entry point.
 """
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List, Optional
 import uvicorn
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-from api import documents, chat, notes
-from services.vector_store import VectorStoreService
+from api import chat, documents, notes, settings as settings_api
 from core.config import settings
 
-# 创建 FastAPI 应用
 app = FastAPI(
     title="NotebookLM Clone API",
-    description="智能文档问答系统",
-    version="1.0.0"
+    description="Intelligent document question-answering system",
+    version="1.0.0",
 )
 
-# 配置 CORS（允许前端跨域请求）
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -28,43 +23,43 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 注册路由
-app.include_router(documents.router, prefix="/api/documents", tags=["文档管理"])
-app.include_router(chat.router, prefix="/api/chat", tags=["对话问答"])
-app.include_router(notes.router, prefix="/api/notes", tags=["笔记管理"])
+app.include_router(documents.router, prefix="/api/documents", tags=["Documents"])
+app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
+app.include_router(notes.router, prefix="/api/notes", tags=["Notes"])
+app.include_router(settings_api.router, prefix="/api/settings", tags=["Settings"])
 
 
 @app.on_event("startup")
 async def startup_event():
-    """应用启动时执行"""
-    print("🚀 NotebookLM Clone API 启动中...")
-    print(f"📊 向量数据库路径: {settings.VECTOR_DB_PATH}")
-    print(f"🤖 LLM 提供商: {settings.LLM_PROVIDER}")
+    """Log startup configuration."""
+    print("NotebookLM Clone API starting...")
+    print(f"Vector database path: {settings.VECTOR_DB_PATH}")
+    print(f"LLM provider: {settings.LLM_PROVIDER}")
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """应用关闭时执行"""
-    print("👋 NotebookLM Clone API 已关闭")
+    """Log shutdown."""
+    print("NotebookLM Clone API stopped")
 
 
 @app.get("/")
 async def root():
-    """健康检查接口"""
+    """Basic health endpoint."""
     return {
         "status": "running",
         "message": "NotebookLM Clone API is running",
-        "version": "1.0.0"
+        "version": "1.0.0",
     }
 
 
 @app.get("/health")
 async def health_check():
-    """详细健康检查"""
+    """Detailed health endpoint."""
     return {
         "status": "healthy",
         "database": "connected",
-        "llm_provider": settings.LLM_PROVIDER
+        "llm_provider": settings.LLM_PROVIDER,
     }
 
 
@@ -73,5 +68,5 @@ if __name__ == "__main__":
         "main:app",
         host="0.0.0.0",
         port=8000,
-        reload=True  # 开发模式，代码修改自动重载
+        reload=True,
     )
