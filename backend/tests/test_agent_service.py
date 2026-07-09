@@ -41,6 +41,15 @@ class FailingLLMService:
         raise RuntimeError("LLM unavailable: secret-token")
 
 
+class SequencedLLMFactory:
+    def __init__(self):
+        self.calls = 0
+
+    def __call__(self):
+        self.calls += 1
+        return FakeLLMService()
+
+
 class AgentServiceTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -82,6 +91,24 @@ class AgentServiceTests(unittest.TestCase):
         self.assertEqual(failed["error"], "LLM unavailable: ***")
         self.assertNotIn("secret-token", failed["steps"][-1]["payload"]["error"])
         self.assertEqual(failed["steps"][-1]["kind"], "error")
+
+    def test_each_run_uses_a_fresh_llm_service(self):
+        factory = SequencedLLMFactory()
+        service = AgentService(
+            metadata_store=self.store,
+            skill_service=FakeSkillService(),
+            tool_registry=FakeToolRegistry(),
+            llm_factory=factory,
+        )
+
+        self.assertIs(service.llm_factory, factory)
+
+        first = service.create_run("paper_planner", {"doc_ids": []})
+        second = service.create_run("paper_planner", {"doc_ids": []})
+        asyncio.run(service.execute_run(first["run_id"]))
+        asyncio.run(service.execute_run(second["run_id"]))
+
+        self.assertEqual(factory.calls, 2)
 
 
 if __name__ == "__main__":

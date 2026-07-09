@@ -1,10 +1,11 @@
 """Inspectable execution flow for local, manifest-defined agent skills."""
 
 import json
-from typing import Optional
+from typing import Callable, Optional
 
 from services.document_metadata_store import DocumentMetadataStore
 from services.llm_service import LLMService
+from services.local_llm_config import LLMConfigurationService
 from services.skill_service import SkillService
 from services.tool_registry import ToolRegistry
 
@@ -18,11 +19,21 @@ class AgentService:
         skill_service: Optional[SkillService] = None,
         tool_registry: Optional[ToolRegistry] = None,
         llm_service: Optional[LLMService] = None,
+        llm_factory: Optional[Callable[[], LLMService]] = None,
+        error_sanitizer: Optional[Callable[[str], str]] = None,
     ):
+        if llm_service is not None and llm_factory is not None:
+            raise ValueError("Provide either llm_service or llm_factory")
         self.metadata_store = metadata_store or DocumentMetadataStore()
         self.skill_service = skill_service or SkillService()
         self.tool_registry = tool_registry or ToolRegistry()
-        self.llm_service = llm_service or LLMService()
+        if llm_factory is not None:
+            self.llm_factory = llm_factory
+        elif llm_service is not None:
+            self.llm_factory = lambda: llm_service
+        else:
+            self.llm_factory = LLMService
+        self.error_sanitizer = error_sanitizer or LLMConfigurationService().sanitize
 
     def create_run(self, skill_id: str, input_payload: dict) -> dict:
         if not self.skill_service.get_skill(skill_id):
@@ -36,6 +47,7 @@ class AgentService:
         if not run:
             raise ValueError(f"Agent run {run_id} does not exist")
 
+        llm_service = None
         try:
             skill = self.skill_service.get_skill(run["skill_id"])
             if not skill:
@@ -68,7 +80,8 @@ class AgentService:
             )
 
             prompt = self._build_prompt(skill, request, sources)
-            content = (await self.llm_service.generate(prompt)).strip()
+            llm_service = self.llm_factory()
+            content = (await llm_service.generate(prompt)).strip()
             if not content:
                 raise RuntimeError("LLM returned empty content")
             self.metadata_store.append_agent_step(
@@ -104,7 +117,7 @@ class AgentService:
                 run_id, "completed", output_id=output_id
             )
         except Exception as exc:
-            error = self._safe_error_message(exc)
+            error = self._safe_error_message(exc, llm_service)
             self.metadata_store.append_agent_step(
                 run_id,
                 {"kind": "error", "title": "Agent run failed", "payload": {"error": error}},
@@ -136,7 +149,7 @@ class AgentService:
             ]
         )
 
-    def _safe_error_message(self, exc: Exception) -> str:
-        error = str(exc)
-        api_key = getattr(self.llm_service, "api_key", "")
+    def _safe_error_message(self, exc: Exception, llm_service: Optional[LLMService]) -> str:
+        error = self.error_sanitizer(str(exc))
+        api_key = getattr(llm_service, "api_key", "")
         return error.replace(api_key, "***") if api_key else error
