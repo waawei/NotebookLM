@@ -4,7 +4,7 @@ RAG chat service with SQLite-backed conversation persistence.
 
 import uuid
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 from core.config import settings
 from models.chat import ChatMessage, ChatResponse, Citation
@@ -17,11 +17,20 @@ from services.vector_store import VectorStoreService
 class ChatService:
     """Document question-answering service."""
 
-    def __init__(self):
-        self.vector_store = VectorStoreService()
-        self.retrieval_service = RetrievalService(self.vector_store)
-        self.llm_service = LLMService()
-        self.metadata_store = DocumentMetadataStore()
+    def __init__(
+        self,
+        vector_store: Optional[VectorStoreService] = None,
+        retrieval_service: Optional[RetrievalService] = None,
+        metadata_store: Optional[DocumentMetadataStore] = None,
+        llm_factory: Optional[Callable[[], LLMService]] = None,
+    ):
+        self.vector_store = vector_store
+        self.retrieval_service = retrieval_service
+        if self.retrieval_service is None:
+            self.vector_store = self.vector_store or VectorStoreService()
+            self.retrieval_service = RetrievalService(self.vector_store)
+        self.llm_factory = llm_factory or LLMService
+        self.metadata_store = metadata_store or DocumentMetadataStore()
         self.conversations = {}
         self._load_conversations()
 
@@ -51,7 +60,7 @@ class ChatService:
 
         context = self.retrieval_service.build_context(search_results)
         prompt = self._build_prompt(question, context, history, mode)
-        answer = await self.llm_service.generate(prompt)
+        answer = await self.llm_factory().generate(prompt)
         citations = self.retrieval_service.build_citations(search_results)
         self._save_conversation(conversation_id, question, answer, citations)
 
@@ -92,7 +101,7 @@ class ChatService:
         prompt = self._build_prompt(question, context, history, mode)
 
         answer_chunks = []
-        async for chunk in self.llm_service.generate_stream(prompt):
+        async for chunk in self.llm_factory().generate_stream(prompt):
             answer_chunks.append(chunk)
             yield {"type": "content", "content": chunk}
 
@@ -346,7 +355,7 @@ Document content:
 
 Generate 5 suggested questions:"""
 
-        response = await self.llm_service.generate(prompt)
+        response = await self.llm_factory().generate(prompt)
 
         questions = []
         for line in response.strip().split("\n"):

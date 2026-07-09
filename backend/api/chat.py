@@ -9,6 +9,8 @@ import json
 
 from models.chat import ChatRequest, ChatResponse
 from services.chat_service import ChatService
+from services.llm_diagnostics import build_connection_diagnostic
+from services.local_llm_config import LLMConfigurationService
 
 router = APIRouter()
 chat_service = ChatService()
@@ -38,8 +40,11 @@ async def ask_question(request: ChatRequest):
 
         return response
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Chat request failed. Check the LLM connection in Settings.",
+        )
 
 
 @router.post("/ask-stream")
@@ -66,14 +71,23 @@ async def ask_question_stream(request: ChatRequest):
                     # 发送 SSE 格式数据
                     yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 
-            except Exception as e:
+            except Exception as error:
                 # 发送错误事件
-                yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+                config = LLMConfigurationService().effective_config()
+                payload = {
+                    "type": "error",
+                    "message": "The response could not be generated. Check the LLM connection in Settings and try again.",
+                    "diagnostic": build_connection_diagnostic(error, config.api_key),
+                }
+                yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
         return StreamingResponse(generate(), media_type="text/event-stream")
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Chat request failed. Check the LLM connection in Settings.",
+        )
 
 
 @router.post("/suggest-questions")
@@ -90,8 +104,11 @@ async def suggest_questions(doc_ids: List[str]):
         questions = await chat_service.generate_suggested_questions(doc_ids)
         return {"questions": questions}
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Suggested questions are unavailable. Check the LLM connection in Settings.",
+        )
 
 
 @router.get("/conversations")
