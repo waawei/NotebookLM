@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from services.llm_service import LLMService
+from services.llm_diagnostics import build_connection_diagnostic
 from services.local_llm_config import LLMConfigurationService
 
 router = APIRouter()
@@ -34,9 +35,17 @@ class LLMConfigUpdate(BaseModel):
     endpoint_mode: Optional[str] = None
 
 
+class LLMConnectionDiagnostic(BaseModel):
+    phase: str
+    status_code: Optional[int]
+    category: str
+    summary: str
+
+
 class LLMTestResult(BaseModel):
     ok: bool
     message: str
+    diagnostic: Optional[LLMConnectionDiagnostic] = None
 
 
 class LLMModelDiscoveryRequest(BaseModel):
@@ -83,14 +92,18 @@ async def test_llm_connection():
     if _safe_status().warnings:
         return LLMTestResult(ok=False, message="LLM configuration needs attention")
 
+    config = configuration_service.effective_config()
     try:
-        service = LLMService(configuration_service.effective_config())
+        service = LLMService(config)
         await service.test_connection()
         return LLMTestResult(ok=True, message="LLM connection succeeded")
-    except Exception:
+    except Exception as error:
         return LLMTestResult(
             ok=False,
             message="LLM connection failed. Check provider, model, endpoint, and API key.",
+            diagnostic=LLMConnectionDiagnostic(
+                **build_connection_diagnostic(error, config.api_key)
+            ),
         )
 
 

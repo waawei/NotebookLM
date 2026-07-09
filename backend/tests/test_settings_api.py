@@ -1,7 +1,9 @@
 import asyncio
 import unittest
 
+import httpx
 from fastapi import HTTPException
+from openai import RateLimitError
 
 from api import settings
 from services.local_llm_config import EffectiveLLMConfig
@@ -72,6 +74,27 @@ class FailingLLMService:
 
     async def test_connection(self):
         raise RuntimeError("upstream rejected saved-secret")
+
+
+class RateLimitedLLMService:
+    def __init__(self, config):
+        self.config = config
+
+    async def test_connection(self):
+        raise RateLimitError(
+            "request failed",
+            response=httpx.Response(
+                429,
+                request=httpx.Request(
+                    "POST", "https://gateway.test/v1/chat/completions"
+                ),
+            ),
+            body={
+                "error": {
+                    "message": "Bearer saved-secret at https://gateway.test/reset"
+                }
+            },
+        )
 
 
 class ListingLLMService:
@@ -149,6 +172,18 @@ class SettingsApiTests(unittest.TestCase):
             "LLM connection failed. Check provider, model, endpoint, and API key.",
         )
         self.assertNotIn("saved-secret", result.message)
+
+    def test_connection_failure_returns_only_a_safe_typed_diagnostic(self):
+        settings.LLMService = RateLimitedLLMService
+
+        result = asyncio.run(settings.test_llm_connection())
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.diagnostic.phase, "chat_completion")
+        self.assertEqual(result.diagnostic.status_code, 429)
+        self.assertEqual(result.diagnostic.category, "rate_limited")
+        self.assertNotIn("saved-secret", result.model_dump_json())
+        self.assertNotIn("gateway.test", result.model_dump_json())
 
     def test_model_discovery_uses_preview_and_returns_only_ids(self):
         settings.LLMService = ListingLLMService
