@@ -7,6 +7,8 @@ import Sidebar from './components/Sidebar'
 import Toast from './components/Toast'
 import UploadModal from './components/UploadModal'
 import WorkbenchShell from './layouts/WorkbenchShell'
+import DashboardView from './views/DashboardView'
+import SourcesView from './views/SourcesView'
 import WorkbenchView from './views/WorkbenchView'
 import { useStore } from './store/useStore'
 import type { AppModule } from './store/useStore'
@@ -88,6 +90,24 @@ function App() {
 
   const activeCopy = moduleCopy[activeModule]
 
+  const renderCenterPanel = () => {
+    if (activeModule === 'dashboard') {
+      return (
+        <DashboardView
+          onOpenUpload={() => setIsUploadModalOpen(true)}
+          onOpenSettings={() => setIsSettingsModalOpen(true)}
+          onModuleChange={handleModuleChange}
+        />
+      )
+    }
+
+    if (activeModule === 'sources') {
+      return <SourcesView onOpenUpload={() => setIsUploadModalOpen(true)} />
+    }
+
+    return <WorkbenchView />
+  }
+
   return (
     <>
       <div className="fixed top-4 right-4 z-50 space-y-2">
@@ -120,7 +140,7 @@ function App() {
             onUploadClick={() => setIsUploadModalOpen(true)}
           />
         }
-        centerPanel={<WorkbenchView />}
+        centerPanel={renderCenterPanel()}
         rightPanel={
           <div className="flex h-full flex-col">
             <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-800">
