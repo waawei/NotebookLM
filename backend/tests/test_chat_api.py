@@ -21,6 +21,11 @@ class FakeLLM:
         return self.answer
 
 
+class FakeStreamingLLM(FakeLLM):
+    async def generate_stream(self, prompt):
+        yield self.answer
+
+
 class FakeLLMFactory:
     def __init__(self, clients):
         self.clients = list(clients)
@@ -92,6 +97,29 @@ class ChatApiTests(unittest.TestCase):
         self.assertEqual(second.answer, "second")
         self.assertEqual(factory.calls, 2)
 
+    def test_each_stream_uses_a_fresh_factory(self):
+        factory = FakeLLMFactory(
+            [FakeStreamingLLM("first"), FakeStreamingLLM("second")]
+        )
+        service = ChatService(
+            retrieval_service=FakeRetrieval(),
+            metadata_store=self.store,
+            llm_factory=factory,
+        )
+
+        async def collect(question):
+            return [
+                event
+                async for event in service.ask_stream(question, ["doc-1"])
+            ]
+
+        first = asyncio.run(collect("first question"))
+        second = asyncio.run(collect("second question"))
+
+        self.assertIn({"type": "content", "content": "first"}, first)
+        self.assertIn({"type": "content", "content": "second"}, second)
+        self.assertEqual(factory.calls, 2)
+
     def test_stream_error_contains_only_safe_diagnostic_fields(self):
         chat.chat_service = FailingChatService()
 
@@ -113,4 +141,3 @@ class ChatApiTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
