@@ -140,7 +140,7 @@ function App() {
     }
 
     if (activeModule === 'agents') {
-      return <AgentsView />
+      return <AgentsView onOpenOutput={() => setActiveModule('outputs')} />
     }
 
     if (activeModule === 'settings') {
