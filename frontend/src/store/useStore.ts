@@ -1,6 +1,18 @@
 import { create } from 'zustand'
 
 export type AppModule = 'dashboard' | 'workbench' | 'sources' | 'notes' | 'wiki' | 'outputs' | 'skills' | 'agents' | 'settings'
+export type ThemePreference = 'system' | 'light' | 'dark'
+export type ResolvedTheme = 'light' | 'dark'
+
+export function resolveTheme(theme: ThemePreference, systemIsDark: boolean): ResolvedTheme {
+  return theme === 'system' ? (systemIsDark ? 'dark' : 'light') : theme
+}
+
+function initialThemePreference(): ThemePreference {
+  if (typeof window === 'undefined') return 'system'
+  const value = localStorage.getItem('theme_preference')
+  return value === 'light' || value === 'dark' || value === 'system' ? value : 'system'
+}
 
 export interface Document {
   doc_id: string
@@ -75,8 +87,8 @@ interface AppState {
   addToast: (message: string, type?: 'success' | 'error' | 'info') => void
   removeToast: (id: string) => void
 
-  isDarkMode: boolean
-  toggleDarkMode: () => void
+  theme: ThemePreference
+  setTheme: (theme: ThemePreference) => void
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -192,21 +204,12 @@ export const useStore = create<AppState>((set) => ({
       toasts: state.toasts.filter((toast) => toast.id !== id)
     })),
 
-  isDarkMode: typeof window !== 'undefined'
-    ? localStorage.getItem('dark_mode') === 'true'
-    : false,
+  theme: initialThemePreference(),
 
-  toggleDarkMode: () =>
-    set((state) => {
-      const newDarkMode = !state.isDarkMode
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('dark_mode', String(newDarkMode))
-        if (newDarkMode) {
-          document.documentElement.classList.add('dark')
-        } else {
-          document.documentElement.classList.remove('dark')
-        }
-      }
-      return { isDarkMode: newDarkMode }
-    }),
+  setTheme: (theme) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('theme_preference', theme)
+    }
+    set({ theme })
+  },
 }))

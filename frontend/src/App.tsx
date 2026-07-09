@@ -17,7 +17,7 @@ import WikiView from './views/WikiView'
 import SkillsView from './views/SkillsView'
 import AgentsView from './views/AgentsView'
 import WorkbenchView from './views/WorkbenchView'
-import { useStore } from './store/useStore'
+import { resolveTheme, useStore } from './store/useStore'
 import type { AppModule } from './store/useStore'
 
 const moduleCopy: Record<AppModule, { title: string; subtitle: string }> = {
@@ -49,7 +49,7 @@ const moduleCopy: Record<AppModule, { title: string; subtitle: string }> = {
   agents: { title: 'Agents', subtitle: 'Inspectable runs, steps, errors, and outputs' },
   settings: {
     title: 'Settings',
-    subtitle: 'Read-only runtime configuration from backend .env',
+    subtitle: 'Configure a local model connection and inspect safe runtime status',
   },
 }
 
@@ -65,17 +65,30 @@ function App() {
     setActiveModule,
     toasts,
     removeToast,
-    isDarkMode,
-    toggleDarkMode,
+    theme,
+    setTheme,
   } = useStore()
+  const [systemIsDark, setSystemIsDark] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches,
+  )
+  const resolvedTheme = resolveTheme(theme, systemIsDark)
 
   useEffect(() => {
-    if (isDarkMode) {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+    const updateSystemTheme = () => setSystemIsDark(mediaQuery.matches)
+    updateSystemTheme()
+    mediaQuery.addEventListener('change', updateSystemTheme)
+    return () => mediaQuery.removeEventListener('change', updateSystemTheme)
+  }, [])
+
+  useEffect(() => {
+    if (resolvedTheme === 'dark') {
       document.documentElement.classList.add('dark')
     } else {
       document.documentElement.classList.remove('dark')
     }
-  }, [isDarkMode])
+    document.documentElement.style.colorScheme = resolvedTheme
+  }, [resolvedTheme])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -154,14 +167,14 @@ function App() {
         activeModule={activeModule}
         title={activeCopy.title}
         subtitle={activeCopy.subtitle}
-        isDarkMode={isDarkMode}
+        isDarkMode={resolvedTheme === 'dark'}
         onModuleChange={handleModuleChange}
         onOpenUpload={() => setIsUploadModalOpen(true)}
         onOpenSearch={() => setIsSearchModalOpen(true)}
         onOpenExport={() => setIsExportModalOpen(true)}
         onOpenNotes={() => setIsNotesModalOpen(true)}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
-        onToggleDarkMode={toggleDarkMode}
+        onToggleDarkMode={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
         leftPanel={
           <Sidebar
             isCollapsed={isSidebarCollapsed}

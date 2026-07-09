@@ -34,8 +34,8 @@ const modules: Array<{
 
 export default function ModuleNav({ activeModule, onModuleChange }: ModuleNavProps) {
   return (
-    <nav className="h-full w-16 flex-shrink-0 border-r border-gray-200 dark:border-gray-800 bg-gray-950 text-gray-300">
-      <div className="flex h-16 items-center justify-center border-b border-gray-800">
+    <nav className="h-full w-16 flex-shrink-0 border-r border-gray-200 bg-white text-gray-600 transition-colors dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300">
+      <div className="flex h-16 items-center justify-center border-b border-gray-200 dark:border-gray-800">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm">
           <BookOpen className="h-5 w-5" />
         </div>
@@ -53,14 +53,14 @@ export default function ModuleNav({ activeModule, onModuleChange }: ModuleNavPro
               className={`group relative flex h-11 w-11 items-center justify-center rounded-lg transition-colors ${
                 isActive
                   ? 'bg-blue-600 text-white'
-                  : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                  : 'text-gray-500 hover:bg-gray-100 hover:text-gray-950 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white'
               }`}
               title={item.label}
               aria-label={item.label}
               aria-current={isActive ? 'page' : undefined}
             >
               <Icon className="h-5 w-5" />
-              <span className="pointer-events-none absolute left-12 z-30 hidden whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white shadow-lg group-hover:block">
+              <span className="pointer-events-none absolute left-12 z-30 hidden whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white shadow-lg group-hover:block dark:bg-gray-800">
                 {item.label}
               </span>
             </button>
