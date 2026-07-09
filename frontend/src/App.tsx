@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import ExportModal from './components/ExportModal'
 import NotesModal from './components/NotesModal'
+import RightInspector from './components/RightInspector'
 import SearchModal from './components/SearchModal'
 import SettingsModal from './components/SettingsModal'
 import Sidebar from './components/Sidebar'
@@ -148,22 +149,7 @@ function App() {
           />
         }
         centerPanel={renderCenterPanel()}
-        rightPanel={
-          <div className="flex h-full flex-col">
-            <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-800">
-              <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Inspector</h2>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Citations and runtime context</p>
-            </div>
-            <div className="flex flex-1 items-center justify-center p-6 text-center">
-              <div>
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-200">No answer selected</p>
-                <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
-                  Citations and retrieval evidence will appear here after a grounded answer is generated.
-                </p>
-              </div>
-            </div>
-          </div>
-        }
+        rightPanel={<RightInspector />}
       />
 
       <UploadModal
