@@ -57,6 +57,24 @@ export interface NoteUpdateRequest {
   conversation_id?: string | null
 }
 
+export interface SettingsStatus {
+  provider: string
+  model: string
+  base_url_configured: boolean
+  api_key_configured: boolean
+  temperature: number
+  max_tokens: number
+  top_k: number
+  embedding_model: string
+  embedding_device: string
+  warnings: string[]
+}
+
+export interface SettingsTestResult {
+  ok: boolean
+  message: string
+}
+
 export const documentApi = {
   upload: async (file: File): Promise<UploadResponse> => {
     const formData = new FormData()
@@ -150,6 +168,18 @@ export const noteApi = {
 
   delete: async (noteId: string): Promise<{ message: string }> => {
     const response = await api.delete(`/notes/${noteId}`)
+    return response.data
+  },
+}
+
+export const settingsApi = {
+  getStatus: async (): Promise<SettingsStatus> => {
+    const response = await api.get('/settings/status')
+    return response.data
+  },
+
+  testLlm: async (): Promise<SettingsTestResult> => {
+    const response = await api.post('/settings/test-llm')
     return response.data
   },
 }

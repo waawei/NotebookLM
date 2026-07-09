@@ -5,15 +5,17 @@ import UploadModal from './components/UploadModal'
 import NotesModal from './components/NotesModal'
 import SearchModal from './components/SearchModal'
 import ExportModal from './components/ExportModal'
+import SettingsModal from './components/SettingsModal'
 import Toast from './components/Toast'
 import { useStore } from './store/useStore'
-import { FileText, Search, Download, Moon, Sun } from 'lucide-react'
+import { FileText, Search, Download, Moon, Sun, Settings } from 'lucide-react'
 
 function App() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false)
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false)
   const [isExportModalOpen, setIsExportModalOpen] = useState(false)
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const { toasts, removeToast, isDarkMode, toggleDarkMode } = useStore()
 
@@ -72,6 +74,13 @@ function App() {
             title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
           >
             {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </button>
+          <button
+            onClick={() => setIsSettingsModalOpen(true)}
+            className="p-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg transition-colors"
+            title="Settings"
+          >
+            <Settings className="w-5 h-5" />
           </button>
           <button
             onClick={() => setIsSearchModalOpen(true)}
@@ -134,6 +143,12 @@ function App() {
       <ExportModal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
+      />
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
       />
     </div>
   )
