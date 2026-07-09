@@ -4,8 +4,17 @@ import { useStore } from '../store/useStore'
 import ReactMarkdown from 'react-markdown'
 import { chatApi, noteApi } from '../services/api'
 
+type ChatMode = 'review' | 'paper' | 'knowledge_base'
+
+const modeOptions: Array<{ value: ChatMode; label: string }> = [
+  { value: 'review', label: 'Review' },
+  { value: 'paper', label: 'Paper' },
+  { value: 'knowledge_base', label: 'Knowledge Base' },
+]
+
 export default function ChatInterface() {
   const [input, setInput] = useState('')
+  const [chatMode, setChatMode] = useState<ChatMode>('knowledge_base')
   const [expandedCitations, setExpandedCitations] = useState<Set<string>>(new Set())
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -71,6 +80,7 @@ export default function ChatInterface() {
         question: input,
         doc_ids: selectedDocIds,
         conversation_id: conversationId,
+        mode: chatMode,
       })
 
       if (!response.body) {
@@ -351,6 +361,22 @@ export default function ChatInterface() {
       {/* Input Area */}
       <div className="border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6">
         <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
+          <div className="mb-3 inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 dark:border-gray-700 dark:bg-gray-800">
+            {modeOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setChatMode(option.value)}
+                className={`h-8 rounded-md px-3 text-xs font-semibold transition-colors ${
+                  chatMode === option.value
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-600 hover:bg-white dark:text-gray-300 dark:hover:bg-gray-700'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
           <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-xl border-2 border-gray-300 dark:border-gray-600 focus-within:border-blue-500 dark:focus-within:border-blue-400 transition-all">
             <textarea
               ref={textareaRef}

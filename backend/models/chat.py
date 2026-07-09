@@ -3,7 +3,7 @@ Chat data models
 """
 
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 
 class ChatMessage(BaseModel):
@@ -29,6 +29,7 @@ class ChatRequest(BaseModel):
     doc_ids: Optional[List[str]] = None
     conversation_id: Optional[str] = None
     history: Optional[List[ChatMessage]] = []
+    mode: Literal["review", "paper", "knowledge_base"] = "knowledge_base"
 
 
 class ChatResponse(BaseModel):

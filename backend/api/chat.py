@@ -32,7 +32,8 @@ async def ask_question(request: ChatRequest):
             question=request.question,
             doc_ids=request.doc_ids,
             conversation_id=request.conversation_id,
-            history=request.history
+            history=request.history,
+            mode=request.mode,
         )
 
         return response
@@ -59,7 +60,8 @@ async def ask_question_stream(request: ChatRequest):
                     question=request.question,
                     doc_ids=request.doc_ids,
                     conversation_id=request.conversation_id,
-                    history=request.history
+                    history=request.history,
+                    mode=request.mode,
                 ):
                     # 发送 SSE 格式数据
                     yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"

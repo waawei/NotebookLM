@@ -50,6 +50,7 @@ export interface ChatAskRequest {
   doc_ids?: string[]
   conversation_id?: string | null
   history?: Array<{ role: string; content: string }>
+  mode?: 'review' | 'paper' | 'knowledge_base'
 }
 
 export interface NoteItem {

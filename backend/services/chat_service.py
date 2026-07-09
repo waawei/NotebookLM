@@ -31,6 +31,7 @@ class ChatService:
         doc_ids: Optional[List[str]] = None,
         conversation_id: Optional[str] = None,
         history: Optional[List[ChatMessage]] = None,
+        mode: str = "knowledge_base",
     ) -> ChatResponse:
         if not conversation_id:
             conversation_id = str(uuid.uuid4())
@@ -49,7 +50,7 @@ class ChatService:
             )
 
         context = self.retrieval_service.build_context(search_results)
-        prompt = self._build_prompt(question, context, history)
+        prompt = self._build_prompt(question, context, history, mode)
         answer = await self.llm_service.generate(prompt)
         citations = self.retrieval_service.build_citations(search_results)
         self._save_conversation(conversation_id, question, answer, citations)
@@ -66,6 +67,7 @@ class ChatService:
         doc_ids: Optional[List[str]] = None,
         conversation_id: Optional[str] = None,
         history: Optional[List[ChatMessage]] = None,
+        mode: str = "knowledge_base",
     ):
         if not conversation_id:
             conversation_id = str(uuid.uuid4())
@@ -87,7 +89,7 @@ class ChatService:
             return
 
         context = self.retrieval_service.build_context(search_results)
-        prompt = self._build_prompt(question, context, history)
+        prompt = self._build_prompt(question, context, history, mode)
 
         answer_chunks = []
         async for chunk in self.llm_service.generate_stream(prompt):
@@ -130,6 +132,7 @@ class ChatService:
         question: str,
         context: str,
         history: Optional[List[ChatMessage]] = None,
+        mode: str = "knowledge_base",
     ) -> str:
         prompt = """You are a professional document Q&A assistant. Please answer the user's question based on the following document content.
 
@@ -141,6 +144,9 @@ Requirements:
 
 """
 
+        prompt += self._mode_instructions(mode)
+        prompt += "\n"
+
         if history:
             prompt += "\nConversation history:\n"
             for message in history[-3:]:
@@ -150,6 +156,24 @@ Requirements:
         prompt += f"\nUser question: {question}\n"
         prompt += "\nPlease answer based on the above documents (remember to mark citation sources):\n"
         return prompt
+
+    def _mode_instructions(self, mode: str) -> str:
+        if mode == "review":
+            return """Mode: Review
+- Provide a study explanation that helps the user understand the material.
+- Include review questions that check comprehension.
+- Keep every claim grounded in the retrieved sources."""
+
+        if mode == "paper":
+            return """Mode: Paper
+- Organize claims, evidence, counterpoints, and citation anchors.
+- Separate source-backed claims from possible interpretation.
+- Prefer phrasing that can be reused in paper notes or outlines."""
+
+        return """Mode: Knowledge Base
+- Provide direct source-grounded answers.
+- Keep the response concise and operational.
+- Cite the relevant source markers for factual claims."""
 
     def _save_conversation(
         self,
