@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     MAX_FILE_SIZE: int = 10 * 1024 * 1024
 
     TOP_K_RESULTS: int = 5
+    ENABLE_QUERY_REWRITE: bool = False
 
     class Config:
         env_file = ".env"
