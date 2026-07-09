@@ -8,6 +8,9 @@ import Toast from './components/Toast'
 import UploadModal from './components/UploadModal'
 import WorkbenchShell from './layouts/WorkbenchShell'
 import DashboardView from './views/DashboardView'
+import NotesView from './views/NotesView'
+import OutputsView from './views/OutputsView'
+import SettingsView from './views/SettingsView'
 import SourcesView from './views/SourcesView'
 import WorkbenchView from './views/WorkbenchView'
 import { useStore } from './store/useStore'
@@ -78,14 +81,6 @@ function App() {
 
   const handleModuleChange = (module: AppModule) => {
     setActiveModule(module)
-
-    if (module === 'settings') {
-      setIsSettingsModalOpen(true)
-    }
-
-    if (module === 'notes') {
-      setIsNotesModalOpen(true)
-    }
   }
 
   const activeCopy = moduleCopy[activeModule]
@@ -103,6 +98,18 @@ function App() {
 
     if (activeModule === 'sources') {
       return <SourcesView onOpenUpload={() => setIsUploadModalOpen(true)} />
+    }
+
+    if (activeModule === 'notes') {
+      return <NotesView onOpenNotesModal={() => setIsNotesModalOpen(true)} />
+    }
+
+    if (activeModule === 'outputs') {
+      return <OutputsView onModuleChange={handleModuleChange} />
+    }
+
+    if (activeModule === 'settings') {
+      return <SettingsView />
     }
 
     return <WorkbenchView />
