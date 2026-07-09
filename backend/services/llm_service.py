@@ -7,6 +7,16 @@ from openai import OpenAI
 from core.config import settings
 
 
+def normalize_openai_base_url(base_url: str) -> str:
+    """Normalize OpenAI-compatible base URLs to include /v1."""
+    normalized = base_url.rstrip("/")
+    if not normalized:
+        return ""
+    if normalized.endswith("/v1"):
+        return normalized
+    return f"{normalized}/v1"
+
+
 class LLMService:
     """Large language model client wrapper."""
 
@@ -33,13 +43,19 @@ class LLMService:
 
         if self.provider == "openai":
             if self.base_url:
-                return OpenAI(api_key=self.api_key, base_url=self.base_url)
+                return OpenAI(
+                    api_key=self.api_key,
+                    base_url=normalize_openai_base_url(self.base_url),
+                )
             return OpenAI(api_key=self.api_key)
 
         if self.provider == "openai_compatible":
             if not self.base_url:
                 raise ValueError("LLM_BASE_URL is required for openai_compatible provider")
-            return OpenAI(api_key=self.api_key, base_url=self.base_url)
+            return OpenAI(
+                api_key=self.api_key,
+                base_url=normalize_openai_base_url(self.base_url),
+            )
 
         raise ValueError(f"Unsupported LLM provider: {self.provider}")
 
