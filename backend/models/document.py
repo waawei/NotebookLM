@@ -38,6 +38,13 @@ class DocumentListResponse(BaseModel):
     total: int
 
 
+class DocumentSearchRequest(BaseModel):
+    query: str = ""
+    space_id: Optional[str] = None
+    tags: List[str] = []
+    status: Optional[str] = None
+
+
 class SpaceCreate(BaseModel):
     name: str
     description: str = ""

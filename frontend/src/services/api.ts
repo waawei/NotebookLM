@@ -19,6 +19,13 @@ export interface DocumentItem {
   summary?: string
 }
 
+export interface DocumentSearchFilters {
+  query?: string
+  space_id?: string | null
+  tags?: string[]
+  status?: string | null
+}
+
 export interface UploadResponse {
   doc_id: string
   filename: string
@@ -96,6 +103,11 @@ export const documentApi = {
 
   list: async (): Promise<{ documents: DocumentItem[]; total: number }> => {
     const response = await api.get('/documents/list')
+    return response.data
+  },
+
+  search: async (filters: DocumentSearchFilters): Promise<{ documents: DocumentItem[]; total: number }> => {
+    const response = await api.post('/documents/search', filters)
     return response.data
   },
 

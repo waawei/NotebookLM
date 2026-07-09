@@ -7,7 +7,7 @@ from typing import List
 from pydantic import BaseModel
 
 from services.document_service import DocumentService
-from models.document import DocumentResponse, DocumentListResponse
+from models.document import DocumentResponse, DocumentListResponse, DocumentSearchRequest
 
 router = APIRouter()
 document_service = DocumentService()
@@ -105,6 +105,17 @@ async def list_documents():
         return DocumentListResponse(documents=documents, total=len(documents))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/search")
+async def search_documents(request: DocumentSearchRequest):
+    results = document_service.metadata_store.search_documents(
+        query=request.query,
+        space_id=request.space_id,
+        tags=request.tags,
+        status=request.status,
+    )
+    return {"documents": results, "total": len(results)}
 
 
 @router.get("/{doc_id}", response_model=DocumentResponse)
