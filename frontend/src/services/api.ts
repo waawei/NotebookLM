@@ -143,9 +143,28 @@ export interface SettingsStatus {
 
 export type SettingsEndpointMode = 'auto' | 'exact'
 
+export type SettingsConnectionDiagnosticCategory =
+  | 'authentication_failed'
+  | 'permission_denied'
+  | 'model_not_found'
+  | 'invalid_request'
+  | 'rate_limited'
+  | 'upstream_unavailable'
+  | 'connection_failed'
+  | 'timed_out'
+  | 'unknown'
+
+export interface SettingsConnectionDiagnostic {
+  phase: 'chat_completion'
+  status_code: number | null
+  category: SettingsConnectionDiagnosticCategory
+  summary: string
+}
+
 export interface SettingsTestResult {
   ok: boolean
   message: string
+  diagnostic?: SettingsConnectionDiagnostic | null
 }
 
 export interface SettingsConfigUpdate {

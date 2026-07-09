@@ -79,4 +79,56 @@ describe('SettingsView', () => {
 
     expect(screen.getByLabelText('API key')).toHaveAttribute('type', 'text')
   })
+
+  it('renders a safe connection diagnostic and never writes it to storage', async () => {
+    const diagnostic = {
+      phase: 'chat_completion',
+      status_code: 429,
+      category: 'rate_limited',
+      summary: 'The upstream request was rate limited.',
+    }
+    const setItem = vi.spyOn(Storage.prototype, 'setItem')
+    settingsApiMock.testLlm.mockResolvedValue({
+      ok: false,
+      message: 'LLM connection failed. Check provider, model, endpoint, and API key.',
+      diagnostic,
+    })
+
+    render(<SettingsView />)
+    await screen.findByText('Runtime settings')
+    fireEvent.click(screen.getByRole('button', { name: 'Test connection' }))
+
+    expect(await screen.findByText('Connection details')).toBeInTheDocument()
+    expect(screen.getByText('HTTP status')).toBeInTheDocument()
+    expect(screen.getByText('429')).toBeInTheDocument()
+    expect(screen.getByText(diagnostic.summary)).toBeInTheDocument()
+    expect(setItem).not.toHaveBeenCalled()
+    setItem.mockRestore()
+  })
+
+  it('clears connection details before a retry', async () => {
+    const diagnostic = {
+      phase: 'chat_completion',
+      status_code: 429,
+      category: 'rate_limited',
+      summary: 'The upstream request was rate limited.',
+    }
+    settingsApiMock.testLlm
+      .mockResolvedValueOnce({
+        ok: false,
+        message: 'LLM connection failed. Check provider, model, endpoint, and API key.',
+        diagnostic,
+      })
+      .mockResolvedValueOnce({ ok: true, message: 'LLM connection succeeded' })
+
+    render(<SettingsView />)
+    await screen.findByText('Runtime settings')
+    fireEvent.click(screen.getByRole('button', { name: 'Test connection' }))
+    await screen.findByText('Connection details')
+    fireEvent.click(screen.getByRole('button', { name: 'Test connection' }))
+
+    await waitFor(() => {
+      expect(screen.queryByText('Connection details')).not.toBeInTheDocument()
+    })
+  })
 })

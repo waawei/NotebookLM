@@ -191,8 +191,12 @@ function Feedback({ message }: { message: SettingsTestResult }) {
   const isSuccess = message.ok
   return <div className={`mt-4 flex gap-2 rounded-lg border p-3 text-sm ${isSuccess ? 'border-green-200 bg-green-50 text-green-800 dark:border-green-900 dark:bg-green-950 dark:text-green-200' : 'border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200'}`}>
     {isSuccess ? <CheckCircle2 className="h-5 w-5 shrink-0" /> : <AlertCircle className="h-5 w-5 shrink-0" />}
-    <p>{message.message}</p>
+    <div className="min-w-0 flex-1"><p>{message.message}</p>{!isSuccess && message.diagnostic && <details className="mt-3 border-t border-current/20 pt-3"><summary className="cursor-pointer font-medium">Connection details</summary><dl className="mt-3 grid gap-2 text-xs"><DiagnosticRow label="Request phase" value={message.diagnostic.phase} />{message.diagnostic.status_code !== null && <DiagnosticRow label="HTTP status" value={String(message.diagnostic.status_code)} />}<DiagnosticRow label="Category" value={message.diagnostic.category} /><DiagnosticRow label="Summary" value={message.diagnostic.summary} /></dl></details>}</div>
   </div>
+}
+
+function DiagnosticRow({ label, value }: { label: string; value: string }) {
+  return <div className="grid gap-1 sm:grid-cols-[8rem_1fr]"><dt className="font-semibold">{label}</dt><dd className="break-words">{value}</dd></div>
 }
 
 function StatusCard({ label, value, tone = 'default', icon }: { label: string; value: string; tone?: 'default' | 'success' | 'warning'; icon?: React.ReactNode }) {
