@@ -1,29 +1,31 @@
 import { create } from 'zustand'
 
-interface Document {
+export type AppModule = 'dashboard' | 'workbench' | 'sources' | 'notes' | 'outputs' | 'settings'
+
+export interface Document {
   doc_id: string
   filename: string
   file_type: string
   upload_time: string
   status: string
   total_chunks: number
-  summary?: string  // 文档摘要
+  summary?: string
 }
 
-interface Message {
-  role: 'user' | 'assistant'
-  content: string
-  citations?: Citation[]
-}
-
-interface Citation {
-  number: number  // 引用编号 [1], [2], [3]...
+export interface Citation {
+  number: number
   doc_id: string
   doc_name: string
   page: number | null
   chunk_id: number
   content: string
   relevance_score: number
+}
+
+export interface Message {
+  role: 'user' | 'assistant'
+  content: string
+  citations?: Citation[]
 }
 
 interface Toast {
@@ -33,7 +35,9 @@ interface Toast {
 }
 
 interface AppState {
-  // 文档状态
+  activeModule: AppModule
+  setActiveModule: (module: AppModule) => void
+
   documents: Document[]
   selectedDocIds: string[]
   setDocuments: (documents: Document[]) => void
@@ -42,7 +46,6 @@ interface AppState {
   toggleDocumentSelection: (docId: string) => void
   clearSelectedDocs: () => void
 
-  // 对话状态
   messages: Message[]
   conversationId: string | null
   isLoading: boolean
@@ -55,22 +58,21 @@ interface AppState {
   setSuggestedQuestions: (questions: string[]) => void
   clearChat: () => void
 
-  // Toast 通知
   toasts: Toast[]
   addToast: (message: string, type?: 'success' | 'error' | 'info') => void
   removeToast: (id: string) => void
 
-  // 主题
   isDarkMode: boolean
   toggleDarkMode: () => void
 }
 
 export const useStore = create<AppState>((set) => ({
-  // 文档状态初始值
+  activeModule: 'workbench',
+  setActiveModule: (module) => set({ activeModule: module }),
+
   documents: [],
   selectedDocIds: [],
 
-  // 文档操作
   setDocuments: (documents) => set({ documents }),
 
   addDocument: (document) =>
@@ -91,7 +93,6 @@ export const useStore = create<AppState>((set) => ({
 
   clearSelectedDocs: () => set({ selectedDocIds: [] }),
 
-  // 对话状态初始值（从 localStorage 恢复）
   messages: typeof window !== 'undefined'
     ? JSON.parse(localStorage.getItem('chat_messages') || '[]')
     : [],
@@ -101,11 +102,9 @@ export const useStore = create<AppState>((set) => ({
   isLoading: false,
   suggestedQuestions: [],
 
-  // 对话操作
   addMessage: (message) =>
     set((state) => {
       const newMessages = [...state.messages, message]
-      // 持久化到 localStorage
       if (typeof window !== 'undefined') {
         localStorage.setItem('chat_messages', JSON.stringify(newMessages))
       }
@@ -116,7 +115,6 @@ export const useStore = create<AppState>((set) => ({
     set((state) => {
       const newMessages = [...state.messages]
       newMessages[index] = message
-      // 持久化到 localStorage
       if (typeof window !== 'undefined') {
         localStorage.setItem('chat_messages', JSON.stringify(newMessages))
       }
@@ -154,7 +152,6 @@ export const useStore = create<AppState>((set) => ({
     })
   },
 
-  // Toast 通知
   toasts: [],
 
   addToast: (message, type = 'info') =>
@@ -170,7 +167,6 @@ export const useStore = create<AppState>((set) => ({
       toasts: state.toasts.filter((toast) => toast.id !== id)
     })),
 
-  // 主题（从 localStorage 恢复）
   isDarkMode: typeof window !== 'undefined'
     ? localStorage.getItem('dark_mode') === 'true'
     : false,
@@ -180,7 +176,6 @@ export const useStore = create<AppState>((set) => ({
       const newDarkMode = !state.isDarkMode
       if (typeof window !== 'undefined') {
         localStorage.setItem('dark_mode', String(newDarkMode))
-        // 更新 document root 的 class
         if (newDarkMode) {
           document.documentElement.classList.add('dark')
         } else {
