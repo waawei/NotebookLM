@@ -63,6 +63,24 @@ export default function WorkbenchShell({
             </div>
 
             <div className="ml-auto flex items-center gap-2">
+              <details className="relative lg:hidden">
+                <summary aria-label="Open source selector" className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 [&::-webkit-details-marker]:hidden">
+                  <FileText className="h-5 w-5" />
+                </summary>
+                <div data-testid="mobile-source-panel" className="absolute right-0 top-12 z-50 max-h-[calc(100vh-5rem)] w-72 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900 lg:hidden">
+                  {leftPanel}
+                </div>
+              </details>
+              {rightPanel && (
+                <details className="relative xl:hidden">
+                  <summary aria-label="Open citation inspector" className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 [&::-webkit-details-marker]:hidden">
+                    <Search className="h-5 w-5" />
+                  </summary>
+                  <div data-testid="mobile-inspector" className="absolute right-0 top-12 z-50 max-h-[calc(100vh-5rem)] w-80 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900 xl:hidden">
+                    {rightPanel}
+                  </div>
+                </details>
+              )}
               <button
                 onClick={onOpenUpload}
                 className="hidden items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 md:flex"
