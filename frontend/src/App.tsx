@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import ChatInterface from './components/ChatInterface'
 import ExportModal from './components/ExportModal'
 import NotesModal from './components/NotesModal'
 import SearchModal from './components/SearchModal'
@@ -8,6 +7,7 @@ import Sidebar from './components/Sidebar'
 import Toast from './components/Toast'
 import UploadModal from './components/UploadModal'
 import WorkbenchShell from './layouts/WorkbenchShell'
+import WorkbenchView from './views/WorkbenchView'
 import { useStore } from './store/useStore'
 import type { AppModule } from './store/useStore'
 
@@ -120,7 +120,23 @@ function App() {
             onUploadClick={() => setIsUploadModalOpen(true)}
           />
         }
-        centerPanel={<ChatInterface />}
+        centerPanel={<WorkbenchView />}
+        rightPanel={
+          <div className="flex h-full flex-col">
+            <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-800">
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Inspector</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Citations and runtime context</p>
+            </div>
+            <div className="flex flex-1 items-center justify-center p-6 text-center">
+              <div>
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-200">No answer selected</p>
+                <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+                  Citations and retrieval evidence will appear here after a grounded answer is generated.
+                </p>
+              </div>
+            </div>
+          </div>
+        }
       />
 
       <UploadModal
