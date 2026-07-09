@@ -4,7 +4,13 @@
 
 from fastapi import APIRouter, HTTPException
 
-from models.note import NoteCreate, NoteUpdate, NoteResponse, NoteListResponse
+from models.note import (
+    NoteCreate,
+    NoteFromMessageCreate,
+    NoteUpdate,
+    NoteResponse,
+    NoteListResponse,
+)
 from services.note_service import NoteService
 
 router = APIRouter()
@@ -22,6 +28,24 @@ async def create_note(request: NoteCreate):
             content=request.content,
             doc_ids=request.doc_ids,
             conversation_id=request.conversation_id
+        )
+        return {"note_id": note_id, "message": "Note created successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/from-message", response_model=dict)
+async def create_note_from_message(request: NoteFromMessageCreate):
+    """
+    Create a note linked to a conversation message and selected source documents.
+    """
+    try:
+        note_id = await note_service.create_note_from_message(
+            message_index=request.message_index,
+            conversation_id=request.conversation_id,
+            title=request.title,
+            content=request.content,
+            doc_ids=request.doc_ids,
         )
         return {"note_id": note_id, "message": "Note created successfully"}
     except Exception as e:

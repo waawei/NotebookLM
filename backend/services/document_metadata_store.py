@@ -125,6 +125,19 @@ class DocumentMetadataStore:
             )
             conn.execute(
                 """
+                CREATE TABLE IF NOT EXISTS notes (
+                    note_id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    doc_ids_json TEXT NOT NULL,
+                    conversation_id TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS wiki_pages (
                     page_id TEXT PRIMARY KEY,
                     title TEXT NOT NULL,
@@ -520,6 +533,61 @@ class DocumentMetadataStore:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def clear_note_links(self, note_id: str) -> None:
+        with self._connect() as conn:
+            conn.execute("DELETE FROM note_links WHERE note_id = ?", (note_id,))
+
+    def save_note(self, note: dict) -> None:
+        note_id = note["note_id"]
+        created_at = self._to_iso_string(note["created_at"])
+        updated_at = self._to_iso_string(note["updated_at"])
+        doc_ids = note.get("doc_ids") or []
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO notes (
+                    note_id, title, content, doc_ids_json, conversation_id, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(note_id) DO UPDATE SET
+                    title=excluded.title,
+                    content=excluded.content,
+                    doc_ids_json=excluded.doc_ids_json,
+                    conversation_id=excluded.conversation_id,
+                    updated_at=excluded.updated_at
+                """,
+                (
+                    note_id,
+                    note["title"],
+                    note["content"],
+                    json.dumps(doc_ids, ensure_ascii=False),
+                    note.get("conversation_id"),
+                    created_at,
+                    updated_at,
+                ),
+            )
+
+    def get_note(self, note_id: str) -> Optional[dict]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM notes WHERE note_id = ?",
+                (note_id,),
+            ).fetchone()
+        return self._note_row_to_dict(row)
+
+    def list_notes(self) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM notes ORDER BY updated_at DESC"
+            ).fetchall()
+        return [self._note_row_to_dict(row) for row in rows]
+
+    def delete_note(self, note_id: str) -> bool:
+        with self._connect() as conn:
+            conn.execute("DELETE FROM note_links WHERE note_id = ?", (note_id,))
+            cursor = conn.execute("DELETE FROM notes WHERE note_id = ?", (note_id,))
+            return cursor.rowcount > 0
+
     def create_wiki_page(
         self,
         title: str,
@@ -697,6 +765,14 @@ class DocumentMetadataStore:
 
         artifact["source_doc_ids"] = json.loads(artifact.pop(source_json_key))
         return artifact
+
+    def _note_row_to_dict(self, row) -> Optional[dict]:
+        note = self._row_to_dict(row)
+        if note is None:
+            return None
+        note["doc_ids"] = json.loads(note.pop("doc_ids_json"))
+        note["links"] = self.list_note_links(note["note_id"])
+        return note
 
     def _decorate_document(
         self,

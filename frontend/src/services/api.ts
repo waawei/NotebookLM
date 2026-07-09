@@ -59,6 +59,7 @@ export interface NoteItem {
   content: string
   doc_ids: string[]
   conversation_id?: string | null
+  links?: Array<{ source_type: string; source_id: string }>
   created_at: string
   updated_at: string
 }
@@ -68,6 +69,14 @@ export interface NoteCreateRequest {
   content: string
   doc_ids?: string[]
   conversation_id?: string | null
+}
+
+export interface NoteFromMessageRequest {
+  message_index: number
+  conversation_id: string
+  title: string
+  content: string
+  doc_ids?: string[]
 }
 
 export interface NoteUpdateRequest {
@@ -190,6 +199,11 @@ export const chatApi = {
 export const noteApi = {
   create: async (data: NoteCreateRequest): Promise<{ note_id: string; message: string }> => {
     const response = await api.post('/notes/create', data)
+    return response.data
+  },
+
+  createFromMessage: async (data: NoteFromMessageRequest): Promise<{ note_id: string; message: string }> => {
+    const response = await api.post('/notes/from-message', data)
     return response.data
   },
 

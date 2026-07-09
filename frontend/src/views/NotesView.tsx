@@ -79,6 +79,7 @@ export default function NotesView({ onOpenNotesModal }: NotesViewProps) {
             <div className="space-y-2">
               {notes.map((note) => {
                 const isSelected = selectedNote?.note_id === note.note_id
+                const linkCount = note.links?.length || 0
 
                 return (
                   <button
@@ -93,6 +94,9 @@ export default function NotesView({ onOpenNotesModal }: NotesViewProps) {
                     <p className="truncate text-sm font-medium text-gray-950 dark:text-gray-100">{note.title}</p>
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       {new Date(note.updated_at).toLocaleString()}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      {linkCount} linked sources
                     </p>
                   </button>
                 )
@@ -111,6 +115,7 @@ export default function NotesView({ onOpenNotesModal }: NotesViewProps) {
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   Updated {new Date(selectedNote.updated_at).toLocaleString()}
                 </p>
+                <NoteLinksSummary note={selectedNote} />
               </div>
               <button
                 onClick={onOpenNotesModal}
@@ -133,6 +138,39 @@ export default function NotesView({ onOpenNotesModal }: NotesViewProps) {
           </div>
         )}
       </main>
+    </div>
+  )
+}
+
+function NoteLinksSummary({ note }: { note: NoteItem }) {
+  const links = note.links || []
+  const documentCount = links.filter((link) => link.source_type === 'document').length
+  const conversationLink = links.find((link) => link.source_type === 'conversation')
+  const messageLink = links.find((link) => link.source_type === 'message')
+
+  if (links.length === 0) {
+    return (
+      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+        No source links
+      </p>
+    )
+  }
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-300">
+      <span className="rounded-md bg-gray-100 px-2 py-1 dark:bg-gray-800">
+        {documentCount} source docs
+      </span>
+      {conversationLink && (
+        <span className="rounded-md bg-blue-50 px-2 py-1 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+          Conversation {conversationLink.source_id.slice(0, 8)}
+        </span>
+      )}
+      {messageLink && (
+        <span className="rounded-md bg-green-50 px-2 py-1 text-green-700 dark:bg-green-950 dark:text-green-300">
+          Message {messageLink.source_id.split(':').pop()}
+        </span>
+      )}
     </div>
   )
 }

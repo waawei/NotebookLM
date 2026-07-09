@@ -176,26 +176,21 @@ export default function ChatInterface() {
   const handleSaveAsNote = async (messageIndex: number) => {
     const message = messages[messageIndex]
     if (!message || message.role !== 'assistant') return
+    if (!conversationId) {
+      addToast('Conversation is not ready yet', 'error')
+      return
+    }
 
     try {
       // 创建笔记内容
-      const title = `Note from Conversation - ${new Date().toLocaleDateString()}`
-      let content = `# ${title}\n\n`
-      content += `## Question\n${messages[messageIndex - 1]?.content || ''}\n\n`
-      content += `## Answer\n${message.content}\n\n`
-
-      if (message.citations && message.citations.length > 0) {
-        content += `## Sources\n`
-        message.citations.forEach(citation => {
-          content += `- [${citation.number}] ${citation.doc_name} (${Math.round(citation.relevance_score * 100)}%)\n`
-        })
-      }
-
-      const response = await noteApi.create({
-        title,
-        content,
-        doc_ids: selectedDocIds,
+      const question = messages[messageIndex - 1]?.content || 'Saved answer'
+      const title = question.length > 80 ? `${question.slice(0, 77)}...` : question
+      const response = await noteApi.createFromMessage({
+        message_index: messageIndex,
         conversation_id: conversationId,
+        title,
+        content: message.content,
+        doc_ids: selectedDocIds,
       })
 
       if (response.note_id) {
