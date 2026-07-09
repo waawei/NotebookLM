@@ -17,7 +17,12 @@ class LLMService:
         self.base_url = settings.LLM_BASE_URL
         self.temperature = settings.LLM_TEMPERATURE
         self.max_tokens = settings.LLM_MAX_TOKENS
-        self.client = self._create_client()
+        self.client: OpenAI | None = None
+
+    def _get_client(self) -> OpenAI:
+        if self.client is None:
+            self.client = self._create_client()
+        return self.client
 
     def _create_client(self) -> OpenAI:
         if self.provider == "dashscope":
@@ -41,7 +46,8 @@ class LLMService:
     async def generate(self, prompt: str) -> str:
         """Generate a full answer."""
         try:
-            response = self.client.chat.completions.create(
+            client = self._get_client()
+            response = client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "user", "content": prompt},
@@ -57,7 +63,8 @@ class LLMService:
     async def generate_stream(self, prompt: str):
         """Generate an answer as text chunks."""
         try:
-            stream = self.client.chat.completions.create(
+            client = self._get_client()
+            stream = client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "user", "content": prompt},

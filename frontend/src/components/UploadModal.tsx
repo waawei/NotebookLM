@@ -15,7 +15,7 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [errorMessage, setErrorMessage] = useState('')
 
-  const { addDocument, addToast } = useStore()
+  const { addDocument, setDocuments, addToast } = useStore()
 
   if (!isOpen) return null
 
@@ -94,6 +94,7 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
       })
 
       addToast('Document uploaded successfully!', 'success')
+      void pollDocumentStatus(data.doc_id)
 
       setTimeout(() => {
         onClose()
@@ -106,6 +107,32 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
       setErrorMessage('Upload failed. Please try again.')
       console.error('Upload error:', error)
     }
+  }
+
+  const pollDocumentStatus = async (docId: string) => {
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      try {
+        const status = await documentApi.getStatus(docId)
+        const data = await documentApi.list()
+        setDocuments(data.documents)
+
+        if (status.status === 'completed') {
+          addToast('Document processing completed', 'success')
+          return
+        }
+
+        if (status.status === 'failed') {
+          addToast(status.error_message || 'Document processing failed', 'error')
+          return
+        }
+      } catch (error) {
+        console.error('Failed to poll document status:', error)
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+    }
+
+    addToast('Document is still processing. Refresh sources later.', 'info')
   }
 
   const resetModal = () => {

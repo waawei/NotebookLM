@@ -1,5 +1,7 @@
+import { useEffect } from 'react'
 import { FileText, Plus, ChevronLeft, ChevronRight, X, CheckCircle2, Loader2 } from 'lucide-react'
 import { useStore } from '../store/useStore'
+import { documentApi } from '../services/api'
 
 interface SidebarProps {
   isCollapsed: boolean
@@ -8,7 +10,32 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ isCollapsed, onToggle, onUploadClick }: SidebarProps) {
-  const { documents, selectedDocIds, toggleDocumentSelection, removeDocument } = useStore()
+  const { documents, selectedDocIds, setDocuments, toggleDocumentSelection, removeDocument, addToast } = useStore()
+
+  useEffect(() => {
+    loadDocuments()
+  }, [])
+
+  const loadDocuments = async () => {
+    try {
+      const data = await documentApi.list()
+      setDocuments(data.documents)
+    } catch (error) {
+      console.error('Failed to load documents:', error)
+      addToast('Failed to load sources', 'error')
+    }
+  }
+
+  const handleDelete = async (docId: string) => {
+    try {
+      await documentApi.delete(docId)
+      removeDocument(docId)
+      addToast('Source deleted', 'success')
+    } catch (error) {
+      console.error('Failed to delete document:', error)
+      addToast('Failed to delete source', 'error')
+    }
+  }
 
   if (isCollapsed) {
     return (
@@ -102,9 +129,9 @@ export default function Sidebar({ isCollapsed, onToggle, onUploadClick }: Sideba
                       </div>
                     </div>
                     <button
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         e.stopPropagation()
-                        removeDocument(doc.doc_id)
+                        await handleDelete(doc.doc_id)
                       }}
                       className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-100 rounded-lg transition-all"
                       aria-label="Remove document"
