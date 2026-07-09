@@ -38,6 +38,24 @@ class DocumentListResponse(BaseModel):
     total: int
 
 
+class SpaceCreate(BaseModel):
+    name: str
+    description: str = ""
+
+
+class SpaceUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+
+class SpaceResponse(BaseModel):
+    space_id: str
+    name: str
+    description: str
+    created_at: str
+    updated_at: str
+
+
 class DocumentChunk(BaseModel):
     """文档分块"""
     chunk_id: int

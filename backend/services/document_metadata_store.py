@@ -185,6 +185,51 @@ class DocumentMetadataStore:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def get_space(self, space_id: str) -> Optional[dict]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM spaces WHERE space_id = ?",
+                (space_id,),
+            ).fetchone()
+        return self._row_to_dict(row)
+
+    def update_space(
+        self,
+        space_id: str,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+    ) -> Optional[dict]:
+        current = self.get_space(space_id)
+        if not current:
+            return None
+
+        updated = {
+            **current,
+            "name": current["name"] if name is None else name,
+            "description": current["description"] if description is None else description,
+            "updated_at": datetime.now().isoformat(),
+        }
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE spaces
+                SET name = ?, description = ?, updated_at = ?
+                WHERE space_id = ?
+                """,
+                (
+                    updated["name"],
+                    updated["description"],
+                    updated["updated_at"],
+                    space_id,
+                ),
+            )
+        return updated
+
+    def delete_space(self, space_id: str) -> bool:
+        with self._connect() as conn:
+            cursor = conn.execute("DELETE FROM spaces WHERE space_id = ?", (space_id,))
+            return cursor.rowcount > 0
+
     def assign_document_to_space(self, doc_id: str, space_id: str) -> None:
         with self._connect() as conn:
             conn.execute(
