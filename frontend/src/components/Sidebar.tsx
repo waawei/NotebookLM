@@ -138,20 +138,24 @@ export default function Sidebar({ isCollapsed, onToggle, onUploadClick }: Sideba
                           {doc.summary}
                         </p>
                       )}
+                      {doc.summary_status === 'unavailable' && (
+                        <p className="mb-2 text-xs font-medium text-amber-700 dark:text-amber-300">LLM summary unavailable</p>
+                      )}
 
                       <div className="flex items-center space-x-2">
                         <span className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-semibold ${
                           doc.status === 'completed' ? 'bg-green-100 text-green-800' :
                           doc.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-gray-100 text-gray-700'
+                          'bg-red-100 text-red-800'
                         }`}>
                           {doc.status === 'completed' ? (
                             <CheckCircle2 className="w-3.5 h-3.5" />
                           ) : doc.status === 'processing' ? (
                             <Loader2 className="w-3.5 h-3.5 animate-spin" />
                           ) : null}
-                          <span>{doc.status}</span>
+                          <span>{doc.status === 'completed' ? 'Indexed' : doc.status === 'failed' ? 'Processing failed' : 'Processing'}</span>
                         </span>
+                        {isSelected && <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 dark:text-blue-300"><CheckCircle2 className="h-3.5 w-3.5" />Selected</span>}
                         <span className="text-xs text-gray-600 font-medium">{doc.total_chunks} chunks</span>
                       </div>
                     </div>

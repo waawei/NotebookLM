@@ -17,6 +17,8 @@ export interface DocumentItem {
   status: string
   total_chunks: number
   summary?: string
+  summary_status?: 'pending' | 'available' | 'unavailable'
+  summary_error?: string | null
   error_message?: string | null
   space_id?: string | null
   space_ids?: string[]
@@ -159,6 +161,12 @@ export interface SettingsConnectionDiagnostic {
   status_code: number | null
   category: SettingsConnectionDiagnosticCategory
   summary: string
+}
+
+export interface ChatStreamErrorEvent {
+  type: 'error'
+  message: string
+  diagnostic?: SettingsConnectionDiagnostic | null
 }
 
 export interface SettingsTestResult {

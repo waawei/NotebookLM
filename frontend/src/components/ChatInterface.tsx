@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Send, Sparkles, Loader2, Lightbulb, ChevronDown, ChevronUp, BookOpen } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import ReactMarkdown from 'react-markdown'
-import { chatApi, noteApi } from '../services/api'
+import { chatApi, noteApi, type SettingsConnectionDiagnostic } from '../services/api'
 
 type ChatMode = 'review' | 'paper' | 'knowledge_base'
 
@@ -16,6 +16,8 @@ export default function ChatInterface() {
   const [input, setInput] = useState('')
   const [chatMode, setChatMode] = useState<ChatMode>('knowledge_base')
   const [expandedCitations, setExpandedCitations] = useState<Set<string>>(new Set())
+  const [inlineError, setInlineError] = useState<string | null>(null)
+  const [streamDiagnostic, setStreamDiagnostic] = useState<SettingsConnectionDiagnostic | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -65,15 +67,19 @@ export default function ChatInterface() {
     if (!input.trim() || isLoading) return
 
     if (selectedDocIds.length === 0) {
-      alert('Please select at least one document')
+      setInlineError('Select at least one source before asking a question.')
       return
     }
+
+    setInlineError(null)
+    setStreamDiagnostic(null)
 
     const userMessage = { role: 'user' as const, content: input }
     addMessage(userMessage)
     setInput('')
     setLoading(true)
 
+    let tempMessageIndex: number | null = null
     try {
       // 使用流式 API
       const response = await chatApi.createStreamRequest({
@@ -95,7 +101,7 @@ export default function ChatInterface() {
       let streamConversationId: string | null = conversationId
 
       // 创建临时的助手消息
-      const tempMessageIndex = messages.length + 1
+      tempMessageIndex = messages.length + 1
       addMessage({
         role: 'assistant',
         content: '',
@@ -123,7 +129,7 @@ export default function ChatInterface() {
                 // 累积回答内容
                 accumulatedAnswer += data.content
                 // 实时更新消息
-                updateMessageAtIndex(tempMessageIndex, {
+                updateMessageAtIndex(tempMessageIndex!, {
                   role: 'assistant',
                   content: accumulatedAnswer,
                   citations: citations,
@@ -131,13 +137,18 @@ export default function ChatInterface() {
               } else if (data.type === 'citations') {
                 citations = data.citations
                 // 更新引用
-                updateMessageAtIndex(tempMessageIndex, {
+                updateMessageAtIndex(tempMessageIndex!, {
                   role: 'assistant',
                   content: accumulatedAnswer,
                   citations: citations,
                 })
               } else if (data.type === 'error') {
-                throw new Error(data.message)
+                updateMessageAtIndex(tempMessageIndex!, {
+                  role: 'assistant',
+                  content: data.message || 'The response could not be generated. Check the LLM connection in Settings and try again.',
+                  citations: [],
+                })
+                setStreamDiagnostic(data.diagnostic ?? null)
               }
             } catch (parseError) {
               console.error('Failed to parse SSE data:', parseError)
@@ -146,11 +157,12 @@ export default function ChatInterface() {
         }
       }
     } catch (error) {
-      console.error('Chat error:', error)
-      addMessage({
-        role: 'assistant',
-        content: 'Sorry, I encountered an error. Please try again.',
-      })
+      const failureMessage = 'The response could not be generated. Check the LLM connection in Settings and try again.'
+      if (tempMessageIndex === null) {
+        addMessage({ role: 'assistant', content: failureMessage, citations: [] })
+      } else {
+        updateMessageAtIndex(tempMessageIndex, { role: 'assistant', content: failureMessage, citations: [] })
+      }
     } finally {
       setLoading(false)
     }
@@ -360,6 +372,8 @@ export default function ChatInterface() {
       <div data-testid="chat-composer" className="sticky bottom-0 border-t border-gray-200 bg-white p-4 shadow-[0_-8px_20px_-18px_rgba(15,23,42,0.45)] dark:border-gray-800 dark:bg-gray-900">
         <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
           <p className="mb-3 text-xs font-medium text-gray-500 dark:text-gray-400">Selected sources: {selectedDocIds.length}</p>
+          {inlineError && <p role="alert" className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100">{inlineError}</p>}
+          {streamDiagnostic && <details open className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900 dark:border-red-900 dark:bg-red-950 dark:text-red-100"><summary className="cursor-pointer font-semibold">Connection details</summary><dl className="mt-2 grid gap-1 sm:grid-cols-[8rem_1fr]"><dt className="font-semibold">Request phase</dt><dd>{streamDiagnostic.phase}</dd>{streamDiagnostic.status_code !== null && <><dt className="font-semibold">HTTP status</dt><dd>{streamDiagnostic.status_code}</dd></>}<dt className="font-semibold">Category</dt><dd>{streamDiagnostic.category}</dd><dt className="font-semibold">Summary</dt><dd className="break-words">{streamDiagnostic.summary}</dd></dl><p className="mt-2">Open Settings to test the connection.</p></details>}
           <div className="mb-3 inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 dark:border-gray-700 dark:bg-gray-800">
             {modeOptions.map((option) => (
               <button

@@ -22,6 +22,8 @@ export interface Document {
   status: string
   total_chunks: number
   summary?: string
+  summary_status?: 'pending' | 'available' | 'unavailable'
+  summary_error?: string | null
   error_message?: string | null
   space_id?: string | null
   space_ids?: string[]
