@@ -13,6 +13,7 @@ import NotesView from './views/NotesView'
 import OutputsView from './views/OutputsView'
 import SettingsView from './views/SettingsView'
 import SourcesView from './views/SourcesView'
+import WikiView from './views/WikiView'
 import WorkbenchView from './views/WorkbenchView'
 import { useStore } from './store/useStore'
 import type { AppModule } from './store/useStore'
@@ -33,6 +34,10 @@ const moduleCopy: Record<AppModule, { title: string; subtitle: string }> = {
   notes: {
     title: 'Notes',
     subtitle: 'Capture useful answers and source references',
+  },
+  wiki: {
+    title: 'Wiki',
+    subtitle: 'Source-grounded pages built from selected documents',
   },
   outputs: {
     title: 'Outputs',
@@ -107,6 +112,10 @@ function App() {
 
     if (activeModule === 'outputs') {
       return <OutputsView onModuleChange={handleModuleChange} />
+    }
+
+    if (activeModule === 'wiki') {
+      return <WikiView onModuleChange={handleModuleChange} />
     }
 
     if (activeModule === 'settings') {

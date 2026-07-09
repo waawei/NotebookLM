@@ -102,6 +102,31 @@ export interface OutputExport {
   content: string
 }
 
+export interface WikiPage {
+  page_id: string
+  title: string
+  content: string
+  source_doc_ids: string[]
+  created_at: string
+  updated_at: string
+}
+
+export interface WikiPageCreateRequest {
+  title: string
+  content: string
+  source_doc_ids?: string[]
+}
+
+export interface WikiPageUpdateRequest {
+  title: string
+  content: string
+}
+
+export interface WikiPageGenerateRequest {
+  title: string
+  source_doc_ids: string[]
+}
+
 export interface SettingsStatus {
   provider: string
   model: string
@@ -269,6 +294,33 @@ export const outputApi = {
 
   export: async (outputId: string): Promise<OutputExport> => {
     const response = await api.post(`/outputs/${outputId}/export`)
+    return response.data
+  },
+}
+
+export const wikiApi = {
+  list: async (): Promise<{ pages: WikiPage[]; total: number }> => {
+    const response = await api.get('/wiki/pages')
+    return response.data
+  },
+
+  create: async (data: WikiPageCreateRequest): Promise<WikiPage> => {
+    const response = await api.post('/wiki/pages', data)
+    return response.data
+  },
+
+  get: async (pageId: string): Promise<WikiPage> => {
+    const response = await api.get(`/wiki/pages/${pageId}`)
+    return response.data
+  },
+
+  update: async (pageId: string, data: WikiPageUpdateRequest): Promise<{ message: string }> => {
+    const response = await api.put(`/wiki/pages/${pageId}`, data)
+    return response.data
+  },
+
+  generate: async (data: WikiPageGenerateRequest): Promise<WikiPage> => {
+    const response = await api.post('/wiki/generate', data)
     return response.data
   },
 }

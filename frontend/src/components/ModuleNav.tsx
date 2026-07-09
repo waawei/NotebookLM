@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  BookOpenText,
   FileStack,
   Home,
   Settings,
@@ -22,6 +23,7 @@ const modules: Array<{
   { key: 'workbench', label: 'Workbench', icon: BookOpen },
   { key: 'sources', label: 'Sources', icon: FileStack },
   { key: 'notes', label: 'Notes', icon: StickyNote },
+  { key: 'wiki', label: 'Wiki', icon: BookOpenText },
   { key: 'outputs', label: 'Outputs', icon: Sparkles },
   { key: 'settings', label: 'Settings', icon: Settings },
 ]
