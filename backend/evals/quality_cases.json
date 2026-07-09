@@ -1,0 +1,26 @@
+[
+  {
+    "case_id": "course-review-1",
+    "question": "What is the main claim, and what should I review next?",
+    "doc_ids": [],
+    "mode": "review",
+    "must_cite": true,
+    "expected_terms": ["claim", "review"]
+  },
+  {
+    "case_id": "paper-outline-1",
+    "question": "Help me outline claims, evidence, and counterpoints for this paper.",
+    "doc_ids": [],
+    "mode": "paper",
+    "must_cite": true,
+    "expected_terms": ["claims", "evidence", "counterpoints"]
+  },
+  {
+    "case_id": "company-kb-1",
+    "question": "What is the policy answer from the source material?",
+    "doc_ids": [],
+    "mode": "knowledge_base",
+    "must_cite": true,
+    "expected_terms": ["policy"]
+  }
+]
