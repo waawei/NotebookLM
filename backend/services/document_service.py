@@ -5,7 +5,7 @@ Document service for upload, parsing, vectorization, and metadata persistence.
 import os
 import uuid
 from datetime import datetime
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 from fastapi import UploadFile
 
@@ -20,12 +20,18 @@ from services.vector_store import VectorStoreService
 class DocumentService:
     """Document management service."""
 
-    def __init__(self):
+    def __init__(
+        self,
+        metadata_store: Optional[DocumentMetadataStore] = None,
+        parser: Optional[DocumentParser] = None,
+        vector_store: Optional[VectorStoreService] = None,
+        llm_factory: Optional[Callable[[], LLMService]] = None,
+    ):
         self.upload_dir = settings.UPLOAD_DIR
-        self.parser = DocumentParser()
-        self.vector_store = VectorStoreService()
-        self.llm_service = LLMService()
-        self.metadata_store = DocumentMetadataStore()
+        self.parser = parser or DocumentParser()
+        self.vector_store = vector_store or VectorStoreService()
+        self.llm_factory = llm_factory or LLMService
+        self.metadata_store = metadata_store or DocumentMetadataStore()
         os.makedirs(self.upload_dir, exist_ok=True)
 
     async def upload_document(self, file: UploadFile) -> str:
@@ -89,20 +95,28 @@ class DocumentService:
                 chunks,
                 doc_name=record["filename"],
             )
-            summary = await self._generate_summary(text)
+            summary, summary_status, summary_error = await self._generate_summary(text)
 
             self.metadata_store.update_status(
                 doc_id=doc_id,
                 status="completed",
                 total_chunks=len(chunks),
                 summary=summary,
+                summary_status=summary_status,
+                summary_error=summary_error,
                 error_message=None,
             )
             return True
 
-        except Exception as e:
-            self.metadata_store.update_status(doc_id, "failed", error_message=str(e))
-            raise e
+        except Exception:
+            self.metadata_store.update_status(
+                doc_id,
+                "failed",
+                summary_status="pending",
+                summary_error=None,
+                error_message="Document processing failed",
+            )
+            raise
 
     async def process_document(self, doc_id: str) -> bool:
         """Parse, chunk, vectorize, and summarize an uploaded document."""
@@ -120,22 +134,30 @@ class DocumentService:
                 chunks,
                 doc_name=record["filename"],
             )
-            summary = await self._generate_summary(text)
+            summary, summary_status, summary_error = await self._generate_summary(text)
 
             self.metadata_store.update_status(
                 doc_id=doc_id,
                 status="completed",
                 total_chunks=len(chunks),
                 summary=summary,
+                summary_status=summary_status,
+                summary_error=summary_error,
                 error_message=None,
             )
             return True
 
-        except Exception as e:
-            self.metadata_store.update_status(doc_id, "failed", error_message=str(e))
-            raise e
+        except Exception:
+            self.metadata_store.update_status(
+                doc_id,
+                "failed",
+                summary_status="pending",
+                summary_error=None,
+                error_message="Document processing failed",
+            )
+            raise
 
-    async def _generate_summary(self, text: str) -> str:
+    async def _generate_summary(self, text: str) -> tuple[Optional[str], str, Optional[str]]:
         """Generate a short document summary."""
         try:
             content_sample = text[:2000]
@@ -145,11 +167,10 @@ Document content:
 {content_sample}
 
 Summary (2-3 sentences):"""
-            summary = await self.llm_service.generate(prompt)
-            return summary.strip()
-        except Exception as e:
-            print(f"Failed to generate summary: {e}")
-            return "Summary generation failed."
+            summary = await self.llm_factory().generate(prompt)
+            return summary.strip(), "available", None
+        except Exception:
+            return None, "unavailable", "LLM summary unavailable"
 
     async def list_documents(self) -> List[DocumentResponse]:
         """List all persisted documents."""
@@ -202,4 +223,6 @@ Summary (2-3 sentences):"""
             status=record["status"],
             total_chunks=record["total_chunks"],
             summary=record["summary"],
+            summary_status=record["summary_status"],
+            summary_error=record["summary_error"],
         )

@@ -17,6 +17,8 @@ class DocumentMetadata(BaseModel):
     status: str  # pending, processing, completed, failed
     total_chunks: int = 0
     summary: Optional[str] = None  # 文档摘要
+    summary_status: str = "pending"
+    summary_error: Optional[str] = None
     error_message: Optional[str] = None
 
 
@@ -29,6 +31,8 @@ class DocumentResponse(BaseModel):
     status: str
     total_chunks: int
     summary: Optional[str] = None  # 文档摘要
+    summary_status: str = "pending"
+    summary_error: Optional[str] = None
     page_count: Optional[int] = None
 
 

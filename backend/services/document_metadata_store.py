@@ -14,6 +14,9 @@ from core.config import settings
 from models.document import DocumentMetadata
 
 
+_UNSET = object()
+
+
 class DocumentMetadataStore:
     """Small SQLite store for document metadata and processing status."""
 
@@ -51,6 +54,8 @@ class DocumentMetadataStore:
                     status TEXT NOT NULL,
                     total_chunks INTEGER NOT NULL DEFAULT 0,
                     summary TEXT,
+                    summary_status TEXT NOT NULL DEFAULT 'pending',
+                    summary_error TEXT,
                     error_message TEXT,
                     source_type TEXT NOT NULL DEFAULT 'file',
                     source_path TEXT,
@@ -161,6 +166,26 @@ class DocumentMetadataStore:
                 )
                 """
             )
+            self._ensure_document_column(
+                conn, "summary_status", "TEXT NOT NULL DEFAULT 'pending'"
+            )
+            self._ensure_document_column(conn, "summary_error", "TEXT")
+            conn.execute(
+                """
+                UPDATE documents
+                SET summary = NULL,
+                    summary_status = 'unavailable',
+                    summary_error = 'LLM summary unavailable'
+                WHERE summary = 'Summary generation failed.'
+                """
+            )
+            conn.execute(
+                """
+                UPDATE documents
+                SET summary_status = 'available'
+                WHERE summary_status = 'pending' AND summary IS NOT NULL
+                """
+            )
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS agent_runs (
@@ -206,9 +231,10 @@ class DocumentMetadataStore:
                 """
                 INSERT INTO documents (
                     doc_id, filename, file_type, file_size, upload_time, status,
-                    total_chunks, summary, error_message, source_type, source_path, source_url
+                    total_chunks, summary, summary_status, summary_error, error_message,
+                    source_type, source_path, source_url
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(doc_id) DO UPDATE SET
                     filename=excluded.filename,
                     file_type=excluded.file_type,
@@ -217,6 +243,8 @@ class DocumentMetadataStore:
                     status=excluded.status,
                     total_chunks=excluded.total_chunks,
                     summary=excluded.summary,
+                    summary_status=excluded.summary_status,
+                    summary_error=excluded.summary_error,
                     error_message=excluded.error_message,
                     source_type=excluded.source_type,
                     source_path=excluded.source_path,
@@ -231,6 +259,8 @@ class DocumentMetadataStore:
                     metadata.status,
                     metadata.total_chunks,
                     metadata.summary,
+                    metadata.summary_status,
+                    metadata.summary_error,
                     metadata.error_message,
                     source_type,
                     source_path,
@@ -874,7 +904,9 @@ class DocumentMetadataStore:
         doc_id: str,
         status: str,
         total_chunks: Optional[int] = None,
-        summary: Optional[str] = None,
+        summary: object = _UNSET,
+        summary_status: Optional[str] = None,
+        summary_error: Optional[str] = None,
         error_message: Optional[str] = None,
     ):
         current = self.get_document(doc_id)
@@ -888,13 +920,17 @@ class DocumentMetadataStore:
                 SET status = ?,
                     total_chunks = ?,
                     summary = ?,
+                    summary_status = ?,
+                    summary_error = ?,
                     error_message = ?
                 WHERE doc_id = ?
                 """,
                 (
                     status,
                     current["total_chunks"] if total_chunks is None else total_chunks,
-                    current["summary"] if summary is None else summary,
+                    current["summary"] if summary is _UNSET else summary,
+                    current["summary_status"] if summary_status is None else summary_status,
+                    summary_error,
                     error_message,
                     doc_id,
                 ),
@@ -909,6 +945,15 @@ class DocumentMetadataStore:
         if row is None:
             return None
         return dict(row)
+
+    @staticmethod
+    def _ensure_document_column(conn, name: str, definition: str) -> None:
+        columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(documents)").fetchall()
+        }
+        if name not in columns:
+            conn.execute(f"ALTER TABLE documents ADD COLUMN {name} {definition}")
 
     def _artifact_row_to_dict(
         self,

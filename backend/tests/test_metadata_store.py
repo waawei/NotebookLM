@@ -42,6 +42,25 @@ class MetadataStorePhase2Tests(unittest.TestCase):
         self.assertEqual(results[0]["space_id"], space["space_id"])
         self.assertEqual(results[0]["tags"], ["paper", "review"])
 
+    def test_legacy_failed_summary_migrates_to_unavailable_without_literal_content(self):
+        self.store.upsert_document(
+            DocumentMetadata(
+                doc_id="legacy-doc",
+                filename="legacy.pdf",
+                file_type="pdf",
+                file_size=1,
+                upload_time="2026-07-10T00:00:00",
+                status="completed",
+                summary="Summary generation failed.",
+            )
+        )
+
+        record = DocumentMetadataStore(self.db_path).get_document("legacy-doc")
+
+        self.assertEqual(record["summary_status"], "unavailable")
+        self.assertEqual(record["summary_error"], "LLM summary unavailable")
+        self.assertIsNone(record["summary"])
+
 
 if __name__ == "__main__":
     unittest.main()
