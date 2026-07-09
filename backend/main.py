@@ -6,7 +6,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api import chat, documents, notes, settings as settings_api, spaces
+from api import chat, documents, notes, outputs, settings as settings_api, spaces
 from core.config import settings
 
 app = FastAPI(
@@ -26,6 +26,7 @@ app.add_middleware(
 app.include_router(documents.router, prefix="/api/documents", tags=["Documents"])
 app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
 app.include_router(notes.router, prefix="/api/notes", tags=["Notes"])
+app.include_router(outputs.router, prefix="/api/outputs", tags=["Outputs"])
 app.include_router(settings_api.router, prefix="/api/settings", tags=["Settings"])
 app.include_router(spaces.router, prefix="/api/spaces", tags=["Spaces"])
 

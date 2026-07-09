@@ -86,6 +86,22 @@ export interface NoteUpdateRequest {
   conversation_id?: string | null
 }
 
+export interface OutputItem {
+  output_id: string
+  kind: string
+  title: string
+  content: string
+  source_doc_ids: string[]
+  created_at: string
+  updated_at: string
+}
+
+export interface OutputExport {
+  filename: string
+  content_type: string
+  content: string
+}
+
 export interface SettingsStatus {
   provider: string
   model: string
@@ -224,6 +240,35 @@ export const noteApi = {
 
   delete: async (noteId: string): Promise<{ message: string }> => {
     const response = await api.delete(`/notes/${noteId}`)
+    return response.data
+  },
+}
+
+export const outputApi = {
+  list: async (kind?: string): Promise<{ outputs: OutputItem[]; total: number }> => {
+    const response = await api.get('/outputs', {
+      params: kind ? { kind } : undefined,
+    })
+    return response.data
+  },
+
+  generate: async (data: { kind: string; source_doc_ids: string[] }): Promise<OutputItem> => {
+    const response = await api.post('/outputs/generate', data)
+    return response.data
+  },
+
+  get: async (outputId: string): Promise<OutputItem> => {
+    const response = await api.get(`/outputs/${outputId}`)
+    return response.data
+  },
+
+  delete: async (outputId: string): Promise<{ message: string }> => {
+    const response = await api.delete(`/outputs/${outputId}`)
+    return response.data
+  },
+
+  export: async (outputId: string): Promise<OutputExport> => {
+    const response = await api.post(`/outputs/${outputId}/export`)
     return response.data
   },
 }

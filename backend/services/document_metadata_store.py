@@ -712,6 +712,22 @@ class DocumentMetadataStore:
             for row in rows
         ]
 
+    def get_output(self, output_id: str) -> Optional[dict]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM outputs WHERE output_id = ?",
+                (output_id,),
+            ).fetchone()
+        return self._artifact_row_to_dict(row, "output_id", "source_doc_ids_json")
+
+    def delete_output(self, output_id: str) -> bool:
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "DELETE FROM outputs WHERE output_id = ?",
+                (output_id,),
+            )
+            return cursor.rowcount > 0
+
     def update_status(
         self,
         doc_id: str,
