@@ -4,7 +4,7 @@ LLM service for OpenAI-compatible chat completions.
 
 from openai import OpenAI
 
-from core.config import settings
+from services.local_llm_config import EffectiveLLMConfig, LLMConfigurationService
 
 
 def normalize_openai_base_url(base_url: str) -> str:
@@ -20,13 +20,14 @@ def normalize_openai_base_url(base_url: str) -> str:
 class LLMService:
     """Large language model client wrapper."""
 
-    def __init__(self):
-        self.provider = settings.LLM_PROVIDER.lower()
-        self.model = settings.LLM_MODEL
-        self.api_key = settings.LLM_API_KEY
-        self.base_url = settings.LLM_BASE_URL
-        self.temperature = settings.LLM_TEMPERATURE
-        self.max_tokens = settings.LLM_MAX_TOKENS
+    def __init__(self, config: EffectiveLLMConfig | None = None):
+        effective_config = config or LLMConfigurationService().effective_config()
+        self.provider = effective_config.provider.lower()
+        self.model = effective_config.model
+        self.api_key = effective_config.api_key
+        self.base_url = effective_config.base_url
+        self.temperature = effective_config.temperature
+        self.max_tokens = effective_config.max_tokens
         self.client: OpenAI | None = None
 
     def _get_client(self) -> OpenAI:
@@ -61,42 +62,33 @@ class LLMService:
 
     async def generate(self, prompt: str) -> str:
         """Generate a full answer."""
-        try:
-            client = self._get_client()
-            response = client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-            )
-            return response.choices[0].message.content or ""
-        except Exception as e:
-            print(f"LLM call failed: {e}")
-            raise e
+        client = self._get_client()
+        response = client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "user", "content": prompt},
+            ],
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+        )
+        return response.choices[0].message.content or ""
 
     async def generate_stream(self, prompt: str):
         """Generate an answer as text chunks."""
-        try:
-            client = self._get_client()
-            stream = client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-                stream=True,
-            )
+        client = self._get_client()
+        stream = client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "user", "content": prompt},
+            ],
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+            stream=True,
+        )
 
-            for chunk in stream:
-                if chunk.choices[0].delta.content is not None:
-                    yield chunk.choices[0].delta.content
-
-        except Exception as e:
-            print(f"LLM streaming call failed: {e}")
-            raise e
+        for chunk in stream:
+            if chunk.choices[0].delta.content is not None:
+                yield chunk.choices[0].delta.content
 
     async def test_connection(self) -> str:
         """Run a minimal completion to validate configured credentials."""
