@@ -1,0 +1,26 @@
+# Backend dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# AI related - fixed versions
+sentence-transformers==2.5.1
+chromadb==0.4.22
+langchain==0.1.0
+langchain-community==0.0.10
+huggingface-hub==0.20.3
+
+# Document parsing
+PyPDF2==3.0.1
+python-docx==1.1.0
+beautifulsoup4==4.12.2
+requests==2.31.0
+
+# LLM API - updated versions
+openai==1.12.0
+httpx==0.26.0
+
+# Utilities
+python-dotenv==1.0.0

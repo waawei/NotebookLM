@@ -1,0 +1,22 @@
+# NotebookLM Clone 项目
+
+# Python
+__pycache__/
+*.pyc
+venv/
+env/
+.env
+
+# Node
+node_modules/
+dist/
+
+# 数据文件
+backend/data/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
