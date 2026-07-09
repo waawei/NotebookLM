@@ -145,6 +145,13 @@ export interface SettingsTestResult {
   message: string
 }
 
+export interface SettingsConfigUpdate {
+  provider: string
+  model: string
+  base_url: string
+  api_key?: string
+}
+
 export interface SkillItem {
   skill_id: string
   name: string
@@ -363,6 +370,16 @@ export const wikiApi = {
 export const settingsApi = {
   getStatus: async (): Promise<SettingsStatus> => {
     const response = await api.get('/settings/status')
+    return response.data
+  },
+
+  save: async (data: SettingsConfigUpdate): Promise<SettingsStatus> => {
+    const response = await api.put('/settings/llm', data)
+    return response.data
+  },
+
+  clear: async (): Promise<SettingsStatus> => {
+    const response = await api.delete('/settings/llm')
     return response.data
   },
 
