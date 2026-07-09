@@ -4,14 +4,14 @@ LLM service for OpenAI-compatible chat completions.
 
 from openai import OpenAI
 
-from services.local_llm_config import EffectiveLLMConfig, LLMConfigurationService
+from services.local_llm_config import EndpointMode, EffectiveLLMConfig, LLMConfigurationService
 
 
-def normalize_openai_base_url(base_url: str) -> str:
-    """Normalize OpenAI-compatible base URLs to include /v1."""
+def normalize_openai_base_url(base_url: str, endpoint_mode: EndpointMode = "auto") -> str:
+    """Normalize OpenAI-compatible client base URLs according to the selected mode."""
     normalized = base_url.rstrip("/")
-    if not normalized:
-        return ""
+    if not normalized or endpoint_mode == "exact":
+        return normalized
     if normalized.endswith("/v1"):
         return normalized
     return f"{normalized}/v1"
@@ -26,6 +26,7 @@ class LLMService:
         self.model = effective_config.model
         self.api_key = effective_config.api_key
         self.base_url = effective_config.base_url
+        self.endpoint_mode = effective_config.endpoint_mode
         self.temperature = effective_config.temperature
         self.max_tokens = effective_config.max_tokens
         self.client: OpenAI | None = None
@@ -46,7 +47,7 @@ class LLMService:
             if self.base_url:
                 return OpenAI(
                     api_key=self.api_key,
-                    base_url=normalize_openai_base_url(self.base_url),
+                    base_url=normalize_openai_base_url(self.base_url, self.endpoint_mode),
                 )
             return OpenAI(api_key=self.api_key)
 
@@ -55,7 +56,7 @@ class LLMService:
                 raise ValueError("LLM_BASE_URL is required for openai_compatible provider")
             return OpenAI(
                 api_key=self.api_key,
-                base_url=normalize_openai_base_url(self.base_url),
+                base_url=normalize_openai_base_url(self.base_url, self.endpoint_mode),
             )
 
         raise ValueError(f"Unsupported LLM provider: {self.provider}")
@@ -93,3 +94,15 @@ class LLMService:
     async def test_connection(self) -> str:
         """Run a minimal completion to validate configured credentials."""
         return await self.generate("Reply with exactly: OK")
+
+    def list_models(self) -> list[str]:
+        """Return sorted, deduplicated model identifiers from the configured provider."""
+        response = self._get_client().models.list()
+        model_ids = [getattr(item, "id", "") for item in response.data]
+        return sorted(
+            {
+                model_id
+                for model_id in model_ids
+                if isinstance(model_id, str) and model_id.strip()
+            }
+        )
