@@ -119,8 +119,11 @@ async def list_conversations():
     try:
         conversations = await chat_service.list_conversations()
         return {"conversations": conversations}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Conversation history is temporarily unavailable. Please try again.",
+        )
 
 
 @router.get("/conversations/{conversation_id}")
@@ -135,8 +138,11 @@ async def get_conversation(conversation_id: str):
         return conversation
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Conversation history is temporarily unavailable. Please try again.",
+        )
 
 
 @router.delete("/conversations/{conversation_id}")
@@ -151,5 +157,8 @@ async def delete_conversation(conversation_id: str):
         return {"message": "Conversation deleted successfully"}
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Conversation history is temporarily unavailable. Please try again.",
+        )

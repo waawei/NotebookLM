@@ -5,6 +5,7 @@ import tempfile
 import unittest
 
 import httpx
+from fastapi import HTTPException
 from openai import RateLimitError
 
 from api import chat
@@ -65,6 +66,11 @@ class FailingChatService:
             },
         )
         yield {}
+
+
+class FailingConversationService:
+    async def list_conversations(self):
+        raise RuntimeError("Bearer saved-secret at https://gateway.test/conversations")
 
 
 async def first_sse_payload(response):
@@ -137,6 +143,18 @@ class ChatApiTests(unittest.TestCase):
         self.assertEqual(payload["diagnostic"]["category"], "rate_limited")
         self.assertNotIn("saved-secret", json.dumps(payload))
         self.assertNotIn("gateway.test", json.dumps(payload))
+
+    def test_conversation_errors_do_not_return_raw_exception_details(self):
+        chat.chat_service = FailingConversationService()
+
+        with self.assertRaises(HTTPException) as raised:
+            asyncio.run(chat.list_conversations())
+
+        self.assertEqual(raised.exception.status_code, 500)
+        self.assertEqual(
+            raised.exception.detail,
+            "Conversation history is temporarily unavailable. Please try again.",
+        )
 
 
 if __name__ == "__main__":
