@@ -34,10 +34,26 @@ class OutputService:
         title = SUPPORTED_OUTPUT_KINDS[kind]
         prompt = self._build_prompt(kind, source_doc_ids)
         content = await self.llm_service.generate(prompt)
-        return self.metadata_store.create_output(
+        return self.create_output(
             kind=kind,
             title=title,
             content=content.strip(),
+            source_doc_ids=source_doc_ids,
+        )
+
+    def create_output(
+        self,
+        kind: str,
+        title: str,
+        content: str,
+        source_doc_ids: list[str],
+    ) -> dict:
+        """Persist already-generated content through the output service boundary."""
+        self._validate_kind(kind)
+        return self.metadata_store.create_output(
+            kind=kind,
+            title=title,
+            content=content,
             source_doc_ids=source_doc_ids,
         )
 
