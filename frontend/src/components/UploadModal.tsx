@@ -1,13 +1,12 @@
 import { useState } from 'react'
 import { X, Upload, FileText, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
 import { useStore } from '../store/useStore'
+import { documentApi } from '../services/api'
 
 interface UploadModalProps {
   isOpen: boolean
   onClose: () => void
 }
-
-const API_BASE_URL = 'http://localhost:8000'
 
 export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
   const [isDragging, setIsDragging] = useState(false)
@@ -42,12 +41,17 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
   }
 
   const validateAndSetFile = (file: File) => {
-    const validTypes = ['application/pdf', 'text/plain', 'text/markdown']
-    const validExtensions = ['.pdf', '.txt', '.md']
+    const validTypes = [
+      'application/pdf',
+      'text/plain',
+      'text/markdown',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ]
+    const validExtensions = ['.pdf', '.txt', '.md', '.docx']
     const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase()
 
     if (!validTypes.includes(file.type) && !validExtensions.includes(fileExtension)) {
-      setErrorMessage('Only PDF, TXT, and MD files are supported')
+      setErrorMessage('Only PDF, TXT, MD, and DOCX files are supported')
       setUploadStatus('error')
       return
     }
@@ -69,26 +73,14 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
     setUploadStatus('uploading')
     setUploadProgress(0)
 
-    const formData = new FormData()
-    formData.append('file', selectedFile)
-
     try {
       const progressInterval = setInterval(() => {
         setUploadProgress((prev) => Math.min(prev + 10, 90))
       }, 200)
 
-      const response = await fetch(`${API_BASE_URL}/upload`, {
-        method: 'POST',
-        body: formData,
-      })
+      const data = await documentApi.upload(selectedFile)
 
       clearInterval(progressInterval)
-
-      if (!response.ok) {
-        throw new Error('Upload failed')
-      }
-
-      const data = await response.json()
       setUploadProgress(100)
       setUploadStatus('success')
 
@@ -161,7 +153,7 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
               type="file"
               id="file-upload"
               className="hidden"
-              accept=".pdf,.txt,.md"
+              accept=".pdf,.txt,.md,.docx"
               onChange={handleFileSelect}
               disabled={uploadStatus === 'uploading'}
             />
@@ -175,7 +167,7 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
                   Drop your file here or click to browse
                 </p>
                 <p className="text-sm text-gray-600">
-                  Supports PDF, TXT, MD files up to 50MB
+                  Supports PDF, TXT, MD, DOCX files up to 50MB
                 </p>
               </label>
             )}

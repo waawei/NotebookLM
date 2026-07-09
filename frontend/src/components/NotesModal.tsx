@@ -1,9 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { X, Save, FileText, Edit3, Trash2, Plus, Check, Quote } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { useStore } from '../store/useStore'
-
-const API_BASE_URL = 'http://localhost:8000'
+import { noteApi } from '../services/api'
 const AUTO_SAVE_DELAY = 3000 // 3 seconds
 
 interface Note {
@@ -73,8 +72,7 @@ export default function NotesModal({ isOpen, onClose }: NotesModalProps) {
 
   const fetchNotes = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/notes/list`)
-      const data = await response.json()
+      const data = await noteApi.list()
       setNotes(data.notes)
     } catch (error) {
       console.error('Failed to fetch notes:', error)
@@ -112,13 +110,9 @@ export default function NotesModal({ isOpen, onClose }: NotesModalProps) {
 
     setIsSaving(true)
     try {
-      await fetch(`${API_BASE_URL}/api/notes/${selectedNote.note_id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: editTitle,
-          content: editContent,
-        }),
+      await noteApi.update(selectedNote.note_id, {
+        title: editTitle,
+        content: editContent,
       })
 
       setHasUnsavedChanges(false)
@@ -135,31 +129,20 @@ export default function NotesModal({ isOpen, onClose }: NotesModalProps) {
     try {
       if (selectedNote) {
         // Update existing note
-        await fetch(`${API_BASE_URL}/api/notes/${selectedNote.note_id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: editTitle,
-            content: editContent,
-          }),
+        await noteApi.update(selectedNote.note_id, {
+          title: editTitle,
+          content: editContent,
         })
       } else {
         // Create new note
-        const response = await fetch(`${API_BASE_URL}/api/notes/create`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: editTitle,
-            content: editContent,
-            doc_ids: [],
-          }),
+        const data = await noteApi.create({
+          title: editTitle,
+          content: editContent,
+          doc_ids: [],
         })
 
-        if (response.ok) {
-          const data = await response.json()
-          // Set the newly created note as selected
-          const newNoteResponse = await fetch(`${API_BASE_URL}/api/notes/${data.note_id}`)
-          const newNote = await newNoteResponse.json()
+        if (data.note_id) {
+          const newNote = await noteApi.get(data.note_id)
           setSelectedNote(newNote)
         }
       }
@@ -181,9 +164,7 @@ export default function NotesModal({ isOpen, onClose }: NotesModalProps) {
 
     if (confirm('Are you sure you want to delete this note?')) {
       try {
-        await fetch(`${API_BASE_URL}/api/notes/${selectedNote.note_id}`, {
-          method: 'DELETE',
-        })
+        await noteApi.delete(selectedNote.note_id)
 
         await fetchNotes()
         setSelectedNote(null)

@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const API_BASE_URL = '/api'
+export const API_BASE_URL = '/api'
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -9,10 +9,56 @@ const api = axios.create({
   },
 })
 
-// 文档相关 API
+export interface DocumentItem {
+  doc_id: string
+  filename: string
+  file_type: string
+  upload_time: string
+  status: string
+  total_chunks: number
+  summary?: string
+}
+
+export interface UploadResponse {
+  doc_id: string
+  filename: string
+  status: string
+  message: string
+}
+
+export interface ChatAskRequest {
+  question: string
+  doc_ids?: string[]
+  conversation_id?: string | null
+  history?: Array<{ role: string; content: string }>
+}
+
+export interface NoteItem {
+  note_id: string
+  title: string
+  content: string
+  doc_ids: string[]
+  conversation_id?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface NoteCreateRequest {
+  title: string
+  content: string
+  doc_ids?: string[]
+  conversation_id?: string | null
+}
+
+export interface NoteUpdateRequest {
+  title?: string
+  content?: string
+  doc_ids?: string[]
+  conversation_id?: string | null
+}
+
 export const documentApi = {
-  // 上传文档
-  upload: async (file: File) => {
+  upload: async (file: File): Promise<UploadResponse> => {
     const formData = new FormData()
     formData.append('file', file)
     const response = await api.post('/documents/upload', formData, {
@@ -23,53 +69,87 @@ export const documentApi = {
     return response.data
   },
 
-  // 获取文档列表
-  list: async () => {
+  uploadUrl: async (url: string): Promise<UploadResponse> => {
+    const response = await api.post('/documents/upload-url', null, {
+      params: { url },
+    })
+    return response.data
+  },
+
+  list: async (): Promise<{ documents: DocumentItem[]; total: number }> => {
     const response = await api.get('/documents/list')
     return response.data
   },
 
-  // 获取文档详情
-  get: async (docId: string) => {
+  get: async (docId: string): Promise<DocumentItem> => {
     const response = await api.get(`/documents/${docId}`)
     return response.data
   },
 
-  // 删除文档
   delete: async (docId: string) => {
     const response = await api.delete(`/documents/${docId}`)
     return response.data
   },
 
-  // 获取文档状态
   getStatus: async (docId: string) => {
     const response = await api.get(`/documents/${docId}/status`)
     return response.data
   },
 }
 
-// 对话相关 API
 export const chatApi = {
-  // 提问
-  ask: async (data: {
-    question: string
-    doc_ids?: string[]
-    conversation_id?: string
-    history?: Array<{ role: string; content: string }>
-  }) => {
+  ask: async (data: ChatAskRequest) => {
     const response = await api.post('/chat/ask', data)
     return response.data
   },
 
-  // 获取对话历史
+  createStreamRequest: async (data: ChatAskRequest): Promise<Response> => {
+    return fetch(`${API_BASE_URL}/chat/ask-stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+  },
+
+  suggestQuestions: async (docIds: string[]): Promise<{ questions: string[] }> => {
+    const response = await api.post('/chat/suggest-questions', docIds)
+    return response.data
+  },
+
   getConversation: async (conversationId: string) => {
     const response = await api.get(`/chat/conversations/${conversationId}`)
     return response.data
   },
 
-  // 删除对话
   deleteConversation: async (conversationId: string) => {
     const response = await api.delete(`/chat/conversations/${conversationId}`)
+    return response.data
+  },
+}
+
+export const noteApi = {
+  create: async (data: NoteCreateRequest): Promise<{ note_id: string; message: string }> => {
+    const response = await api.post('/notes/create', data)
+    return response.data
+  },
+
+  list: async (): Promise<{ notes: NoteItem[]; total: number }> => {
+    const response = await api.get('/notes/list')
+    return response.data
+  },
+
+  get: async (noteId: string): Promise<NoteItem> => {
+    const response = await api.get(`/notes/${noteId}`)
+    return response.data
+  },
+
+  update: async (noteId: string, data: NoteUpdateRequest): Promise<{ message: string }> => {
+    const response = await api.put(`/notes/${noteId}`, data)
+    return response.data
+  },
+
+  delete: async (noteId: string): Promise<{ message: string }> => {
+    const response = await api.delete(`/notes/${noteId}`)
     return response.data
   },
 }

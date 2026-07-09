@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react'
 import { X, Search, FileText, MessageSquare, File } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import ReactMarkdown from 'react-markdown'
-
-const API_BASE_URL = 'http://localhost:8000'
+import { noteApi } from '../services/api'
 
 interface Note {
   note_id: string
@@ -71,8 +70,7 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
       })
 
       // 2. 搜索笔记
-      const notesResponse = await fetch(`${API_BASE_URL}/api/notes/list`)
-      const notesData = await notesResponse.json()
+      const notesData = await noteApi.list()
       const notes: Note[] = notesData.notes || []
 
       notes.forEach((note) => {

@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { X, Download, FileText, MessageSquare, CheckCircle } from 'lucide-react'
 import { useStore } from '../store/useStore'
-
-const API_BASE_URL = 'http://localhost:8000'
+import { noteApi } from '../services/api'
 
 interface ExportModalProps {
   isOpen: boolean
@@ -77,8 +76,7 @@ export default function ExportModal({ isOpen, onClose }: ExportModalProps) {
 
   const exportNotes = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/notes/list`)
-      const data = await response.json()
+      const data = await noteApi.list()
       const notes = data.notes || []
 
       if (notes.length === 0) {

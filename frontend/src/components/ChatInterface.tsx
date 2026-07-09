@@ -2,8 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Send, Sparkles, Loader2, Lightbulb, ChevronDown, ChevronUp, BookOpen } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import ReactMarkdown from 'react-markdown'
-
-const API_BASE_URL = 'http://localhost:8000'
+import { chatApi, noteApi } from '../services/api'
 
 export default function ChatInterface() {
   const [input, setInput] = useState('')
@@ -45,12 +44,7 @@ export default function ChatInterface() {
 
   const fetchSuggestedQuestions = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/chat/suggest-questions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(selectedDocIds),
-      })
-      const data = await response.json()
+      const data = await chatApi.suggestQuestions(selectedDocIds)
       setSuggestedQuestions(data.questions || [])
     } catch (error) {
       console.error('Failed to fetch suggested questions:', error)
@@ -73,14 +67,10 @@ export default function ChatInterface() {
 
     try {
       // 使用流式 API
-      const response = await fetch(`${API_BASE_URL}/api/chat/ask-stream`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          question: input,
-          doc_ids: selectedDocIds,
-          conversation_id: conversationId,
-        }),
+      const response = await chatApi.createStreamRequest({
+        question: input,
+        doc_ids: selectedDocIds,
+        conversation_id: conversationId,
       })
 
       if (!response.body) {
@@ -92,7 +82,7 @@ export default function ChatInterface() {
 
       let accumulatedAnswer = ''
       let citations: any[] = []
-      let streamConversationId = conversationId
+      let streamConversationId: string | null = conversationId
 
       // 创建临时的助手消息
       const tempMessageIndex = messages.length + 1
@@ -116,7 +106,7 @@ export default function ChatInterface() {
 
               if (data.type === 'start') {
                 streamConversationId = data.conversation_id
-                if (!conversationId) {
+                if (!conversationId && streamConversationId) {
                   setConversationId(streamConversationId)
                 }
               } else if (data.type === 'content') {
@@ -191,18 +181,14 @@ export default function ChatInterface() {
         })
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/notes/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title,
-          content,
-          doc_ids: selectedDocIds,
-          conversation_id: conversationId
-        }),
+      const response = await noteApi.create({
+        title,
+        content,
+        doc_ids: selectedDocIds,
+        conversation_id: conversationId,
       })
 
-      if (response.ok) {
+      if (response.note_id) {
         addToast('Saved to notes successfully!', 'success')
       } else {
         throw new Error('Failed to save note')
