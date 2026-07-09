@@ -5,13 +5,15 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Iterable, Optional
+from typing import Iterable, Literal, Optional
 from urllib.parse import urlparse
 
 from core.config import settings
 
 
 SUPPORTED_PROVIDERS = {"openai", "dashscope", "openai_compatible"}
+EndpointMode = Literal["auto", "exact"]
+SUPPORTED_ENDPOINT_MODES = {"auto", "exact"}
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[1] / "data" / "llm_config.json"
 
 
@@ -25,6 +27,7 @@ class EffectiveLLMConfig:
     api_key: str
     temperature: float
     max_tokens: int
+    endpoint_mode: EndpointMode = "auto"
 
 
 class LocalLLMConfigStore:
@@ -78,7 +81,21 @@ class LLMConfigurationService:
         self.defaults = defaults or settings
 
     def effective_config(self) -> EffectiveLLMConfig:
-        overlay = self.store.load()
+        return self._to_effective_config(self.store.load())
+
+    def preview(self, values: dict) -> EffectiveLLMConfig:
+        """Resolve a validated request patch without persisting it."""
+        if not isinstance(values, dict):
+            raise ValueError("LLM configuration must be an object")
+
+        candidate = {**self.store.load(), **self._allowed_values(values)}
+        self._validate(candidate)
+        return self._to_effective_config(candidate)
+
+    def _to_effective_config(self, overlay: dict) -> EffectiveLLMConfig:
+        endpoint_mode = self._string_value(overlay, "endpoint_mode", None).lower()
+        if endpoint_mode not in SUPPORTED_ENDPOINT_MODES:
+            endpoint_mode = "auto"
         return EffectiveLLMConfig(
             provider=self._string_value(overlay, "provider", "LLM_PROVIDER").lower(),
             model=self._string_value(overlay, "model", "LLM_MODEL"),
@@ -86,6 +103,7 @@ class LLMConfigurationService:
             api_key=self._string_value(overlay, "api_key", "LLM_API_KEY"),
             temperature=float(getattr(self.defaults, "LLM_TEMPERATURE")),
             max_tokens=int(getattr(self.defaults, "LLM_MAX_TOKENS")),
+            endpoint_mode=endpoint_mode,
         )
 
     def save(self, values: dict) -> dict:
@@ -93,11 +111,7 @@ class LLMConfigurationService:
             raise ValueError("LLM configuration must be an object")
 
         current = self.store.load()
-        allowed_values = {
-            key: value
-            for key, value in values.items()
-            if key in {"provider", "model", "base_url", "api_key"}
-        }
+        allowed_values = self._allowed_values(values)
         candidate = {**current, **allowed_values}
         self._validate(candidate)
         return self.store.save(candidate)
@@ -118,6 +132,7 @@ class LLMConfigurationService:
             "top_k": int(getattr(self.defaults, "TOP_K_RESULTS")),
             "embedding_model": str(getattr(self.defaults, "EMBEDDING_MODEL")),
             "embedding_device": str(getattr(self.defaults, "EMBEDDING_DEVICE")),
+            "endpoint_mode": effective.endpoint_mode,
             "warnings": warnings,
         }
 
@@ -132,6 +147,7 @@ class LLMConfigurationService:
         provider = str(values.get("provider", getattr(self.defaults, "LLM_PROVIDER"))).lower()
         model = str(values.get("model", getattr(self.defaults, "LLM_MODEL"))).strip()
         base_url = str(values.get("base_url", getattr(self.defaults, "LLM_BASE_URL"))).strip()
+        endpoint_mode = str(values.get("endpoint_mode", "auto")).lower()
 
         if provider not in SUPPORTED_PROVIDERS:
             raise ValueError("Unsupported LLM provider")
@@ -141,6 +157,8 @@ class LLMConfigurationService:
             raise ValueError("LLM base URL must use HTTP or HTTPS")
         if provider == "openai_compatible" and not base_url:
             raise ValueError("LLM base URL is required for openai_compatible")
+        if endpoint_mode not in SUPPORTED_ENDPOINT_MODES:
+            raise ValueError("Unsupported LLM endpoint mode")
 
     def _warnings(self, effective: EffectiveLLMConfig) -> list[str]:
         warnings: list[str] = []
@@ -154,8 +172,15 @@ class LLMConfigurationService:
             warnings.append("LLM base URL is required for openai_compatible")
         return warnings
 
-    def _string_value(self, overlay: dict, key: str, default_name: str) -> str:
-        value = overlay.get(key, getattr(self.defaults, default_name))
+    def _allowed_values(self, values: dict) -> dict:
+        return {
+            key: value
+            for key, value in values.items()
+            if key in {"provider", "model", "base_url", "api_key", "endpoint_mode"}
+        }
+
+    def _string_value(self, overlay: dict, key: str, default_name: Optional[str]) -> str:
+        value = overlay.get(key, getattr(self.defaults, default_name) if default_name else "")
         return value if isinstance(value, str) else str(value)
 
     @staticmethod

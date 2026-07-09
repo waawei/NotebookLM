@@ -95,6 +95,39 @@ class LocalLLMConfigurationTests(unittest.TestCase):
                 }
             )
 
+    def test_preview_merges_a_temporary_key_without_writing_the_overlay(self):
+        service = self.make_service()
+
+        preview = service.preview(
+            {
+                "provider": "openai_compatible",
+                "model": "listed-model",
+                "base_url": "https://gateway.test",
+                "api_key": "temporary-key",
+                "endpoint_mode": "exact",
+            }
+        )
+
+        self.assertEqual(preview.api_key, "temporary-key")
+        self.assertEqual(preview.endpoint_mode, "exact")
+        self.assertFalse(self.path.exists())
+
+    def test_safe_status_returns_endpoint_mode_but_never_key(self):
+        service = self.make_service()
+        service.save(
+            {
+                "provider": "openai",
+                "model": "listed-model",
+                "api_key": "stored-key",
+                "endpoint_mode": "exact",
+            }
+        )
+
+        status = service.safe_status()
+
+        self.assertEqual(status["endpoint_mode"], "exact")
+        self.assertNotIn("stored-key", str(status))
+
 
 if __name__ == "__main__":
     unittest.main()
