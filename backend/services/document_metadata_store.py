@@ -4,6 +4,8 @@ SQLite persistence for user-facing document metadata.
 
 import os
 import sqlite3
+import uuid
+from contextlib import contextmanager
 from datetime import datetime
 from typing import Optional
 
@@ -20,10 +22,20 @@ class DocumentMetadataStore:
         self.db_path = db_path or os.path.join(data_dir, "notebooklm.db")
         self._init_db()
 
+    @contextmanager
     def _connect(self):
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
-        return conn
+        conn.execute("PRAGMA foreign_keys = ON")
+        try:
+            yield conn
+        except Exception:
+            conn.rollback()
+            raise
+        else:
+            conn.commit()
+        finally:
+            conn.close()
 
     def _init_db(self):
         with self._connect() as conn:
@@ -42,6 +54,38 @@ class DocumentMetadataStore:
                     source_type TEXT NOT NULL DEFAULT 'file',
                     source_path TEXT,
                     source_url TEXT
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS spaces (
+                    space_id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    description TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS document_spaces (
+                    doc_id TEXT NOT NULL,
+                    space_id TEXT NOT NULL,
+                    PRIMARY KEY (doc_id, space_id),
+                    FOREIGN KEY (doc_id) REFERENCES documents(doc_id) ON DELETE CASCADE,
+                    FOREIGN KEY (space_id) REFERENCES spaces(space_id) ON DELETE CASCADE
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS document_tags (
+                    doc_id TEXT NOT NULL,
+                    tag TEXT NOT NULL,
+                    PRIMARY KEY (doc_id, tag),
+                    FOREIGN KEY (doc_id) REFERENCES documents(doc_id) ON DELETE CASCADE
                 )
                 """
             )
@@ -107,7 +151,130 @@ class DocumentMetadataStore:
             rows = conn.execute(
                 "SELECT * FROM documents ORDER BY upload_time DESC"
             ).fetchall()
-        return [self._row_to_dict(row) for row in rows if row is not None]
+        return [self._decorate_document(row) for row in rows if row is not None]
+
+    def create_space(self, name: str, description: str = "") -> dict:
+        now = datetime.now().isoformat()
+        space = {
+            "space_id": str(uuid.uuid4()),
+            "name": name,
+            "description": description,
+            "created_at": now,
+            "updated_at": now,
+        }
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO spaces (space_id, name, description, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    space["space_id"],
+                    space["name"],
+                    space["description"],
+                    space["created_at"],
+                    space["updated_at"],
+                ),
+            )
+        return space
+
+    def list_spaces(self) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM spaces ORDER BY updated_at DESC, name ASC"
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def assign_document_to_space(self, doc_id: str, space_id: str) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO document_spaces (doc_id, space_id)
+                VALUES (?, ?)
+                """,
+                (doc_id, space_id),
+            )
+
+    def set_document_tags(self, doc_id: str, tags: list[str]) -> None:
+        normalized_tags = []
+        seen = set()
+        for tag in tags:
+            normalized = tag.strip()
+            if normalized and normalized not in seen:
+                normalized_tags.append(normalized)
+                seen.add(normalized)
+
+        with self._connect() as conn:
+            conn.execute("DELETE FROM document_tags WHERE doc_id = ?", (doc_id,))
+            conn.executemany(
+                "INSERT INTO document_tags (doc_id, tag) VALUES (?, ?)",
+                [(doc_id, tag) for tag in normalized_tags],
+            )
+
+    def search_documents(
+        self,
+        query: str = "",
+        space_id: Optional[str] = None,
+        tags: Optional[list[str]] = None,
+        status: Optional[str] = None,
+    ) -> list[dict]:
+        clauses = []
+        params = []
+
+        if query:
+            clauses.append(
+                """
+                (
+                    d.filename LIKE ?
+                    OR COALESCE(d.summary, '') LIKE ?
+                    OR COALESCE(d.source_path, '') LIKE ?
+                    OR COALESCE(d.source_url, '') LIKE ?
+                )
+                """
+            )
+            like_query = f"%{query}%"
+            params.extend([like_query, like_query, like_query, like_query])
+
+        if space_id:
+            clauses.append(
+                """
+                EXISTS (
+                    SELECT 1 FROM document_spaces ds_filter
+                    WHERE ds_filter.doc_id = d.doc_id AND ds_filter.space_id = ?
+                )
+                """
+            )
+            params.append(space_id)
+
+        if status:
+            clauses.append("d.status = ?")
+            params.append(status)
+
+        for tag in tags or []:
+            clauses.append(
+                """
+                EXISTS (
+                    SELECT 1 FROM document_tags dt_filter
+                    WHERE dt_filter.doc_id = d.doc_id AND dt_filter.tag = ?
+                )
+                """
+            )
+            params.append(tag)
+
+        where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT d.*
+                FROM documents d
+                {where_sql}
+                ORDER BY d.upload_time DESC
+                """,
+                params,
+            ).fetchall()
+
+        return [self._decorate_document(row, selected_space_id=space_id) for row in rows]
 
     def update_status(
         self,
@@ -149,3 +316,38 @@ class DocumentMetadataStore:
         if row is None:
             return None
         return dict(row)
+
+    def _decorate_document(
+        self,
+        row,
+        selected_space_id: Optional[str] = None,
+    ) -> Optional[dict]:
+        document = self._row_to_dict(row)
+        if document is None:
+            return None
+
+        with self._connect() as conn:
+            tag_rows = conn.execute(
+                """
+                SELECT tag
+                FROM document_tags
+                WHERE doc_id = ?
+                ORDER BY tag ASC
+                """,
+                (document["doc_id"],),
+            ).fetchall()
+            space_rows = conn.execute(
+                """
+                SELECT space_id
+                FROM document_spaces
+                WHERE doc_id = ?
+                ORDER BY space_id ASC
+                """,
+                (document["doc_id"],),
+            ).fetchall()
+
+        space_ids = [space_row["space_id"] for space_row in space_rows]
+        document["tags"] = [tag_row["tag"] for tag_row in tag_rows]
+        document["space_ids"] = space_ids
+        document["space_id"] = selected_space_id or (space_ids[0] if space_ids else None)
+        return document
