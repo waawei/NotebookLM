@@ -100,8 +100,8 @@ async def list_llm_models(request: LLMModelDiscoveryRequest):
     try:
         config = configuration_service.preview(request.model_dump(exclude_none=True))
         return LLMModelDiscoveryResult(models=LLMService(config).list_models())
-    except Exception as exc:
+    except Exception:
         raise HTTPException(
             status_code=400,
             detail="Unable to load available models. Check the provider, endpoint, and API key.",
-        ) from exc
+        ) from None

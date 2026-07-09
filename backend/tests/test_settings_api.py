@@ -179,6 +179,7 @@ class SettingsApiTests(unittest.TestCase):
             "Unable to load available models. Check the provider, endpoint, and API key.",
         )
         self.assertNotIn("temporary-key", str(raised.exception.detail))
+        self.assertIsNone(raised.exception.__cause__)
 
 
 if __name__ == "__main__":
