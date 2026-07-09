@@ -205,9 +205,9 @@ export default function ChatInterface() {
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-gray-800">
+    <div className="flex h-full min-h-0 flex-1 flex-col bg-gray-50 dark:bg-gray-950">
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto">
+      <div data-testid="message-timeline" className="min-h-0 flex-1 overflow-y-auto">
         {messages.length === 0 ? (
           <div className="h-full flex items-center justify-center p-8">
             <div className="text-center max-w-2xl">
@@ -357,8 +357,9 @@ export default function ChatInterface() {
       </div>
 
       {/* Input Area */}
-      <div className="border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6">
+      <div data-testid="chat-composer" className="sticky bottom-0 border-t border-gray-200 bg-white p-4 shadow-[0_-8px_20px_-18px_rgba(15,23,42,0.45)] dark:border-gray-800 dark:bg-gray-900">
         <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
+          <p className="mb-3 text-xs font-medium text-gray-500 dark:text-gray-400">Selected sources: {selectedDocIds.length}</p>
           <div className="mb-3 inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 dark:border-gray-700 dark:bg-gray-800">
             {modeOptions.map((option) => (
               <button
