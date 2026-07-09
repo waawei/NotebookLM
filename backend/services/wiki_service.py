@@ -48,7 +48,11 @@ class WikiService:
         return {
             "filename": f"{self._slug(page['title'])}.md",
             "content_type": "text/markdown",
-            "content": page["content"],
+            "content": self._markdown_export(
+                title=page["title"],
+                content=page["content"],
+                source_doc_ids=page["source_doc_ids"],
+            ),
         }
 
     def _build_prompt(self, title: str, source_doc_ids: list[str]) -> str:
@@ -94,3 +98,19 @@ Wiki page:"""
             char.lower() if char.isalnum() else "-"
             for char in title
         ).strip("-") or "wiki-page"
+
+    def _markdown_export(
+        self,
+        title: str,
+        content: str,
+        source_doc_ids: list[str],
+    ) -> str:
+        body = content.strip()
+        if not body.startswith("#"):
+            body = f"# {title}\n\n{body}"
+
+        if not source_doc_ids:
+            return body
+
+        sources = "\n".join(f"- {doc_id}" for doc_id in source_doc_ids)
+        return f"{body}\n\n---\n\n## Sources\n\n{sources}\n"

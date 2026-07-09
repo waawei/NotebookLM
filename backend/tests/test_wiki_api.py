@@ -40,6 +40,16 @@ class FakeWikiService:
     async def generate_page(self, title, source_doc_ids):
         return self.create_page(title, "# Generated\nGrounded page.", source_doc_ids)
 
+    def export_page(self, page_id):
+        page = self.pages.get(page_id)
+        if not page:
+            return None
+        return {
+            "filename": "retrieval.md",
+            "content_type": "text/markdown",
+            "content": page["content"],
+        }
+
 
 class WikiApiTests(unittest.TestCase):
     def setUp(self):
@@ -86,6 +96,23 @@ class WikiApiTests(unittest.TestCase):
         self.assertEqual(updated["message"], "Wiki page updated successfully")
         self.assertEqual(generated["content"], "# Generated\nGrounded page.")
         self.assertEqual(generated["source_doc_ids"], ["doc-2"])
+
+    def test_export_page_returns_markdown_payload(self):
+        created = asyncio.run(
+            wiki.create_page(
+                wiki.WikiPageCreate(
+                    title="Retrieval",
+                    content="# Retrieval\nNotes.",
+                    source_doc_ids=["doc-1"],
+                )
+            )
+        )
+
+        exported = asyncio.run(wiki.export_page(created["page_id"]))
+
+        self.assertEqual(exported["filename"], "retrieval.md")
+        self.assertEqual(exported["content_type"], "text/markdown")
+        self.assertEqual(exported["content"], "# Retrieval\nNotes.")
 
 
 if __name__ == "__main__":

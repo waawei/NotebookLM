@@ -61,7 +61,11 @@ class OutputService:
         return {
             "filename": filename,
             "content_type": "text/markdown",
-            "content": output["content"],
+            "content": self._markdown_export(
+                title=output["title"],
+                content=output["content"],
+                source_doc_ids=output["source_doc_ids"],
+            ),
         }
 
     def _build_prompt(self, kind: str, source_doc_ids: list[str]) -> str:
@@ -119,3 +123,19 @@ Generated artifact:"""
     def _filename_slug(self, title: str) -> str:
         slug = re.sub(r"[^a-zA-Z0-9]+", "-", title.lower()).strip("-")
         return slug or "output"
+
+    def _markdown_export(
+        self,
+        title: str,
+        content: str,
+        source_doc_ids: list[str],
+    ) -> str:
+        body = content.strip()
+        if not body.startswith("#"):
+            body = f"# {title}\n\n{body}"
+
+        if not source_doc_ids:
+            return body
+
+        sources = "\n".join(f"- {doc_id}" for doc_id in source_doc_ids)
+        return f"{body}\n\n---\n\n## Sources\n\n{sources}\n"

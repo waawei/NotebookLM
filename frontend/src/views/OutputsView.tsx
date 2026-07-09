@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FileText, Loader2, RefreshCw, Sparkles, Trash2 } from 'lucide-react'
+import { Download, FileText, Loader2, RefreshCw, Sparkles, Trash2 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { outputApi, type OutputItem } from '../services/api'
 import type { AppModule } from '../store/useStore'
@@ -81,6 +81,29 @@ export default function OutputsView({ onModuleChange }: OutputsViewProps) {
       console.error('Failed to delete output:', error)
       addToast('Failed to delete output', 'error')
     }
+  }
+
+  const handleExport = async (outputId: string) => {
+    try {
+      const exported = await outputApi.export(outputId)
+      downloadFile(exported.content, exported.filename, exported.content_type)
+      addToast('Output exported', 'success')
+    } catch (error) {
+      console.error('Failed to export output:', error)
+      addToast('Failed to export output', 'error')
+    }
+  }
+
+  const downloadFile = (content: string, filename: string, mimeType: string) => {
+    const blob = new Blob([content], { type: mimeType })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
   }
 
   return (
@@ -166,7 +189,7 @@ export default function OutputsView({ onModuleChange }: OutputsViewProps) {
                   >
                     <p className="truncate text-sm font-medium text-gray-950 dark:text-gray-100">{output.title}</p>
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      {output.kind} · {output.source_doc_ids.length} sources
+                      {output.kind} - {output.source_doc_ids.length} sources
                     </p>
                   </button>
                 )
@@ -183,17 +206,27 @@ export default function OutputsView({ onModuleChange }: OutputsViewProps) {
               <div className="min-w-0">
                 <h1 className="truncate text-xl font-semibold text-gray-950 dark:text-gray-100">{selectedOutput.title}</h1>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {selectedOutput.source_doc_ids.length} sources · Updated {new Date(selectedOutput.updated_at).toLocaleString()}
+                  {selectedOutput.source_doc_ids.length} sources - Updated {new Date(selectedOutput.updated_at).toLocaleString()}
                 </p>
               </div>
-              <button
-                onClick={() => handleDelete(selectedOutput.output_id)}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-600 dark:text-gray-400 dark:hover:bg-red-950 dark:hover:text-red-300"
-                title="Delete output"
-                aria-label="Delete output"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => handleExport(selectedOutput.output_id)}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-50 hover:text-blue-600 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-blue-300"
+                  title="Export output"
+                  aria-label="Export output"
+                >
+                  <Download className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => handleDelete(selectedOutput.output_id)}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-600 dark:text-gray-400 dark:hover:bg-red-950 dark:hover:text-red-300"
+                  title="Delete output"
+                  aria-label="Delete output"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             </div>
             <div className="prose prose-sm max-w-none dark:prose-invert">
               <ReactMarkdown>{selectedOutput.content}</ReactMarkdown>

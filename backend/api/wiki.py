@@ -73,6 +73,19 @@ async def update_page(page_id: str, request: WikiPageUpdate):
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+@router.post("/pages/{page_id}/export")
+async def export_page(page_id: str):
+    try:
+        export = wiki_service.export_page(page_id)
+        if not export:
+            raise HTTPException(status_code=404, detail="Wiki page not found")
+        return export
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 @router.post("/generate")
 async def generate_page(request: WikiPageGenerate):
     try:

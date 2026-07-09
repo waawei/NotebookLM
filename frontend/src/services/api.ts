@@ -323,6 +323,11 @@ export const wikiApi = {
     const response = await api.post('/wiki/generate', data)
     return response.data
   },
+
+  export: async (pageId: string): Promise<OutputExport> => {
+    const response = await api.post(`/wiki/pages/${pageId}/export`)
+    return response.data
+  },
 }
 
 export const settingsApi = {

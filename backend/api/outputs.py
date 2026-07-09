@@ -44,10 +44,15 @@ async def generate_output(request: OutputGenerateRequest):
 
 @router.post("/{output_id}/export")
 async def export_output(output_id: str):
-    export = output_service.export_output(output_id)
-    if not export:
-        raise HTTPException(status_code=404, detail="Output not found")
-    return export
+    try:
+        export = output_service.export_output(output_id)
+        if not export:
+            raise HTTPException(status_code=404, detail="Output not found")
+        return export
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.get("/{output_id}")
