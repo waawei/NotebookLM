@@ -1,7 +1,7 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { FileText, Plus, ChevronLeft, ChevronRight, X, CheckCircle2, Loader2 } from 'lucide-react'
 import { useStore } from '../store/useStore'
-import { documentApi } from '../services/api'
+import { documentApi, spacesApi, type SpaceItem } from '../services/api'
 
 interface SidebarProps {
   isCollapsed: boolean
@@ -10,21 +10,47 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ isCollapsed, onToggle, onUploadClick }: SidebarProps) {
-  const { documents, selectedDocIds, setDocuments, toggleDocumentSelection, removeDocument, addToast } = useStore()
+  const {
+    documents,
+    selectedDocIds,
+    activeSpaceId,
+    setDocuments,
+    toggleDocumentSelection,
+    removeDocument,
+    addToast,
+  } = useStore()
+  const [spaces, setSpaces] = useState<SpaceItem[]>([])
+
+  const activeSpaceName = useMemo(
+    () => spaces.find((space) => space.space_id === activeSpaceId)?.name ?? 'All sources',
+    [activeSpaceId, spaces],
+  )
+  const visibleSelectedCount = useMemo(
+    () => documents.filter((doc) => selectedDocIds.includes(doc.doc_id)).length,
+    [documents, selectedDocIds],
+  )
 
   useEffect(() => {
-    loadDocuments()
-  }, [])
+    spacesApi.list()
+      .then((data) => setSpaces(data.spaces))
+      .catch((error) => {
+        console.error('Failed to load spaces:', error)
+      })
+  }, [activeSpaceId])
 
-  const loadDocuments = async () => {
+  const loadDocuments = useCallback(async () => {
     try {
-      const data = await documentApi.list()
+      const data = await documentApi.search({ space_id: activeSpaceId })
       setDocuments(data.documents)
     } catch (error) {
       console.error('Failed to load documents:', error)
       addToast('Failed to load sources', 'error')
     }
-  }
+  }, [activeSpaceId, addToast, setDocuments])
+
+  useEffect(() => {
+    void loadDocuments()
+  }, [loadDocuments])
 
   const handleDelete = async (docId: string) => {
     try {
@@ -65,6 +91,7 @@ export default function Sidebar({ isCollapsed, onToggle, onUploadClick }: Sideba
             <ChevronLeft className="w-4 h-4 text-gray-400 dark:text-gray-500" />
           </button>
         </div>
+        <p className="mb-3 truncate text-xs font-medium text-gray-600 dark:text-gray-300">{activeSpaceName}</p>
         <button
           onClick={onUploadClick}
           className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-sm hover:shadow-md"
@@ -150,7 +177,7 @@ export default function Sidebar({ isCollapsed, onToggle, onUploadClick }: Sideba
       {documents.length > 0 && (
         <div className="p-4 border-t border-gray-200 bg-white">
           <p className="text-xs text-gray-600 font-medium">
-            <span className="text-blue-600 font-bold">{selectedDocIds.length}</span> of {documents.length} sources selected
+            <span className="text-blue-600 font-bold">{visibleSelectedCount}</span> of {documents.length} visible selected
           </p>
         </div>
       )}

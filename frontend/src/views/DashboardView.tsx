@@ -8,7 +8,7 @@ import {
   Plus,
   Settings,
 } from 'lucide-react'
-import { settingsApi, type SettingsStatus } from '../services/api'
+import { documentApi, settingsApi, spacesApi, type SettingsStatus, type SpaceItem } from '../services/api'
 import type { AppModule } from '../store/useStore'
 import { useStore } from '../store/useStore'
 
@@ -23,7 +23,8 @@ export default function DashboardView({
   onOpenSettings,
   onModuleChange,
 }: DashboardViewProps) {
-  const { documents, messages, selectedDocIds } = useStore()
+  const { documents, messages, selectedDocIds, activeSpaceId, setDocuments } = useStore()
+  const [spaces, setSpaces] = useState<SpaceItem[]>([])
   const [settingsStatus, setSettingsStatus] = useState<SettingsStatus | null>(null)
   const [isLoadingSettings, setIsLoadingSettings] = useState(false)
 
@@ -47,6 +48,34 @@ export default function DashboardView({
     }
   }, [])
 
+  useEffect(() => {
+    spacesApi.list()
+      .then((data) => setSpaces(data.spaces))
+      .catch((error) => {
+        console.error('Failed to load spaces:', error)
+      })
+  }, [activeSpaceId])
+
+  useEffect(() => {
+    let isMounted = true
+
+    documentApi.search({ space_id: activeSpaceId })
+      .then((data) => {
+        if (isMounted) setDocuments(data.documents)
+      })
+      .catch((error) => {
+        console.error('Failed to load dashboard sources:', error)
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [activeSpaceId, setDocuments])
+
+  const activeSpaceName = useMemo(
+    () => spaces.find((space) => space.space_id === activeSpaceId)?.name ?? 'All sources',
+    [activeSpaceId, spaces],
+  )
   const completedCount = useMemo(
     () => documents.filter((doc) => doc.status === 'completed').length,
     [documents],
@@ -72,7 +101,7 @@ export default function DashboardView({
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-sm font-semibold text-gray-950 dark:text-gray-100">Recent sources</h2>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Latest files available to the workbench</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{activeSpaceName}</p>
               </div>
               <button
                 onClick={onOpenUpload}

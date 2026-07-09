@@ -10,6 +10,10 @@ export interface Document {
   status: string
   total_chunks: number
   summary?: string
+  error_message?: string | null
+  space_id?: string | null
+  space_ids?: string[]
+  tags?: string[]
 }
 
 export interface Citation {
@@ -40,11 +44,19 @@ interface AppState {
 
   documents: Document[]
   selectedDocIds: string[]
+  activeSpaceId: string | null
+  sourceQuery: string
+  sourceStatusFilter: string | null
+  sourceTagFilter: string[]
   setDocuments: (documents: Document[]) => void
   addDocument: (document: Document) => void
   removeDocument: (docId: string) => void
   toggleDocumentSelection: (docId: string) => void
   clearSelectedDocs: () => void
+  setActiveSpaceId: (spaceId: string | null) => void
+  setSourceQuery: (query: string) => void
+  setSourceStatusFilter: (status: string | null) => void
+  setSourceTagFilter: (tags: string[]) => void
 
   messages: Message[]
   conversationId: string | null
@@ -72,6 +84,10 @@ export const useStore = create<AppState>((set) => ({
 
   documents: [],
   selectedDocIds: [],
+  activeSpaceId: null,
+  sourceQuery: '',
+  sourceStatusFilter: null,
+  sourceTagFilter: [],
 
   setDocuments: (documents) => set({ documents }),
 
@@ -92,6 +108,14 @@ export const useStore = create<AppState>((set) => ({
     })),
 
   clearSelectedDocs: () => set({ selectedDocIds: [] }),
+
+  setActiveSpaceId: (spaceId) => set({ activeSpaceId: spaceId }),
+
+  setSourceQuery: (query) => set({ sourceQuery: query }),
+
+  setSourceStatusFilter: (status) => set({ sourceStatusFilter: status }),
+
+  setSourceTagFilter: (tags) => set({ sourceTagFilter: tags }),
 
   messages: typeof window !== 'undefined'
     ? JSON.parse(localStorage.getItem('chat_messages') || '[]')

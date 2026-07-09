@@ -17,6 +17,10 @@ export interface DocumentItem {
   status: string
   total_chunks: number
   summary?: string
+  error_message?: string | null
+  space_id?: string | null
+  space_ids?: string[]
+  tags?: string[]
 }
 
 export interface DocumentSearchFilters {
@@ -24,6 +28,14 @@ export interface DocumentSearchFilters {
   space_id?: string | null
   tags?: string[]
   status?: string | null
+}
+
+export interface SpaceItem {
+  space_id: string
+  name: string
+  description: string
+  created_at: string
+  updated_at: string
 }
 
 export interface UploadResponse {
@@ -123,6 +135,23 @@ export const documentApi = {
 
   getStatus: async (docId: string) => {
     const response = await api.get(`/documents/${docId}/status`)
+    return response.data
+  },
+}
+
+export const spacesApi = {
+  list: async (): Promise<{ spaces: SpaceItem[] }> => {
+    const response = await api.get('/spaces')
+    return response.data
+  },
+
+  create: async (data: { name: string; description?: string }): Promise<SpaceItem> => {
+    const response = await api.post('/spaces', data)
+    return response.data
+  },
+
+  assignDocument: async (spaceId: string, docId: string): Promise<{ message: string }> => {
+    const response = await api.post(`/spaces/${spaceId}/documents/${docId}`)
     return response.data
   },
 }
