@@ -145,6 +145,36 @@ export interface SettingsTestResult {
   message: string
 }
 
+export interface SkillItem {
+  skill_id: string
+  name: string
+  description: string
+  allowed_tools: string[]
+  prompt_template: string
+  output_kind: string
+}
+
+export interface AgentStep {
+  step_id: string
+  step_index: number
+  kind: string
+  title: string
+  payload: Record<string, unknown>
+  created_at: string
+}
+
+export interface AgentRun {
+  run_id: string
+  skill_id: string
+  status: 'running' | 'completed' | 'failed'
+  input_payload: { doc_ids?: string[]; request?: string }
+  output_id?: string | null
+  error?: string | null
+  created_at?: string
+  updated_at?: string
+  steps: AgentStep[]
+}
+
 export const documentApi = {
   upload: async (file: File): Promise<UploadResponse> => {
     const formData = new FormData()
@@ -338,6 +368,35 @@ export const settingsApi = {
 
   testLlm: async (): Promise<SettingsTestResult> => {
     const response = await api.post('/settings/test-llm')
+    return response.data
+  },
+}
+
+export const skillsApi = {
+  list: async (): Promise<{ skills: SkillItem[] }> => {
+    const response = await api.get('/skills')
+    return response.data
+  },
+
+  get: async (skillId: string): Promise<SkillItem> => {
+    const response = await api.get(`/skills/${skillId}`)
+    return response.data
+  },
+}
+
+export const agentsApi = {
+  listRuns: async (): Promise<{ runs: AgentRun[]; total: number }> => {
+    const response = await api.get('/agents/runs')
+    return response.data
+  },
+
+  createRun: async (data: { skill_id: string; doc_ids: string[]; request?: string }): Promise<AgentRun> => {
+    const response = await api.post('/agents/runs', data)
+    return response.data
+  },
+
+  getRun: async (runId: string): Promise<AgentRun> => {
+    const response = await api.get(`/agents/runs/${runId}`)
     return response.data
   },
 }

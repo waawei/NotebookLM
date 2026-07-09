@@ -6,7 +6,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api import chat, documents, notes, outputs, settings as settings_api, spaces, wiki
+from api import agents, chat, documents, notes, outputs, settings as settings_api, skills, spaces, wiki
 from core.config import settings
 
 app = FastAPI(
@@ -30,6 +30,8 @@ app.include_router(outputs.router, prefix="/api/outputs", tags=["Outputs"])
 app.include_router(wiki.router, prefix="/api/wiki", tags=["Wiki"])
 app.include_router(settings_api.router, prefix="/api/settings", tags=["Settings"])
 app.include_router(spaces.router, prefix="/api/spaces", tags=["Spaces"])
+app.include_router(skills.router, prefix="/api/skills", tags=["Skills"])
+app.include_router(agents.router, prefix="/api/agents", tags=["Agents"])
 
 
 @app.on_event("startup")
