@@ -6,9 +6,11 @@ import uuid
 from datetime import datetime, timedelta
 from typing import List, Optional
 
+from core.config import settings
 from models.chat import ChatMessage, ChatResponse, Citation
 from services.document_metadata_store import DocumentMetadataStore
 from services.llm_service import LLMService
+from services.retrieval_service import RetrievalService
 from services.vector_store import VectorStoreService
 
 
@@ -17,6 +19,7 @@ class ChatService:
 
     def __init__(self):
         self.vector_store = VectorStoreService()
+        self.retrieval_service = RetrievalService(self.vector_store)
         self.llm_service = LLMService()
         self.metadata_store = DocumentMetadataStore()
         self.conversations = {}
@@ -32,7 +35,11 @@ class ChatService:
         if not conversation_id:
             conversation_id = str(uuid.uuid4())
 
-        search_results = await self.vector_store.search(query=question, doc_ids=doc_ids)
+        search_results = await self.retrieval_service.retrieve(
+            question=question,
+            doc_ids=doc_ids,
+            top_k=settings.TOP_K_RESULTS,
+        )
 
         if not search_results:
             return ChatResponse(
@@ -41,10 +48,10 @@ class ChatService:
                 conversation_id=conversation_id,
             )
 
-        context = self._build_context(search_results)
+        context = self.retrieval_service.build_context(search_results)
         prompt = self._build_prompt(question, context, history)
         answer = await self.llm_service.generate(prompt)
-        citations = self._build_citations(search_results)
+        citations = self.retrieval_service.build_citations(search_results)
         self._save_conversation(conversation_id, question, answer, citations)
 
         return ChatResponse(
@@ -65,7 +72,11 @@ class ChatService:
 
         yield {"type": "start", "conversation_id": conversation_id}
 
-        search_results = await self.vector_store.search(query=question, doc_ids=doc_ids)
+        search_results = await self.retrieval_service.retrieve(
+            question=question,
+            doc_ids=doc_ids,
+            top_k=settings.TOP_K_RESULTS,
+        )
 
         if not search_results:
             yield {
@@ -75,7 +86,7 @@ class ChatService:
             yield {"type": "done"}
             return
 
-        context = self._build_context(search_results)
+        context = self.retrieval_service.build_context(search_results)
         prompt = self._build_prompt(question, context, history)
 
         answer_chunks = []
@@ -84,7 +95,7 @@ class ChatService:
             yield {"type": "content", "content": chunk}
 
         full_answer = "".join(answer_chunks)
-        citations = self._build_citations(search_results)
+        citations = self.retrieval_service.build_citations(search_results)
 
         yield {"type": "citations", "citations": [c.dict() for c in citations]}
         self._save_conversation(conversation_id, question, full_answer, citations)
@@ -114,17 +125,6 @@ class ChatService:
             self._api_to_store_conversation(conversation)
         )
 
-    def _build_context(self, search_results: List[dict]) -> str:
-        context = ""
-        for index, result in enumerate(search_results):
-            context += f"\n[Source {index + 1}]\n"
-            context += f"{result['content']}\n"
-            context += (
-                f"(Document ID: {result['metadata']['doc_id']}, "
-                f"Chunk ID: {result['metadata']['chunk_id']})\n"
-            )
-        return context
-
     def _build_prompt(
         self,
         question: str,
@@ -150,22 +150,6 @@ Requirements:
         prompt += f"\nUser question: {question}\n"
         prompt += "\nPlease answer based on the above documents (remember to mark citation sources):\n"
         return prompt
-
-    def _build_citations(self, search_results: List[dict]) -> List[Citation]:
-        citations = []
-        for index, result in enumerate(search_results, start=1):
-            citations.append(
-                Citation(
-                    number=index,
-                    doc_id=result["metadata"]["doc_id"],
-                    doc_name=f"Document_{result['metadata']['doc_id'][:8]}",
-                    page=None,
-                    chunk_id=result["metadata"]["chunk_id"],
-                    content=result["content"][:200] + "...",
-                    relevance_score=result["score"],
-                )
-            )
-        return citations
 
     def _save_conversation(
         self,
