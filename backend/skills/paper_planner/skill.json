@@ -1,0 +1,8 @@
+{
+  "skill_id": "paper_planner",
+  "name": "Paper Planner",
+  "description": "Create a paper outline with claims, evidence, and citation anchors.",
+  "allowed_tools": ["retrieve_sources", "create_output"],
+  "prompt_template": "Use selected sources to create a paper plan with claims, evidence, counterpoints, and citation anchors.",
+  "output_kind": "paper_plan"
+}

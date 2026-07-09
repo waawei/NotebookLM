@@ -1,0 +1,8 @@
+{
+  "skill_id": "kb_maintainer",
+  "name": "Knowledge Base Maintainer",
+  "description": "Organize selected sources into a reusable knowledge-base outline.",
+  "allowed_tools": ["retrieve_sources", "create_output", "create_wiki_page"],
+  "prompt_template": "Create a concise knowledge-base outline that groups source-backed concepts and identifies useful Wiki sections.",
+  "output_kind": "outline"
+}

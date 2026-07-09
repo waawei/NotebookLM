@@ -1,0 +1,8 @@
+{
+  "skill_id": "course_reviewer",
+  "name": "Course Reviewer",
+  "description": "Turn selected local sources into a focused study review.",
+  "allowed_tools": ["retrieve_sources", "create_output"],
+  "prompt_template": "Create a study review with key concepts, concise explanations, review questions, and source anchors.",
+  "output_kind": "review_cards"
+}
