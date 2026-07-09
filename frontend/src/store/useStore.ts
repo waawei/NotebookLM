@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type AppModule = 'dashboard' | 'workbench' | 'sources' | 'notes' | 'wiki' | 'outputs' | 'settings'
+export type AppModule = 'dashboard' | 'workbench' | 'sources' | 'notes' | 'wiki' | 'outputs' | 'skills' | 'agents' | 'settings'
 
 export interface Document {
   doc_id: string

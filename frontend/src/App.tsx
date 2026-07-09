@@ -14,6 +14,8 @@ import OutputsView from './views/OutputsView'
 import SettingsView from './views/SettingsView'
 import SourcesView from './views/SourcesView'
 import WikiView from './views/WikiView'
+import SkillsView from './views/SkillsView'
+import AgentsView from './views/AgentsView'
 import WorkbenchView from './views/WorkbenchView'
 import { useStore } from './store/useStore'
 import type { AppModule } from './store/useStore'
@@ -43,6 +45,8 @@ const moduleCopy: Record<AppModule, { title: string; subtitle: string }> = {
     title: 'Outputs',
     subtitle: 'Generated summaries, outlines, and study artifacts',
   },
+  skills: { title: 'Skills', subtitle: 'Local skill manifests with explicit safe tools' },
+  agents: { title: 'Agents', subtitle: 'Inspectable runs, steps, errors, and outputs' },
   settings: {
     title: 'Settings',
     subtitle: 'Read-only runtime configuration from backend .env',
@@ -116,6 +120,14 @@ function App() {
 
     if (activeModule === 'wiki') {
       return <WikiView onModuleChange={handleModuleChange} />
+    }
+
+    if (activeModule === 'skills') {
+      return <SkillsView onRunCreated={() => setActiveModule('agents')} />
+    }
+
+    if (activeModule === 'agents') {
+      return <AgentsView />
     }
 
     if (activeModule === 'settings') {

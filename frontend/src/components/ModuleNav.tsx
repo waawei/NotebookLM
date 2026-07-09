@@ -1,11 +1,13 @@
 import {
   BookOpen,
   BookOpenText,
+  Bot,
   FileStack,
   Home,
   Settings,
   Sparkles,
   StickyNote,
+  Wrench,
 } from 'lucide-react'
 import type { AppModule } from '../store/useStore'
 
@@ -25,6 +27,8 @@ const modules: Array<{
   { key: 'notes', label: 'Notes', icon: StickyNote },
   { key: 'wiki', label: 'Wiki', icon: BookOpenText },
   { key: 'outputs', label: 'Outputs', icon: Sparkles },
+  { key: 'skills', label: 'Skills', icon: Wrench },
+  { key: 'agents', label: 'Agents', icon: Bot },
   { key: 'settings', label: 'Settings', icon: Settings },
 ]
 
