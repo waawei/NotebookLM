@@ -3,6 +3,7 @@ SQLite persistence for user-facing document metadata.
 """
 
 import os
+import json
 import sqlite3
 import uuid
 from contextlib import contextmanager
@@ -86,6 +87,29 @@ class DocumentMetadataStore:
                     tag TEXT NOT NULL,
                     PRIMARY KEY (doc_id, tag),
                     FOREIGN KEY (doc_id) REFERENCES documents(doc_id) ON DELETE CASCADE
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS conversations (
+                    conversation_id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS conversation_messages (
+                    message_id TEXT PRIMARY KEY,
+                    conversation_id TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    citations_json TEXT NOT NULL DEFAULT '[]',
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id) ON DELETE CASCADE
                 )
                 """
             )
@@ -321,6 +345,123 @@ class DocumentMetadataStore:
 
         return [self._decorate_document(row, selected_space_id=space_id) for row in rows]
 
+    def save_conversation(self, conversation: dict) -> None:
+        conversation_id = conversation.get("conversation_id") or conversation.get("id")
+        if not conversation_id:
+            raise ValueError("conversation_id is required")
+
+        now = datetime.now().isoformat()
+        created_at = self._to_iso_string(conversation.get("created_at") or now)
+        updated_at = self._to_iso_string(conversation.get("updated_at") or now)
+        title = conversation.get("title") or self._conversation_title(conversation)
+        messages = conversation.get("messages", [])
+
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO conversations (conversation_id, title, created_at, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(conversation_id) DO UPDATE SET
+                    title=excluded.title,
+                    created_at=excluded.created_at,
+                    updated_at=excluded.updated_at
+                """,
+                (conversation_id, title, created_at, updated_at),
+            )
+            conn.execute(
+                "DELETE FROM conversation_messages WHERE conversation_id = ?",
+                (conversation_id,),
+            )
+            conn.executemany(
+                """
+                INSERT INTO conversation_messages (
+                    message_id, conversation_id, role, content, citations_json, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (
+                        message.get("message_id") or str(uuid.uuid4()),
+                        conversation_id,
+                        message["role"],
+                        message["content"],
+                        json.dumps(message.get("citations", []), ensure_ascii=False),
+                        self._to_iso_string(message.get("created_at") or now),
+                    )
+                    for message in messages
+                ],
+            )
+
+    def get_conversation(self, conversation_id: str) -> Optional[dict]:
+        with self._connect() as conn:
+            conversation_row = conn.execute(
+                """
+                SELECT *
+                FROM conversations
+                WHERE conversation_id = ?
+                """,
+                (conversation_id,),
+            ).fetchone()
+            message_rows = conn.execute(
+                """
+                SELECT *
+                FROM conversation_messages
+                WHERE conversation_id = ?
+                ORDER BY created_at ASC, message_id ASC
+                """,
+                (conversation_id,),
+            ).fetchall()
+
+        if conversation_row is None:
+            return None
+
+        conversation = dict(conversation_row)
+        conversation["messages"] = [
+            {
+                "message_id": row["message_id"],
+                "role": row["role"],
+                "content": row["content"],
+                "citations": json.loads(row["citations_json"]),
+                "created_at": row["created_at"],
+            }
+            for row in message_rows
+        ]
+        return conversation
+
+    def list_conversations(self) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT
+                    c.conversation_id,
+                    c.title,
+                    c.created_at,
+                    c.updated_at,
+                    COUNT(cm.message_id) AS message_count,
+                    (
+                        SELECT content
+                        FROM conversation_messages latest
+                        WHERE latest.conversation_id = c.conversation_id
+                        ORDER BY latest.created_at DESC, latest.message_id DESC
+                        LIMIT 1
+                    ) AS last_message
+                FROM conversations c
+                LEFT JOIN conversation_messages cm
+                    ON cm.conversation_id = c.conversation_id
+                GROUP BY c.conversation_id, c.title, c.created_at, c.updated_at
+                ORDER BY c.updated_at DESC
+                """
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def delete_conversation(self, conversation_id: str) -> bool:
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "DELETE FROM conversations WHERE conversation_id = ?",
+                (conversation_id,),
+            )
+            return cursor.rowcount > 0
+
     def update_status(
         self,
         doc_id: str,
@@ -396,3 +537,14 @@ class DocumentMetadataStore:
         document["space_ids"] = space_ids
         document["space_id"] = selected_space_id or (space_ids[0] if space_ids else None)
         return document
+
+    def _to_iso_string(self, value) -> str:
+        if isinstance(value, datetime):
+            return value.isoformat()
+        return str(value)
+
+    def _conversation_title(self, conversation: dict) -> str:
+        for message in conversation.get("messages", []):
+            if message.get("role") == "user" and message.get("content"):
+                return message["content"][:80]
+        return "Untitled conversation"
