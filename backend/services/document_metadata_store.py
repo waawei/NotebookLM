@@ -113,6 +113,41 @@ class DocumentMetadataStore:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS note_links (
+                    note_id TEXT NOT NULL,
+                    source_type TEXT NOT NULL,
+                    source_id TEXT NOT NULL,
+                    PRIMARY KEY (note_id, source_type, source_id)
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS wiki_pages (
+                    page_id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    source_doc_ids_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS outputs (
+                    output_id TEXT PRIMARY KEY,
+                    kind TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    source_doc_ids_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
 
     def upsert_document(
         self,
@@ -462,6 +497,153 @@ class DocumentMetadataStore:
             )
             return cursor.rowcount > 0
 
+    def save_note_link(self, note_id: str, source_type: str, source_id: str) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO note_links (note_id, source_type, source_id)
+                VALUES (?, ?, ?)
+                """,
+                (note_id, source_type, source_id),
+            )
+
+    def list_note_links(self, note_id: str) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT source_type, source_id
+                FROM note_links
+                WHERE note_id = ?
+                ORDER BY source_type ASC, source_id ASC
+                """,
+                (note_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def create_wiki_page(
+        self,
+        title: str,
+        content: str,
+        source_doc_ids: list[str],
+    ) -> dict:
+        now = datetime.now().isoformat()
+        page = {
+            "page_id": str(uuid.uuid4()),
+            "title": title,
+            "content": content,
+            "source_doc_ids": source_doc_ids,
+            "created_at": now,
+            "updated_at": now,
+        }
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO wiki_pages (
+                    page_id, title, content, source_doc_ids_json, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    page["page_id"],
+                    page["title"],
+                    page["content"],
+                    json.dumps(page["source_doc_ids"], ensure_ascii=False),
+                    page["created_at"],
+                    page["updated_at"],
+                ),
+            )
+        return page
+
+    def update_wiki_page(self, page_id: str, title: str, content: str) -> bool:
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE wiki_pages
+                SET title = ?, content = ?, updated_at = ?
+                WHERE page_id = ?
+                """,
+                (title, content, datetime.now().isoformat(), page_id),
+            )
+            return cursor.rowcount > 0
+
+    def get_wiki_page(self, page_id: str) -> Optional[dict]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM wiki_pages WHERE page_id = ?",
+                (page_id,),
+            ).fetchone()
+        return self._artifact_row_to_dict(row, "page_id", "source_doc_ids_json")
+
+    def list_wiki_pages(self) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM wiki_pages ORDER BY updated_at DESC"
+            ).fetchall()
+        return [
+            self._artifact_row_to_dict(row, "page_id", "source_doc_ids_json")
+            for row in rows
+        ]
+
+    def create_output(
+        self,
+        kind: str,
+        title: str,
+        content: str,
+        source_doc_ids: list[str],
+    ) -> dict:
+        now = datetime.now().isoformat()
+        output = {
+            "output_id": str(uuid.uuid4()),
+            "kind": kind,
+            "title": title,
+            "content": content,
+            "source_doc_ids": source_doc_ids,
+            "created_at": now,
+            "updated_at": now,
+        }
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO outputs (
+                    output_id, kind, title, content, source_doc_ids_json, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    output["output_id"],
+                    output["kind"],
+                    output["title"],
+                    output["content"],
+                    json.dumps(output["source_doc_ids"], ensure_ascii=False),
+                    output["created_at"],
+                    output["updated_at"],
+                ),
+            )
+        return output
+
+    def list_outputs(self, kind: Optional[str] = None) -> list[dict]:
+        params = []
+        where_sql = ""
+        if kind:
+            where_sql = "WHERE kind = ?"
+            params.append(kind)
+
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT *
+                FROM outputs
+                {where_sql}
+                ORDER BY updated_at DESC
+                """,
+                params,
+            ).fetchall()
+
+        return [
+            self._artifact_row_to_dict(row, "output_id", "source_doc_ids_json")
+            for row in rows
+        ]
+
     def update_status(
         self,
         doc_id: str,
@@ -502,6 +684,19 @@ class DocumentMetadataStore:
         if row is None:
             return None
         return dict(row)
+
+    def _artifact_row_to_dict(
+        self,
+        row,
+        id_key: str,
+        source_json_key: str,
+    ) -> Optional[dict]:
+        artifact = self._row_to_dict(row)
+        if artifact is None:
+            return None
+
+        artifact["source_doc_ids"] = json.loads(artifact.pop(source_json_key))
+        return artifact
 
     def _decorate_document(
         self,
