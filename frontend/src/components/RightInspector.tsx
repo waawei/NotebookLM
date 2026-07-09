@@ -86,7 +86,11 @@ function CitationsPanel({ citations }: { citations: Citation[] }) {
                 [{citation.number}] {citation.doc_name}
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                {citation.page ? `Page ${citation.page}` : 'Source section'} · {Math.round(citation.relevance_score * 100)}%
+                {citation.page
+                  ? `Page ${citation.page}`
+                  : citation.section
+                    ? `Section ${citation.section}`
+                    : 'Source section'} · {Math.round(citation.relevance_score * 100)}%
               </p>
             </div>
             <span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">

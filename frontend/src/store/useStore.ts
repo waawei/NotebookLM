@@ -21,6 +21,7 @@ export interface Citation {
   doc_id: string
   doc_name: string
   page: number | null
+  section?: string | null
   chunk_id: number
   content: string
   relevance_score: number

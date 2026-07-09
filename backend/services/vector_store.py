@@ -1,149 +1,151 @@
 """
-向量存储服务 - 使用 ChromaDB
+ChromaDB-backed vector store service.
 """
+
+from typing import List, Optional
 
 import chromadb
 from chromadb.config import Settings as ChromaSettings
 from sentence_transformers import SentenceTransformer
-from typing import List, Optional
 
 from core.config import settings
 
 
 class VectorStoreService:
-    """向量数据库服务"""
+    """Vector database service for document chunks."""
 
     def __init__(self):
-        # 初始化 ChromaDB 客户端
-        self.client = chromadb.Client(ChromaSettings(
-            persist_directory=settings.VECTOR_DB_PATH,
-            anonymized_telemetry=False,
-            allow_reset=True,
-            is_persistent=True
-        ))
-
-        # 初始化 Embedding 模型
+        self.client = chromadb.Client(
+            ChromaSettings(
+                persist_directory=settings.VECTOR_DB_PATH,
+                anonymized_telemetry=False,
+                allow_reset=True,
+                is_persistent=True,
+            )
+        )
         self.embedding_model = SentenceTransformer(
             settings.EMBEDDING_MODEL,
-            device=settings.EMBEDDING_DEVICE
+            device=settings.EMBEDDING_DEVICE,
         )
-
-        # 创建或获取集合
         self.collection = self.client.get_or_create_collection(
             name="documents",
-            metadata={"description": "文档向量存储"}
+            metadata={"description": "Document vector store"},
         )
 
-    async def add_documents(self, doc_id: str, chunks: List[str]) -> bool:
-        """
-        添加文档到向量数据库
-
-        Args:
-            doc_id: 文档 ID
-            chunks: 文档分块列表
-
-        Returns:
-            success: 是否成功
-        """
+    async def add_documents(
+        self,
+        doc_id: str,
+        chunks: List,
+        doc_name: Optional[str] = None,
+    ) -> bool:
+        """Add document chunks to the vector database."""
         try:
-            # 生成向量
-            embeddings = self.embedding_model.encode(chunks).tolist()
+            normalized_chunks = [
+                self._normalize_chunk(chunk, index)
+                for index, chunk in enumerate(chunks)
+            ]
+            if not normalized_chunks:
+                return True
 
-            # 准备 ID 和元数据
-            ids = [f"{doc_id}_chunk_{i}" for i in range(len(chunks))]
+            contents = [chunk["content"] for chunk in normalized_chunks]
+            embeddings = self.embedding_model.encode(contents).tolist()
+            ids = [
+                f"{doc_id}_chunk_{chunk['chunk_index']}"
+                for chunk in normalized_chunks
+            ]
             metadatas = [
-                {
-                    "doc_id": doc_id,
-                    "chunk_id": i,
-                    "chunk_size": len(chunk)
-                }
-                for i, chunk in enumerate(chunks)
+                self._build_metadata(doc_id, doc_name, chunk)
+                for chunk in normalized_chunks
             ]
 
-            # 存入 ChromaDB
             self.collection.add(
                 ids=ids,
                 embeddings=embeddings,
-                documents=chunks,
-                metadatas=metadatas
+                documents=contents,
+                metadatas=metadatas,
             )
-
             return True
 
-        except Exception as e:
-            print(f"向量化存储失败: {e}")
-            raise e
+        except Exception as exc:
+            print(f"Failed to store document vectors: {exc}")
+            raise exc
 
     async def search(
         self,
         query: str,
         doc_ids: Optional[List[str]] = None,
-        top_k: int = None
+        top_k: int = None,
     ) -> List[dict]:
-        """
-        搜索相关文档块
-
-        Args:
-            query: 查询文本
-            doc_ids: 限制搜索的文档 ID 列表
-            top_k: 返回的结果数量
-
-        Returns:
-            results: 搜索结果列表
-        """
+        """Search relevant document chunks."""
         if top_k is None:
             top_k = settings.TOP_K_RESULTS
 
-        # 向量化查询
         query_embedding = self.embedding_model.encode([query]).tolist()
+        where = {"doc_id": {"$in": doc_ids}} if doc_ids else None
 
-        # 构建过滤条件
-        where = None
-        if doc_ids:
-            where = {"doc_id": {"$in": doc_ids}}
-
-        # 搜索
         results = self.collection.query(
             query_embeddings=query_embedding,
             n_results=top_k,
-            where=where
+            where=where,
         )
 
-        # 格式化结果
         formatted_results = []
         if results["documents"] and len(results["documents"]) > 0:
-            for i in range(len(results["documents"][0])):
-                formatted_results.append({
-                    "content": results["documents"][0][i],
-                    "metadata": results["metadatas"][0][i],
-                    "score": 1 - results["distances"][0][i],  # 转换为相似度分数
-                    "id": results["ids"][0][i]
-                })
+            for index in range(len(results["documents"][0])):
+                formatted_results.append(
+                    {
+                        "content": results["documents"][0][index],
+                        "metadata": results["metadatas"][0][index],
+                        "score": 1 - results["distances"][0][index],
+                        "id": results["ids"][0][index],
+                    }
+                )
 
         return formatted_results
 
     async def delete_document(self, doc_id: str) -> bool:
-        """
-        删除文档的所有向量
-
-        Args:
-            doc_id: 文档 ID
-
-        Returns:
-            success: 是否成功
-        """
+        """Delete all vectors for a document."""
         try:
-            # 查找该文档的所有 chunk
-            results = self.collection.get(
-                where={"doc_id": doc_id}
-            )
-
+            results = self.collection.get(where={"doc_id": doc_id})
             if results["ids"]:
-                # 删除所有相关向量
                 self.collection.delete(ids=results["ids"])
-
             return True
 
-        except Exception as e:
-            print(f"删除文档向量失败: {e}")
+        except Exception as exc:
+            print(f"Failed to delete document vectors: {exc}")
             return False
+
+    def _normalize_chunk(self, chunk, index: int) -> dict:
+        if isinstance(chunk, dict):
+            return {
+                "content": chunk.get("content", ""),
+                "section": chunk.get("section"),
+                "chunk_index": chunk.get("chunk_index", index),
+                "page": chunk.get("page"),
+            }
+
+        return {
+            "content": str(chunk),
+            "section": None,
+            "chunk_index": index,
+            "page": None,
+        }
+
+    def _build_metadata(
+        self,
+        doc_id: str,
+        doc_name: Optional[str],
+        chunk: dict,
+    ) -> dict:
+        metadata = {
+            "doc_id": doc_id,
+            "doc_name": doc_name or doc_id,
+            "chunk_id": chunk["chunk_index"],
+            "chunk_index": chunk["chunk_index"],
+            "chunk_size": len(chunk["content"]),
+        }
+        if chunk.get("section") is not None:
+            metadata["section"] = chunk["section"]
+        if chunk.get("page") is not None:
+            metadata["page"] = chunk["page"]
+        return metadata

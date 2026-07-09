@@ -2,9 +2,11 @@
 文档解析器 - 支持 PDF、TXT、Markdown、DOCX、网页 URL
 """
 
+import re
+
 import PyPDF2
 import requests
-from typing import List
+from typing import List, Optional
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from docx import Document
 from bs4 import BeautifulSoup
@@ -138,7 +140,7 @@ class DocumentParser:
 
         return text
 
-    def chunk_text(self, text: str) -> List[str]:
+    def chunk_text(self, text: str) -> List[dict]:
         """
         将文本分块
 
@@ -148,5 +150,51 @@ class DocumentParser:
         Returns:
             chunks: 文本块列表
         """
-        chunks = self.text_splitter.split_text(text)
+        chunks = []
+        for block in self._split_structured_blocks(text):
+            split_contents = self.text_splitter.split_text(block["content"])
+            for content in split_contents:
+                stripped_content = content.strip()
+                if not stripped_content:
+                    continue
+                chunks.append(
+                    {
+                        "content": stripped_content,
+                        "section": block["section"],
+                        "chunk_index": len(chunks),
+                    }
+                )
         return chunks
+
+    def _split_structured_blocks(self, text: str) -> List[dict]:
+        blocks = []
+        current_section: Optional[str] = None
+        buffer: List[str] = []
+        blank_count = 0
+
+        def flush_buffer():
+            content = "\n".join(buffer).strip()
+            if content:
+                blocks.append({"content": content, "section": current_section})
+            buffer.clear()
+
+        normalized_text = text.replace("\r\n", "\n").replace("\r", "\n")
+        for line in normalized_text.split("\n"):
+            heading_match = re.match(r"^\s{0,3}#{1,6}\s+(.+?)\s*$", line)
+            if heading_match:
+                flush_buffer()
+                current_section = heading_match.group(1).strip()
+                blank_count = 0
+                continue
+
+            if not line.strip():
+                blank_count += 1
+                if blank_count >= 2:
+                    flush_buffer()
+                continue
+
+            blank_count = 0
+            buffer.append(line)
+
+        flush_buffer()
+        return blocks

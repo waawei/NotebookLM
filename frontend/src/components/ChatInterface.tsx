@@ -307,7 +307,10 @@ export default function ChatInterface() {
                                     </span>
                                     <p className="text-xs font-bold text-blue-900">
                                       {citation.doc_name}
-                                      {citation.page && <span className="ml-2 text-blue-700">· Page {citation.page}</span>}
+                                      {citation.page && <span className="ml-2 text-blue-700">Page {citation.page}</span>}
+                                      {!citation.page && citation.section && (
+                                        <span className="ml-2 text-blue-700">Section {citation.section}</span>
+                                      )}
                                     </p>
                                   </div>
                                   <div className="flex items-center gap-2">

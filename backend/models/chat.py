@@ -18,6 +18,7 @@ class Citation(BaseModel):
     doc_id: str
     doc_name: str
     page: Optional[int]
+    section: Optional[str] = None
     chunk_id: int
     content: str
     relevance_score: float

@@ -52,6 +52,7 @@ class RetrievalService:
                     doc_id=metadata.get("doc_id", ""),
                     doc_name=self._doc_name(metadata),
                     page=metadata.get("page"),
+                    section=metadata.get("section"),
                     chunk_id=metadata.get("chunk_id", metadata.get("chunk_index", 0)),
                     content=result.get("content", ""),
                     relevance_score=result.get("score", 0.0),

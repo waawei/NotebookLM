@@ -69,6 +69,8 @@ class DocumentChunk(BaseModel):
     doc_id: str
     content: str
     metadata: dict
+    section: Optional[str] = None
+    chunk_index: Optional[int] = None
 
 
 class ChunkWithScore(BaseModel):

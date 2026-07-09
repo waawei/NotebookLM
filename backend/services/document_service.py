@@ -84,7 +84,11 @@ class DocumentService:
             url = record["source_url"]
             text = self.parser.parse_url(url)
             chunks = self.parser.chunk_text(text)
-            await self.vector_store.add_documents(doc_id, chunks)
+            await self.vector_store.add_documents(
+                doc_id,
+                chunks,
+                doc_name=record["filename"],
+            )
             summary = await self._generate_summary(text)
 
             self.metadata_store.update_status(
@@ -111,7 +115,11 @@ class DocumentService:
             file_path = record["source_path"]
             text = self.parser.parse_file(file_path)
             chunks = self.parser.chunk_text(text)
-            await self.vector_store.add_documents(doc_id, chunks)
+            await self.vector_store.add_documents(
+                doc_id,
+                chunks,
+                doc_name=record["filename"],
+            )
             summary = await self._generate_summary(text)
 
             self.metadata_store.update_status(
