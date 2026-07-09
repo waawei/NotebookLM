@@ -161,6 +161,34 @@ class DocumentMetadataStore:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS agent_runs (
+                    run_id TEXT PRIMARY KEY,
+                    skill_id TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    input_payload_json TEXT NOT NULL,
+                    output_id TEXT,
+                    error TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS agent_steps (
+                    step_id TEXT PRIMARY KEY,
+                    run_id TEXT NOT NULL,
+                    step_index INTEGER NOT NULL,
+                    kind TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    payload_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (run_id) REFERENCES agent_runs(run_id) ON DELETE CASCADE
+                )
+                """
+            )
 
     def upsert_document(
         self,
@@ -728,6 +756,119 @@ class DocumentMetadataStore:
             )
             return cursor.rowcount > 0
 
+    def create_agent_run(self, skill_id: str, input_payload: dict) -> dict:
+        now = datetime.now().isoformat()
+        run = {
+            "run_id": str(uuid.uuid4()),
+            "skill_id": skill_id,
+            "status": "running",
+            "input_payload": input_payload,
+            "output_id": None,
+            "error": None,
+            "created_at": now,
+            "updated_at": now,
+            "steps": [],
+        }
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO agent_runs (
+                    run_id, skill_id, status, input_payload_json, output_id, error,
+                    created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run["run_id"],
+                    run["skill_id"],
+                    run["status"],
+                    json.dumps(run["input_payload"], ensure_ascii=False),
+                    run["output_id"],
+                    run["error"],
+                    run["created_at"],
+                    run["updated_at"],
+                ),
+            )
+        return run
+
+    def append_agent_step(self, run_id: str, step: dict) -> None:
+        kind = step.get("kind")
+        title = step.get("title")
+        if not isinstance(kind, str) or not kind:
+            raise ValueError("Agent step kind is required")
+        if not isinstance(title, str) or not title:
+            raise ValueError("Agent step title is required")
+
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT COALESCE(MAX(step_index), -1) AS last_index FROM agent_steps WHERE run_id = ?",
+                (run_id,),
+            ).fetchone()
+            if conn.execute(
+                "SELECT 1 FROM agent_runs WHERE run_id = ?",
+                (run_id,),
+            ).fetchone() is None:
+                raise ValueError(f"Agent run {run_id} does not exist")
+            conn.execute(
+                """
+                INSERT INTO agent_steps (
+                    step_id, run_id, step_index, kind, title, payload_json, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    str(uuid.uuid4()),
+                    run_id,
+                    row["last_index"] + 1,
+                    kind,
+                    title,
+                    json.dumps(step.get("payload", {}), ensure_ascii=False),
+                    datetime.now().isoformat(),
+                ),
+            )
+
+    def update_agent_run_status(
+        self,
+        run_id: str,
+        status: str,
+        output_id: Optional[str] = None,
+        error: Optional[str] = None,
+    ) -> None:
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE agent_runs
+                SET status = ?, output_id = ?, error = ?, updated_at = ?
+                WHERE run_id = ?
+                """,
+                (status, output_id, error, datetime.now().isoformat(), run_id),
+            )
+            if cursor.rowcount == 0:
+                raise ValueError(f"Agent run {run_id} does not exist")
+
+    def get_agent_run(self, run_id: str) -> Optional[dict]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM agent_runs WHERE run_id = ?",
+                (run_id,),
+            ).fetchone()
+            step_rows = conn.execute(
+                """
+                SELECT * FROM agent_steps
+                WHERE run_id = ?
+                ORDER BY step_index ASC, step_id ASC
+                """,
+                (run_id,),
+            ).fetchall()
+        return self._agent_run_row_to_dict(row, step_rows)
+
+    def list_agent_runs(self) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT run_id FROM agent_runs ORDER BY updated_at DESC, run_id ASC"
+            ).fetchall()
+        return [self.get_agent_run(row["run_id"]) for row in rows]
+
     def update_status(
         self,
         doc_id: str,
@@ -789,6 +930,24 @@ class DocumentMetadataStore:
         note["doc_ids"] = json.loads(note.pop("doc_ids_json"))
         note["links"] = self.list_note_links(note["note_id"])
         return note
+
+    def _agent_run_row_to_dict(self, row, step_rows) -> Optional[dict]:
+        run = self._row_to_dict(row)
+        if run is None:
+            return None
+        run["input_payload"] = json.loads(run.pop("input_payload_json"))
+        run["steps"] = [
+            {
+                "step_id": step["step_id"],
+                "step_index": step["step_index"],
+                "kind": step["kind"],
+                "title": step["title"],
+                "payload": json.loads(step["payload_json"]),
+                "created_at": step["created_at"],
+            }
+            for step in step_rows
+        ]
+        return run
 
     def _decorate_document(
         self,
