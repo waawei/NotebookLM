@@ -46,3 +46,19 @@ class ModelingStoreTests(unittest.TestCase):
         self.assertEqual(loaded["output_requirements"], ["problem_spec.json"])
         self.assertNotIn("input_payload_json", loaded)
         self.assertNotIn("output_requirements_json", loaded)
+
+    def test_transition_state_records_and_updates_in_one_store_call(self):
+        project = self.store.create_project("Forecast", "forecast", "D:/safe/forecast", None)
+
+        self.store.transition_state(
+            project["project_id"],
+            "project_initialized",
+            "problem_parsing",
+            "advance",
+        )
+
+        loaded = self.store.get_project(project["project_id"])
+        [transition] = self.store.list_transitions(project["project_id"])
+        self.assertEqual(loaded["state"], "problem_parsing")
+        self.assertEqual(transition["from_state"], "project_initialized")
+        self.assertEqual(transition["to_state"], "problem_parsing")

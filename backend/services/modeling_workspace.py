@@ -1,4 +1,5 @@
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -17,20 +18,31 @@ class ModelingWorkspaceService:
         if target != self.workspace_root / slug or target.exists():
             raise ValueError("Project workspace already exists or escapes its root")
 
-        target.mkdir(parents=True)
-        for relative in (
-            "problem/original",
-            "data/raw",
-            "analysis",
-            "src",
-            "tests",
-            "experiments",
-            "figures",
-            "tables",
-            "paper/sections",
-            "deliverables",
-            ".workflow/runs",
-        ):
-            (target / relative).mkdir(parents=True, exist_ok=True)
-        subprocess.run(["git", "init"], cwd=target, check=True, capture_output=True, text=True)
+        try:
+            target.mkdir(parents=True)
+            for relative in (
+                "problem/original",
+                "data/raw",
+                "analysis",
+                "src",
+                "tests",
+                "experiments",
+                "figures",
+                "tables",
+                "paper/sections",
+                "deliverables",
+                ".workflow/runs",
+            ):
+                (target / relative).mkdir(parents=True, exist_ok=True)
+            subprocess.run(["git", "init"], cwd=target, check=True, capture_output=True, text=True)
+        except Exception:
+            self.remove_created(target)
+            raise
         return target
+
+    def remove_created(self, path: Path) -> None:
+        target = Path(path).resolve()
+        if target == self.workspace_root or self.workspace_root not in target.parents:
+            raise ValueError("Refusing to remove a path outside the modeling workspace root")
+        if target.exists():
+            shutil.rmtree(target)

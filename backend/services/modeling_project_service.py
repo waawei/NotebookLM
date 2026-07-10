@@ -21,7 +21,11 @@ class ModelingProjectService:
             raise ValueError("Project name is required")
         slug = self._slug(clean_name)
         path = self.workspace_service.create(slug)
-        return self.store.create_project(clean_name, slug, str(path), deadline)
+        try:
+            return self.store.create_project(clean_name, slug, str(path), deadline)
+        except Exception:
+            self.workspace_service.remove_created(path)
+            raise
 
     def list_projects(self) -> list[dict]:
         return self.store.list_projects()
@@ -40,15 +44,19 @@ class ModelingProjectService:
     def advance(self, project_id: str) -> dict:
         project = self._require(project_id)
         target = next_state(project["state"])
-        self.store.record_transition(project_id, project["state"], target, "advance")
-        self.store.update_state(project_id, target)
+        self.store.transition_state(project_id, project["state"], target, "advance")
         return self._require(project_id)
 
-    def rollback(self, project_id: str, reason: str) -> dict:
+    def rollback(self, project_id: str, reason: str | None) -> dict:
         project = self._require(project_id)
         target = previous_state(project["state"])
-        self.store.record_transition(project_id, project["state"], target, reason.strip() or "rollback")
-        self.store.update_state(project_id, target)
+        reason_text = reason.strip() if isinstance(reason, str) else ""
+        self.store.transition_state(
+            project_id,
+            project["state"],
+            target,
+            reason_text or "rollback",
+        )
         return self._require(project_id)
 
     def _require(self, project_id: str) -> dict:

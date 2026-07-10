@@ -1,3 +1,5 @@
+import subprocess
+
 import pytest
 
 from services.modeling_workspace import ModelingWorkspaceService
@@ -43,3 +45,17 @@ def test_workspace_rejects_invalid_slug(tmp_path):
 
     with pytest.raises(ValueError, match="Invalid project slug"):
         service.create("../forecast")
+
+
+def test_workspace_cleans_up_when_git_init_fails(tmp_path, monkeypatch):
+    service = ModelingWorkspaceService(str(tmp_path / "projects"), str(tmp_path / "source"))
+
+    def fail_git_init(*_args, **_kwargs):
+        raise subprocess.CalledProcessError(1, ["git", "init"], stderr="git missing")
+
+    monkeypatch.setattr("services.modeling_workspace.subprocess.run", fail_git_init)
+
+    with pytest.raises(subprocess.CalledProcessError):
+        service.create("forecast")
+
+    assert not (tmp_path / "projects" / "forecast").exists()

@@ -161,6 +161,41 @@ class ModelingStore:
                 ),
             )
 
+    def transition_state(
+        self,
+        project_id: str,
+        from_state: str,
+        to_state: str,
+        reason: str,
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO workflow_transitions (
+                    transition_id, project_id, from_state, to_state, reason, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    str(uuid.uuid4()),
+                    project_id,
+                    from_state,
+                    to_state,
+                    reason,
+                    datetime.now().isoformat(),
+                ),
+            )
+            cursor = conn.execute(
+                """
+                UPDATE modeling_projects
+                SET state = ?, updated_at = ?
+                WHERE project_id = ?
+                """,
+                (to_state, datetime.now().isoformat(), project_id),
+            )
+            if cursor.rowcount == 0:
+                raise ValueError("Modeling project not found")
+
     def list_transitions(self, project_id: str) -> list[dict]:
         with self._connect() as conn:
             rows = conn.execute(
