@@ -241,11 +241,10 @@ class ModelingStore:
                 """,
                 (project_id,),
             ).fetchall()
-        return [
-            {
-                **dict(row),
-                "input_payload": json.loads(row["input_payload_json"]),
-                "output_requirements": json.loads(row["output_requirements_json"]),
-            }
-            for row in rows
-        ]
+        tasks = []
+        for row in rows:
+            task = dict(row)
+            task["input_payload"] = json.loads(task.pop("input_payload_json"))
+            task["output_requirements"] = json.loads(task.pop("output_requirements_json"))
+            tasks.append(task)
+        return tasks

@@ -92,6 +92,55 @@ class AgentStoreTests(unittest.TestCase):
         self.assertEqual([item["run_id"] for item in listed], [run["run_id"]])
         self.assertEqual(self.store.list_agent_runs(project_id="missing"), [])
 
+    def test_existing_agent_run_rows_migrate_with_empty_modeling_links(self):
+        conn = sqlite3.connect(self.db_path)
+        try:
+            conn.execute("DROP TABLE agent_runs")
+            conn.execute(
+                """
+                CREATE TABLE agent_runs (
+                    run_id TEXT PRIMARY KEY,
+                    skill_id TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    input_payload_json TEXT NOT NULL,
+                    output_id TEXT,
+                    error TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                INSERT INTO agent_runs (
+                    run_id, skill_id, status, input_payload_json, output_id, error,
+                    created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "old-run",
+                    "paper_planner",
+                    "completed",
+                    '{"doc_ids": []}',
+                    None,
+                    None,
+                    "2026-07-11T00:00:00",
+                    "2026-07-11T00:00:00",
+                ),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        reopened = DocumentMetadataStore(self.db_path)
+        loaded = reopened.get_agent_run("old-run")
+
+        self.assertEqual(loaded["run_id"], "old-run")
+        self.assertIsNone(loaded["project_id"])
+        self.assertIsNone(loaded["task_id"])
+        self.assertIsNone(loaded["stage"])
+
     def test_failed_run_persists_visible_error(self):
         run = self.store.create_agent_run("course_reviewer", {"doc_ids": []})
 

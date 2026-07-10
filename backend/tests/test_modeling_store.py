@@ -44,3 +44,5 @@ class ModelingStoreTests(unittest.TestCase):
         self.assertEqual(loaded["retry_count"], 1)
         self.assertEqual(loaded["input_payload"], {"prompt": "Forecast sales"})
         self.assertEqual(loaded["output_requirements"], ["problem_spec.json"])
+        self.assertNotIn("input_payload_json", loaded)
+        self.assertNotIn("output_requirements_json", loaded)
