@@ -11,10 +11,14 @@ from urllib.parse import urlparse
 from core.config import settings
 
 
-SUPPORTED_PROVIDERS = {"openai", "dashscope", "openai_compatible"}
+SUPPORTED_PROVIDERS = {"openai", "dashscope", "openai_compatible", "ollama", "deepseek"}
 EndpointMode = Literal["auto", "exact"]
 SUPPORTED_ENDPOINT_MODES = {"auto", "exact"}
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[1] / "data" / "llm_config.json"
+PROVIDER_DEFAULTS = {
+    "ollama": {"base_url": "http://localhost:11434", "endpoint_mode": "auto"},
+    "deepseek": {"base_url": "https://api.deepseek.com", "endpoint_mode": "exact"},
+}
 
 
 @dataclass(frozen=True)
@@ -93,14 +97,22 @@ class LLMConfigurationService:
         return self._to_effective_config(candidate)
 
     def _to_effective_config(self, overlay: dict) -> EffectiveLLMConfig:
+        provider = self._string_value(overlay, "provider", "LLM_PROVIDER").lower()
+        provider_defaults = PROVIDER_DEFAULTS.get(provider, {})
         endpoint_mode = self._string_value(overlay, "endpoint_mode", None).lower()
         if endpoint_mode not in SUPPORTED_ENDPOINT_MODES:
-            endpoint_mode = "auto"
+            endpoint_mode = str(provider_defaults.get("endpoint_mode", "auto"))
+        base_url = self._string_value(overlay, "base_url", "LLM_BASE_URL")
+        if not base_url and provider_defaults.get("base_url"):
+            base_url = str(provider_defaults["base_url"])
+        api_key = self._string_value(overlay, "api_key", "LLM_API_KEY")
+        if provider == "ollama" and "api_key" not in overlay:
+            api_key = ""
         return EffectiveLLMConfig(
-            provider=self._string_value(overlay, "provider", "LLM_PROVIDER").lower(),
+            provider=provider,
             model=self._string_value(overlay, "model", "LLM_MODEL"),
-            base_url=self._string_value(overlay, "base_url", "LLM_BASE_URL"),
-            api_key=self._string_value(overlay, "api_key", "LLM_API_KEY"),
+            base_url=base_url,
+            api_key=api_key,
             temperature=float(getattr(self.defaults, "LLM_TEMPERATURE")),
             max_tokens=int(getattr(self.defaults, "LLM_MAX_TOKENS")),
             endpoint_mode=endpoint_mode,
@@ -112,6 +124,11 @@ class LLMConfigurationService:
 
         current = self.store.load()
         allowed_values = self._allowed_values(values)
+        if (
+            str(allowed_values.get("provider", "")).lower() == "ollama"
+            and "api_key" not in allowed_values
+        ):
+            allowed_values["api_key"] = ""
         candidate = {**current, **allowed_values}
         self._validate(candidate)
         return self.store.save(candidate)
@@ -164,7 +181,7 @@ class LLMConfigurationService:
         warnings: list[str] = []
         if effective.provider not in SUPPORTED_PROVIDERS:
             warnings.append("Configured LLM provider is unsupported")
-        if not effective.api_key:
+        if not effective.api_key and effective.provider != "ollama":
             warnings.append("LLM API key is not configured")
         if effective.base_url and not self._is_http_url(effective.base_url):
             warnings.append("Configured LLM base URL is invalid")

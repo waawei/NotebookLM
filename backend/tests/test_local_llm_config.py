@@ -128,6 +128,56 @@ class LocalLLMConfigurationTests(unittest.TestCase):
         self.assertEqual(status["endpoint_mode"], "exact")
         self.assertNotIn("stored-key", str(status))
 
+    def test_ollama_defaults_to_local_openai_compatible_endpoint_without_key_warning(self):
+        service = self.make_service()
+        service.save({"provider": "ollama", "model": "qwen3:8b"})
+
+        effective = service.effective_config()
+        status = service.safe_status()
+
+        self.assertEqual(effective.provider, "ollama")
+        self.assertEqual(effective.model, "qwen3:8b")
+        self.assertEqual(effective.base_url, "http://localhost:11434")
+        self.assertEqual(effective.api_key, "")
+        self.assertEqual(effective.endpoint_mode, "auto")
+        self.assertFalse(status["api_key_configured"])
+        self.assertEqual(status["warnings"], [])
+
+    def test_switching_to_ollama_without_key_clears_previous_local_key(self):
+        service = self.make_service()
+        service.save(
+            {
+                "provider": "deepseek",
+                "model": "deepseek-v4-flash",
+                "api_key": "previous-provider-secret",
+            }
+        )
+        service.save({"provider": "ollama", "model": "qwen3:8b"})
+
+        effective = service.effective_config()
+
+        self.assertEqual(effective.provider, "ollama")
+        self.assertEqual(effective.api_key, "")
+        self.assertNotIn("previous-provider-secret", str(service.store.load()))
+
+    def test_deepseek_defaults_to_exact_api_base(self):
+        service = self.make_service()
+        service.save(
+            {
+                "provider": "deepseek",
+                "model": "deepseek-v4-flash",
+                "api_key": "deepseek-secret",
+            }
+        )
+
+        effective = service.effective_config()
+
+        self.assertEqual(effective.provider, "deepseek")
+        self.assertEqual(effective.model, "deepseek-v4-flash")
+        self.assertEqual(effective.base_url, "https://api.deepseek.com")
+        self.assertEqual(effective.api_key, "deepseek-secret")
+        self.assertEqual(effective.endpoint_mode, "exact")
+
 
 if __name__ == "__main__":
     unittest.main()

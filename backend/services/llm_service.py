@@ -51,11 +51,12 @@ class LLMService:
                 )
             return OpenAI(api_key=self.api_key)
 
-        if self.provider == "openai_compatible":
+        if self.provider in {"openai_compatible", "ollama", "deepseek"}:
             if not self.base_url:
-                raise ValueError("LLM_BASE_URL is required for openai_compatible provider")
+                raise ValueError(f"LLM_BASE_URL is required for {self.provider} provider")
+            api_key = self.api_key or ("ollama-local" if self.provider == "ollama" else "")
             return OpenAI(
-                api_key=self.api_key,
+                api_key=api_key,
                 base_url=normalize_openai_base_url(self.base_url, self.endpoint_mode),
             )
 

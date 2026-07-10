@@ -2,6 +2,21 @@ import { useEffect, useState } from 'react'
 import { AlertCircle, CheckCircle2, Eye, EyeOff, RefreshCw, Server, ShieldCheck } from 'lucide-react'
 import { settingsApi, type SettingsConfigUpdate, type SettingsEndpointMode, type SettingsStatus, type SettingsTestResult } from '../services/api'
 
+const PROVIDER_PRESETS: Record<string, { model: string; baseUrl: string; endpointMode: SettingsEndpointMode; keyPlaceholder: string }> = {
+  ollama: {
+    model: 'qwen3:8b',
+    baseUrl: 'http://localhost:11434',
+    endpointMode: 'auto',
+    keyPlaceholder: 'Optional for local Ollama',
+  },
+  deepseek: {
+    model: 'deepseek-v4-flash',
+    baseUrl: 'https://api.deepseek.com',
+    endpointMode: 'exact',
+    keyPlaceholder: 'Required by DeepSeek',
+  },
+}
+
 export default function LLMSettingsPanel() {
   const [status, setStatus] = useState<SettingsStatus | null>(null)
   const [provider, setProvider] = useState('openai')
@@ -43,6 +58,18 @@ export default function LLMSettingsPanel() {
   useEffect(() => {
     void loadStatus()
   }, [])
+
+  const changeProvider = (nextProvider: string) => {
+    setProvider(nextProvider)
+    const preset = PROVIDER_PRESETS[nextProvider]
+    if (!preset) return
+    setModel(preset.model)
+    setBaseUrl(preset.baseUrl)
+    setBaseUrlTouched(true)
+    setEndpointMode(preset.endpointMode)
+    setApiKey('')
+    setShowApiKey(false)
+  }
 
   const saveConfiguration = async () => {
     setIsSaving(true)
@@ -139,10 +166,12 @@ export default function LLMSettingsPanel() {
 
         <div className="grid gap-4 md:grid-cols-2">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">Provider
-            <select value={provider} onChange={(event) => setProvider(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-950 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
+            <select value={provider} onChange={(event) => changeProvider(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-950 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
               <option value="openai">OpenAI</option>
               <option value="dashscope">DashScope</option>
               <option value="openai_compatible">OpenAI compatible</option>
+              <option value="ollama">Ollama</option>
+              <option value="deepseek">DeepSeek</option>
             </select>
           </label>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">Model
@@ -160,7 +189,7 @@ export default function LLMSettingsPanel() {
             <span className="mt-1 block text-xs font-normal text-gray-500 dark:text-gray-400">Automatic accepts the API root or /v1 (with or without a trailing slash). Exact preserves a documented custom API base. Do not enter /models or /chat/completions.</span>
           </label>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">API key
-            <span className="mt-1 flex gap-2"><input aria-label="API key" type={showApiKey ? 'text' : 'password'} autoComplete="off" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={status?.api_key_configured ? 'Configured; enter a replacement only' : 'Required by most providers'} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-950 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100" /><button type="button" aria-label={showApiKey ? 'Hide API key' : 'Show API key'} onClick={() => setShowApiKey((visible) => !visible)} className="rounded-lg border border-gray-300 px-3 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800">{showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></span>
+            <span className="mt-1 flex gap-2"><input aria-label="API key" type={showApiKey ? 'text' : 'password'} autoComplete="off" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={status?.api_key_configured ? 'Configured; enter a replacement only' : PROVIDER_PRESETS[provider]?.keyPlaceholder || 'Required by most providers'} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-950 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100" /><button type="button" aria-label={showApiKey ? 'Hide API key' : 'Show API key'} onClick={() => setShowApiKey((visible) => !visible)} className="rounded-lg border border-gray-300 px-3 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800">{showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></span>
           </label>
         </div>
 

@@ -131,4 +131,45 @@ describe('SettingsView', () => {
       expect(screen.queryByText('Connection details')).not.toBeInTheDocument()
     })
   })
+
+  it('applies the Ollama preset and saves a local qwen model without a key', async () => {
+    render(<SettingsView />)
+    await screen.findByText('Runtime settings')
+
+    fireEvent.change(screen.getByLabelText('Provider'), { target: { value: 'ollama' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save configuration' }))
+
+    await waitFor(() => {
+      expect(settingsApiMock.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: 'ollama',
+          model: 'qwen3:8b',
+          base_url: 'http://localhost:11434',
+          endpoint_mode: 'auto',
+        }),
+      )
+    })
+    expect(settingsApiMock.save).toHaveBeenCalledWith(expect.not.objectContaining({ api_key: expect.any(String) }))
+  })
+
+  it('applies the DeepSeek preset with an exact API base', async () => {
+    render(<SettingsView />)
+    await screen.findByText('Runtime settings')
+
+    fireEvent.change(screen.getByLabelText('Provider'), { target: { value: 'deepseek' } })
+    fireEvent.change(screen.getByLabelText('API key'), { target: { value: 'deepseek-secret' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save configuration' }))
+
+    await waitFor(() => {
+      expect(settingsApiMock.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: 'deepseek',
+          model: 'deepseek-v4-flash',
+          base_url: 'https://api.deepseek.com',
+          api_key: 'deepseek-secret',
+          endpoint_mode: 'exact',
+        }),
+      )
+    })
+  })
 })

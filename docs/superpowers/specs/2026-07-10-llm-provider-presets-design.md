@@ -17,7 +17,7 @@ This change adds provider compatibility only. It does not change Agent skill pro
 
 ## Settings UI
 
-Settings adds explicit `Ollama` and `DeepSeek` provider options. Choosing `Ollama` pre-fills `qwen:8b`, `http://localhost:11434`, and automatic `/v1` normalization. Choosing `DeepSeek` pre-fills `deepseek-v4-flash`, `https://api.deepseek.com`, and exact endpoint mode.
+Settings adds explicit `Ollama` and `DeepSeek` provider options. Choosing `Ollama` pre-fills `qwen3:8b`, `http://localhost:11434`, and automatic `/v1` normalization. Choosing `DeepSeek` pre-fills `deepseek-v4-flash`, `https://api.deepseek.com`, and exact endpoint mode.
 
 The API key input remains write-only. Ollama copy states that a key is optional for local use. DeepSeek copy keeps the key requirement clear.
 

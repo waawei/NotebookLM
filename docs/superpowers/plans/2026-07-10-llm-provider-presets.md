@@ -35,7 +35,7 @@
 Add tests proving:
 
 ```python
-service.save({"provider": "ollama", "model": "qwen:8b"})
+service.save({"provider": "ollama", "model": "qwen3:8b"})
 effective = service.effective_config()
 self.assertEqual(effective.base_url, "http://localhost:11434")
 self.assertEqual(effective.api_key, "")
@@ -99,7 +99,7 @@ Add tests proving selecting `Ollama` and saving sends:
 ```ts
 expect.objectContaining({
   provider: 'ollama',
-  model: 'qwen:8b',
+  model: 'qwen3:8b',
   base_url: 'http://localhost:11434',
   endpoint_mode: 'auto',
 })

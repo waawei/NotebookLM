@@ -1,5 +1,6 @@
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from services.local_llm_config import EffectiveLLMConfig
 from services.llm_service import LLMService
@@ -82,6 +83,49 @@ class NormalizeOpenAIBaseURLTests(unittest.TestCase):
         self.assertEqual(service.model, "configured-model")
         self.assertEqual(service.base_url, "https://example.test")
         self.assertEqual(service.api_key, "injected-secret")
+
+    def test_ollama_uses_local_openai_compatible_client_with_placeholder_key(self):
+        service = LLMService(
+            EffectiveLLMConfig(
+                provider="ollama",
+                model="qwen3:8b",
+                base_url="http://localhost:11434",
+                api_key="",
+                temperature=0.2,
+                max_tokens=123,
+            )
+        )
+
+        with patch("services.llm_service.OpenAI") as openai:
+            client = service._get_client()
+
+        self.assertEqual(client, openai.return_value)
+        openai.assert_called_once_with(
+            api_key="ollama-local",
+            base_url="http://localhost:11434/v1",
+        )
+
+    def test_deepseek_uses_exact_openai_compatible_client(self):
+        service = LLMService(
+            EffectiveLLMConfig(
+                provider="deepseek",
+                model="deepseek-v4-flash",
+                base_url="https://api.deepseek.com",
+                api_key="deepseek-secret",
+                temperature=0.2,
+                max_tokens=123,
+                endpoint_mode="exact",
+            )
+        )
+
+        with patch("services.llm_service.OpenAI") as openai:
+            client = service._get_client()
+
+        self.assertEqual(client, openai.return_value)
+        openai.assert_called_once_with(
+            api_key="deepseek-secret",
+            base_url="https://api.deepseek.com",
+        )
 
 
 if __name__ == "__main__":
