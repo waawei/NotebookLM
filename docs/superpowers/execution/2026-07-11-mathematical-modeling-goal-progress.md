@@ -10,11 +10,11 @@ current_phase: 1
 phase_status: not_started
 current_task: null
 task_status: pending
-baseline_commit: null
+baseline_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
 worktree_path: null
-last_verified_commit: bd167bf
-last_verification: planning_documents_only
-next_action: reconcile_dirty_worktree_before_phase_1
+last_verified_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
+last_verification: reviva_workbench_baseline_committed
+next_action: create_phase_1_worktree_from_baseline
 ```
 
 ## 启动前风险
@@ -61,7 +61,7 @@ Phase 1 尚未开始。启动后按以下格式替换本段：
 
 ## 阻塞项
 
-1. Phase 1 开始前需要确认如何处理与计划文件重叠的现有未提交改动。
+1. 已处理：Phase 1 开始前的 Reviva 工作台改动已整理为实现、文档截图和基线记录提交。
 
 ## Goal 运行历史
 
