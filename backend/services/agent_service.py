@@ -40,7 +40,9 @@ class AgentService:
             raise ValueError(f"Unknown skill: {skill_id}")
         if not isinstance(input_payload, dict):
             raise ValueError("Agent input must be an object")
-        return self.metadata_store.create_agent_run(skill_id, input_payload)
+        return self.metadata_store.create_agent_run(
+            skill_id, self._sanitize_input_payload(input_payload)
+        )
 
     async def execute_run(self, run_id: str) -> dict:
         run = self.metadata_store.get_agent_run(run_id)
@@ -153,3 +155,17 @@ class AgentService:
         error = self.error_sanitizer(str(exc))
         api_key = getattr(llm_service, "api_key", "")
         return error.replace(api_key, "***") if api_key else error
+
+    def _sanitize_input_payload(self, value):
+        if isinstance(value, dict):
+            return {
+                key: self._sanitize_input_payload(item)
+                for key, item in value.items()
+            }
+        if isinstance(value, list):
+            return [self._sanitize_input_payload(item) for item in value]
+        if isinstance(value, tuple):
+            return tuple(self._sanitize_input_payload(item) for item in value)
+        if isinstance(value, str):
+            return self.error_sanitizer(value)
+        return value

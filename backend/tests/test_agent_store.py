@@ -1,4 +1,5 @@
 import os
+import sqlite3
 import tempfile
 import unittest
 
@@ -13,6 +14,21 @@ class AgentStoreTests(unittest.TestCase):
 
     def tearDown(self):
         self.tmp.cleanup()
+
+    def _raw_agent_values(self, run_id):
+        conn = sqlite3.connect(self.db_path)
+        try:
+            run_row = conn.execute(
+                "SELECT input_payload_json, error FROM agent_runs WHERE run_id = ?",
+                (run_id,),
+            ).fetchone()
+            step_rows = conn.execute(
+                "SELECT payload_json FROM agent_steps WHERE run_id = ?",
+                (run_id,),
+            ).fetchall()
+        finally:
+            conn.close()
+        return run_row, step_rows
 
     def test_agent_run_steps_and_completion_survive_reopen(self):
         run = self.store.create_agent_run(
@@ -67,6 +83,100 @@ class AgentStoreTests(unittest.TestCase):
         loaded = self.store.get_agent_run(run["run_id"])
         self.assertEqual(loaded["status"], "failed")
         self.assertEqual(loaded["error"], "LLM unavailable")
+
+    def test_redacts_sensitive_input_payload_values_before_returning_or_storing(self):
+        key_token = "sk-agent-input-0123456789"
+        bearer_token = "agent-input-bearer-0123456789"
+        run = self.store.create_agent_run(
+            "paper_planner",
+            {
+                "doc_ids": ["doc-1"],
+                "request": f"Plan with {key_token} included",
+                "connection": {
+                    "api_key": key_token,
+                    "authorization": f"Bearer {bearer_token}",
+                },
+            },
+        )
+
+        loaded = self.store.get_agent_run(run["run_id"])
+        raw_run, raw_steps = self._raw_agent_values(run["run_id"])
+
+        self.assertEqual(loaded["input_payload"]["doc_ids"], ["doc-1"])
+        self.assertEqual(loaded["input_payload"]["request"], "Plan with *** included")
+        self.assertEqual(
+            loaded["input_payload"]["connection"],
+            {"api_key": "***", "authorization": "***"},
+        )
+        self.assertNotIn(key_token, str(loaded))
+        self.assertNotIn(bearer_token, str(loaded))
+        self.assertNotIn(key_token, raw_run[0])
+        self.assertNotIn(bearer_token, raw_run[0])
+        self.assertEqual(raw_steps, [])
+
+    def test_redacts_sensitive_step_payload_values_before_returning_or_storing(self):
+        key_token = "sk-agent-step-0123456789"
+        bearer_token = "agent-step-bearer-0123456789"
+        run = self.store.create_agent_run("paper_planner", {"doc_ids": ["doc-1"]})
+
+        self.store.append_agent_step(
+            run["run_id"],
+            {
+                "kind": "tool",
+                "title": "Retrieved selected sources",
+                "payload": {
+                    "tool": "retrieve_sources",
+                    "source_count": 2,
+                    "connection": {
+                        "api_key": key_token,
+                        "authorization": f"Bearer {bearer_token}",
+                    },
+                    "detail": f"Retry using {key_token}",
+                },
+            },
+        )
+
+        loaded = self.store.get_agent_run(run["run_id"])
+        raw_run, raw_steps = self._raw_agent_values(run["run_id"])
+        payload = loaded["steps"][0]["payload"]
+
+        self.assertEqual(payload["tool"], "retrieve_sources")
+        self.assertEqual(payload["source_count"], 2)
+        self.assertEqual(payload["detail"], "Retry using ***")
+        self.assertEqual(
+            payload["connection"],
+            {"api_key": "***", "authorization": "***"},
+        )
+        self.assertNotIn(key_token, str(loaded))
+        self.assertNotIn(bearer_token, str(loaded))
+        self.assertNotIn(key_token, raw_run[0])
+        self.assertNotIn(bearer_token, raw_run[0])
+        self.assertNotIn(key_token, raw_steps[0][0])
+        self.assertNotIn(bearer_token, raw_steps[0][0])
+
+    def test_redacts_sensitive_failed_error_before_returning_or_storing(self):
+        key_token = "sk-agent-error-0123456789"
+        bearer_token = "agent-error-bearer-0123456789"
+        run = self.store.create_agent_run("paper_planner", {"doc_ids": ["doc-1"]})
+
+        self.store.update_agent_run_status(
+            run["run_id"],
+            "failed",
+            error=f"Provider rejected Bearer {bearer_token}; key {key_token}",
+        )
+
+        loaded = self.store.get_agent_run(run["run_id"])
+        raw_run, raw_steps = self._raw_agent_values(run["run_id"])
+
+        self.assertEqual(loaded["status"], "failed")
+        self.assertEqual(loaded["error"], "Provider rejected Bearer ***; key ***")
+        self.assertNotIn(key_token, str(loaded))
+        self.assertNotIn(bearer_token, str(loaded))
+        self.assertNotIn(key_token, raw_run[0])
+        self.assertNotIn(bearer_token, raw_run[0])
+        self.assertNotIn(key_token, raw_run[1])
+        self.assertNotIn(bearer_token, raw_run[1])
+        self.assertEqual(raw_steps, [])
 
 
 if __name__ == "__main__":

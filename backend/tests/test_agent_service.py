@@ -1,5 +1,6 @@
 import asyncio
 import os
+import sqlite3
 import tempfile
 import unittest
 
@@ -109,6 +110,36 @@ class AgentServiceTests(unittest.TestCase):
         asyncio.run(service.execute_run(second["run_id"]))
 
         self.assertEqual(factory.calls, 2)
+
+    def test_sanitizes_configured_key_in_input_payload_before_persistence(self):
+        saved_key = "stored configuration value with spaces"
+        service = AgentService(
+            metadata_store=self.store,
+            skill_service=FakeSkillService(),
+            tool_registry=FakeToolRegistry(),
+            llm_service=FakeLLMService(),
+            error_sanitizer=lambda value: value.replace(saved_key, "***"),
+        )
+
+        run = service.create_run(
+            "paper_planner",
+            {"doc_ids": ["doc-1"], "request": f"Plan using {saved_key}"},
+        )
+        loaded = service.get_run(run["run_id"])
+        conn = sqlite3.connect(self.store.db_path)
+        try:
+            raw_input = conn.execute(
+                "SELECT input_payload_json FROM agent_runs WHERE run_id = ?",
+                (run["run_id"],),
+            ).fetchone()[0]
+        finally:
+            conn.close()
+
+        self.assertEqual(loaded["input_payload"]["doc_ids"], ["doc-1"])
+        self.assertEqual(loaded["input_payload"]["request"], "Plan using ***")
+        self.assertNotIn(saved_key, str(run))
+        self.assertNotIn(saved_key, str(loaded))
+        self.assertNotIn(saved_key, raw_input)
 
 
 if __name__ == "__main__":

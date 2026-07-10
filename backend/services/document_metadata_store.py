@@ -4,6 +4,7 @@ SQLite persistence for user-facing document metadata.
 
 import os
 import json
+import re
 import sqlite3
 import uuid
 from contextlib import contextmanager
@@ -19,6 +20,23 @@ _UNSET = object()
 
 class DocumentMetadataStore:
     """Small SQLite store for document metadata and processing status."""
+
+    _SENSITIVE_AGENT_FIELD_NAMES = frozenset(
+        {
+            "apikey",
+            "authorization",
+            "accesstoken",
+            "refreshtoken",
+            "token",
+            "secret",
+            "password",
+        }
+    )
+    _BEARER_TOKEN_PATTERN = re.compile(r"\bbearer\s+[^\s,;]+", re.IGNORECASE)
+    _KEY_LIKE_TOKEN_PATTERN = re.compile(
+        r"(?<![A-Za-z0-9_-])(?:sk|rk|pk|api|key)[_-][A-Za-z0-9][A-Za-z0-9_-]{7,}(?![A-Za-z0-9_-])",
+        re.IGNORECASE,
+    )
 
     def __init__(self, db_path: Optional[str] = None):
         data_dir = os.path.dirname(settings.UPLOAD_DIR) or "."
@@ -792,7 +810,7 @@ class DocumentMetadataStore:
             "run_id": str(uuid.uuid4()),
             "skill_id": skill_id,
             "status": "running",
-            "input_payload": input_payload,
+            "input_payload": self._redact_agent_data(input_payload),
             "output_id": None,
             "error": None,
             "created_at": now,
@@ -828,6 +846,7 @@ class DocumentMetadataStore:
             raise ValueError("Agent step kind is required")
         if not isinstance(title, str) or not title:
             raise ValueError("Agent step title is required")
+        payload = self._redact_agent_data(step.get("payload", {}))
 
         with self._connect() as conn:
             row = conn.execute(
@@ -852,7 +871,7 @@ class DocumentMetadataStore:
                     row["last_index"] + 1,
                     kind,
                     title,
-                    json.dumps(step.get("payload", {}), ensure_ascii=False),
+                    json.dumps(payload, ensure_ascii=False),
                     datetime.now().isoformat(),
                 ),
             )
@@ -864,6 +883,7 @@ class DocumentMetadataStore:
         output_id: Optional[str] = None,
         error: Optional[str] = None,
     ) -> None:
+        error = self._redact_agent_data(error)
         with self._connect() as conn:
             cursor = conn.execute(
                 """
@@ -993,6 +1013,31 @@ class DocumentMetadataStore:
             for step in step_rows
         ]
         return run
+
+    @classmethod
+    def _redact_agent_data(cls, value):
+        if isinstance(value, dict):
+            return {
+                key: "***"
+                if cls._is_sensitive_agent_field(key)
+                else cls._redact_agent_data(item)
+                for key, item in value.items()
+            }
+        if isinstance(value, list):
+            return [cls._redact_agent_data(item) for item in value]
+        if isinstance(value, tuple):
+            return tuple(cls._redact_agent_data(item) for item in value)
+        if isinstance(value, str):
+            value = cls._BEARER_TOKEN_PATTERN.sub("Bearer ***", value)
+            return cls._KEY_LIKE_TOKEN_PATTERN.sub("***", value)
+        return value
+
+    @classmethod
+    def _is_sensitive_agent_field(cls, name) -> bool:
+        if not isinstance(name, str):
+            return False
+        normalized = re.sub(r"[^a-z0-9]", "", name.lower())
+        return normalized in cls._SENSITIVE_AGENT_FIELD_NAMES
 
     def _decorate_document(
         self,
