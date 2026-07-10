@@ -30,8 +30,8 @@ async def create_run(request: AgentRunCreate, background_tasks: BackgroundTasks 
             request.skill_id,
             {"doc_ids": request.doc_ids, "request": request.request},
         )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid agent run request")
 
     if background_tasks is not None:
         background_tasks.add_task(agent_service.execute_run, run["run_id"])

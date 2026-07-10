@@ -151,10 +151,9 @@ class AgentService:
             ]
         )
 
-    def _safe_error_message(self, exc: Exception, llm_service: Optional[LLMService]) -> str:
-        error = self.error_sanitizer(str(exc))
-        api_key = getattr(llm_service, "api_key", "")
-        return error.replace(api_key, "***") if api_key else error
+    @staticmethod
+    def _safe_error_message(_exc: Exception, _llm_service: Optional[LLMService]) -> str:
+        return "Agent run failed. Check your LLM settings and try again."
 
     def _sanitize_input_payload(self, value):
         if isinstance(value, dict):

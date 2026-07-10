@@ -42,6 +42,24 @@ class FailingLLMService:
         raise RuntimeError("LLM unavailable: secret-token")
 
 
+class PromptReflectingFailureLLMService:
+    async def generate(self, prompt):
+        raise RuntimeError(f"LLM rejected prompt: {prompt}")
+
+
+class SourceBearingToolRegistry(FakeToolRegistry):
+    def __init__(self, source_sentinel):
+        self.source_sentinel = source_sentinel
+
+    async def run_tool(self, tool_name, params):
+        if tool_name == "retrieve_sources":
+            return {
+                "ok": True,
+                "result": {"sources": [{"content": self.source_sentinel}]},
+            }
+        return await super().run_tool(tool_name, params)
+
+
 class SequencedLLMFactory:
     def __init__(self):
         self.calls = 0
@@ -89,9 +107,38 @@ class AgentServiceTests(unittest.TestCase):
         failed = asyncio.run(service.execute_run(run["run_id"]))
 
         self.assertEqual(failed["status"], "failed")
-        self.assertEqual(failed["error"], "LLM unavailable: ***")
+        self.assertEqual(
+            failed["error"],
+            "Agent run failed. Check your LLM settings and try again.",
+        )
         self.assertNotIn("secret-token", failed["steps"][-1]["payload"]["error"])
         self.assertEqual(failed["steps"][-1]["kind"], "error")
+
+    def test_hides_reflected_request_and_source_values_from_failed_run(self):
+        request_sentinel = "SYNTHETIC_REQUEST_9f2a"
+        source_sentinel = "SYNTHETIC_SOURCE_7c3d"
+        service = AgentService(
+            metadata_store=self.store,
+            skill_service=FakeSkillService(),
+            tool_registry=SourceBearingToolRegistry(source_sentinel),
+            llm_service=PromptReflectingFailureLLMService(),
+        )
+
+        run = service.create_run(
+            "paper_planner",
+            {"doc_ids": ["doc-1"], "request": request_sentinel},
+        )
+        failed = asyncio.run(service.execute_run(run["run_id"]))
+        error_step = failed["steps"][-1]
+
+        self.assertEqual(failed["status"], "failed")
+        self.assertEqual(
+            failed["error"],
+            "Agent run failed. Check your LLM settings and try again.",
+        )
+        for sentinel in (request_sentinel, source_sentinel):
+            self.assertNotIn(sentinel, failed["error"])
+            self.assertNotIn(sentinel, error_step["payload"]["error"])
 
     def test_each_run_uses_a_fresh_llm_service(self):
         factory = SequencedLLMFactory()

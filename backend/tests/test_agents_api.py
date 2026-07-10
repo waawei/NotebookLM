@@ -1,6 +1,8 @@
 import asyncio
 import unittest
 
+from fastapi import HTTPException
+
 from api import agents, skills
 
 
@@ -33,6 +35,11 @@ class FakeAgentService:
         return list(self.runs.values())
 
 
+class UnknownSkillAgentService(FakeAgentService):
+    def create_run(self, skill_id, input_payload):
+        raise ValueError(f"Unknown skill: {skill_id}")
+
+
 class AgentsApiTests(unittest.TestCase):
     def setUp(self):
         self.original_skills = skills.skill_service
@@ -62,6 +69,21 @@ class AgentsApiTests(unittest.TestCase):
         self.assertEqual(created["status"], "running")
         self.assertEqual(listed["total"], 1)
         self.assertEqual(loaded["input_payload"]["doc_ids"], ["doc-1"])
+
+    def test_create_run_hides_unknown_skill_id_from_error_detail(self):
+        sentinel = "SYNTHETIC_UNKNOWN_SKILL_9f2a"
+        agents.agent_service = UnknownSkillAgentService()
+
+        with self.assertRaises(HTTPException) as raised:
+            asyncio.run(
+                agents.create_run(
+                    agents.AgentRunCreate(skill_id=sentinel),
+                    background_tasks=None,
+                )
+            )
+
+        self.assertEqual(raised.exception.status_code, 400)
+        self.assertNotIn(sentinel, raised.exception.detail)
 
 
 if __name__ == "__main__":
