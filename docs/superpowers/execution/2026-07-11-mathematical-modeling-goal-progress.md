@@ -8,13 +8,13 @@
 workflow: mathematical-modeling
 current_phase: 1
 phase_status: in_progress
-current_task: "Task 1: Pure Workflow State Machine"
+current_task: "Task 2: Modeling Metadata Store"
 task_status: verified
 baseline_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase1"
 last_verified_commit: 640372ed3e444e005f7150c887f71da728bcbd02
-last_verification: "Task 1 review fixes verified and re-reviewed"
-next_action: "Task 2 red test"
+last_verification: "Task 2 focused and regression tests passed"
+next_action: "Task 2 commit"
 ```
 
 ## 启动前风险
@@ -60,6 +60,18 @@ next_action: "Task 2 red test"
 - 提交：实现 `029e5ef8eaf5b4ef607e603de0b97b5f6f287316`；review fix `640372ed3e444e005f7150c887f71da728bcbd02`
 - 保留的用户改动：无；隔离工作树启动时 `git status --short` 为空
 - 备注：基线验证使用 `DEBUG=false`，因为当前 shell 环境存在 `DEBUG=release`；Task 1 初始 review 指出测试需覆盖导出常量和 rollback 拒绝路径，已补充并验证；re-review 剩余问题为账本未指向 review fix commit，本次已更正
+
+### Task 2: Modeling Metadata Store
+
+- 状态：verified
+- 预计文件：`backend/services/modeling_store.py`, `backend/tests/test_modeling_store.py`, `backend/services/document_metadata_store.py`, `backend/tests/test_agent_store.py`
+- 实际文件：`backend/services/modeling_store.py`, `backend/tests/test_modeling_store.py`, `backend/services/document_metadata_store.py`, `backend/tests/test_agent_store.py`
+- 失败测试：`DEBUG=false; python -m pytest tests/test_modeling_store.py tests/test_agent_store.py -q`，退出码 1，预期失败 `ModuleNotFoundError: No module named 'services.modeling_store'`；`DEBUG=false; python -m pytest tests/test_agent_store.py -q`，退出码 1，2 failed（缺少 `project_id` 返回字段和 `create_agent_run(project_id=...)` 支持）
+- 聚焦验证：`DEBUG=false; python -m pytest tests/test_modeling_store.py tests/test_agent_store.py -q`，退出码 0，9 passed，保留既有 Pydantic deprecation warning
+- 相关回归：`DEBUG=false; python -m pytest tests/test_agent_service.py tests/test_agents_api.py -q`，退出码 0，8 passed，保留既有 Pydantic/PyPDF2 warnings；`DEBUG=false; python -m pytest tests/test_modeling_state.py -q`，退出码 0，5 passed
+- 提交：待记录
+- 保留的用户改动：无；Task 2 开始时 `git status --short` 为空
+- 备注：
 
 ## 验证历史
 

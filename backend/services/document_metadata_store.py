@@ -222,6 +222,9 @@ class DocumentMetadataStore:
                 )
                 """
             )
+            self._ensure_table_column(conn, "agent_runs", "project_id", "TEXT")
+            self._ensure_table_column(conn, "agent_runs", "task_id", "TEXT")
+            self._ensure_table_column(conn, "agent_runs", "stage", "TEXT")
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS agent_steps (
@@ -841,13 +844,23 @@ class DocumentMetadataStore:
             )
             return cursor.rowcount > 0
 
-    def create_agent_run(self, skill_id: str, input_payload: dict) -> dict:
+    def create_agent_run(
+        self,
+        skill_id: str,
+        input_payload: dict,
+        project_id: Optional[str] = None,
+        task_id: Optional[str] = None,
+        stage: Optional[str] = None,
+    ) -> dict:
         now = datetime.now().isoformat()
         run = {
             "run_id": str(uuid.uuid4()),
             "skill_id": skill_id,
             "status": "running",
             "input_payload": self._redact_agent_data(input_payload),
+            "project_id": project_id,
+            "task_id": task_id,
+            "stage": stage,
             "output_id": None,
             "error": None,
             "created_at": now,
@@ -859,9 +872,9 @@ class DocumentMetadataStore:
                 """
                 INSERT INTO agent_runs (
                     run_id, skill_id, status, input_payload_json, output_id, error,
-                    created_at, updated_at
+                    created_at, updated_at, project_id, task_id, stage
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     run["run_id"],
@@ -872,6 +885,9 @@ class DocumentMetadataStore:
                     run["error"],
                     run["created_at"],
                     run["updated_at"],
+                    run["project_id"],
+                    run["task_id"],
+                    run["stage"],
                 ),
             )
         return run
@@ -949,10 +965,20 @@ class DocumentMetadataStore:
             ).fetchall()
         return self._agent_run_row_to_dict(row, step_rows)
 
-    def list_agent_runs(self) -> list[dict]:
+    def list_agent_runs(self, project_id: Optional[str] = None) -> list[dict]:
+        where_sql = ""
+        params = []
+        if project_id is not None:
+            where_sql = "WHERE project_id = ?"
+            params.append(project_id)
         with self._connect() as conn:
             rows = conn.execute(
-                "SELECT run_id FROM agent_runs ORDER BY updated_at DESC, run_id ASC"
+                f"""
+                SELECT run_id FROM agent_runs
+                {where_sql}
+                ORDER BY updated_at DESC, run_id ASC
+                """,
+                params,
             ).fetchall()
         return [self.get_agent_run(row["run_id"]) for row in rows]
 

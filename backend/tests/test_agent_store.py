@@ -70,6 +70,27 @@ class AgentStoreTests(unittest.TestCase):
         self.assertEqual(loaded["steps"][0]["payload"]["tool"], "retrieve_sources")
         self.assertEqual(len(listed), 1)
         self.assertEqual(listed[0]["run_id"], run["run_id"])
+        self.assertIsNone(loaded["project_id"])
+        self.assertIsNone(loaded["task_id"])
+        self.assertIsNone(loaded["stage"])
+
+    def test_modeling_links_round_trip_on_agent_runs(self):
+        run = self.store.create_agent_run(
+            "modeling_agent",
+            {"project": "forecast"},
+            project_id="project-1",
+            task_id="task-1",
+            stage="problem_parsing",
+        )
+
+        loaded = self.store.get_agent_run(run["run_id"])
+        listed = self.store.list_agent_runs(project_id="project-1")
+
+        self.assertEqual(loaded["project_id"], "project-1")
+        self.assertEqual(loaded["task_id"], "task-1")
+        self.assertEqual(loaded["stage"], "problem_parsing")
+        self.assertEqual([item["run_id"] for item in listed], [run["run_id"]])
+        self.assertEqual(self.store.list_agent_runs(project_id="missing"), [])
 
     def test_failed_run_persists_visible_error(self):
         run = self.store.create_agent_run("course_reviewer", {"doc_ids": []})
