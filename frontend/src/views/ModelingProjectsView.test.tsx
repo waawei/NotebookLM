@@ -22,6 +22,25 @@ const forecast = {
   state: 'project_initialized',
 }
 
+const workflowActionAvailability = [
+  ['project_initialized', true, false],
+  ['problem_parsing', true, true],
+  ['data_profiling', true, true],
+  ['model_planning', true, true],
+  ['model_approval_pending', true, true],
+  ['experiment_implementation', true, true],
+  ['execution_approval_pending', true, true],
+  ['experiment_running', true, true],
+  ['result_validation', true, true],
+  ['paper_drafting', true, true],
+  ['consistency_review', true, true],
+  ['final_approval_pending', true, true],
+  ['packaging', true, true],
+  ['commit_approval_pending', true, true],
+  ['committing', true, true],
+  ['completed', false, false],
+] as const
+
 describe('ModelingProjectsView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -91,6 +110,20 @@ describe('ModelingProjectsView', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Rollback project' }))
     await waitFor(() => expect(modelingApiMock.rollback).toHaveBeenCalledWith('project-1', ''))
   })
+
+  it.each(workflowActionAvailability)(
+    'matches backend action availability for %s',
+    async (state, advanceEnabled, rollbackEnabled) => {
+      modelingApiMock.list.mockResolvedValue({ projects: [{ ...forecast, state }], total: 1 })
+      render(<ModelingProjectsView />)
+
+      await screen.findByRole('heading', { name: 'Forecast' })
+      const advance = screen.getByRole('button', { name: 'Advance project' })
+      const rollback = screen.getByRole('button', { name: 'Rollback project' })
+      expect(advance).toHaveProperty('disabled', !advanceEnabled)
+      expect(rollback).toHaveProperty('disabled', !rollbackEnabled)
+    },
+  )
 
   it('shows an error when the project list cannot be loaded', async () => {
     modelingApiMock.list.mockRejectedValue(new Error('offline'))
