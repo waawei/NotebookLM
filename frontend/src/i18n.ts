@@ -17,6 +17,8 @@ type TranslationKey =
   | 'module.skills.subtitle'
   | 'module.agents.title'
   | 'module.agents.subtitle'
+  | 'module.modeling.title'
+  | 'module.modeling.subtitle'
   | 'module.settings.title'
   | 'module.settings.subtitle'
   | 'nav.dashboard'
@@ -27,6 +29,7 @@ type TranslationKey =
   | 'nav.outputs'
   | 'nav.skills'
   | 'nav.agents'
+  | 'nav.modeling'
   | 'nav.settings'
   | 'shell.addSource'
   | 'shell.search'
@@ -66,6 +69,8 @@ const translations: Record<LanguagePreference, Record<TranslationKey, string>> =
     'module.skills.subtitle': 'Local skill manifests with explicit safe tools',
     'module.agents.title': 'Agents',
     'module.agents.subtitle': 'Inspectable runs, steps, errors, and outputs',
+    'module.modeling.title': 'Modeling',
+    'module.modeling.subtitle': 'Create projects and move through the modeling workflow',
     'module.settings.title': 'Settings',
     'module.settings.subtitle': 'Configure a local model connection and inspect safe runtime status',
     'nav.dashboard': 'Dashboard',
@@ -76,6 +81,7 @@ const translations: Record<LanguagePreference, Record<TranslationKey, string>> =
     'nav.outputs': 'Outputs',
     'nav.skills': 'Skills',
     'nav.agents': 'Agents',
+    'nav.modeling': 'Modeling',
     'nav.settings': 'Settings',
     'shell.addSource': 'Add source',
     'shell.search': 'Search',
@@ -114,6 +120,8 @@ const translations: Record<LanguagePreference, Record<TranslationKey, string>> =
     'module.skills.subtitle': '本地技能清单和明确的安全工具边界',
     'module.agents.title': '智能体',
     'module.agents.subtitle': '可检查的运行、步骤、错误和产物',
+    'module.modeling.title': '建模',
+    'module.modeling.subtitle': '创建项目并推进建模工作流',
     'module.settings.title': '设置',
     'module.settings.subtitle': '配置本地模型连接并查看安全运行状态',
     'nav.dashboard': '仪表盘',
@@ -124,6 +132,7 @@ const translations: Record<LanguagePreference, Record<TranslationKey, string>> =
     'nav.outputs': '产物',
     'nav.skills': '技能',
     'nav.agents': '智能体',
+    'nav.modeling': '建模',
     'nav.settings': '设置',
     'shell.addSource': '添加来源',
     'shell.search': '搜索',

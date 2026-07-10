@@ -13,7 +13,7 @@ vi.mock('axios', () => ({
   },
 }))
 
-import { chatApi, outputApi, previewApi, settingsApi } from './api'
+import { chatApi, modelingApi, outputApi, previewApi, settingsApi } from './api'
 
 const safeStatus = {
   provider: 'openai',
@@ -182,5 +182,36 @@ describe('previewApi and output lifecycle', () => {
     expect(httpClient.get).toHaveBeenCalledWith('/outputs', { params: { include_archived: true } })
     expect(httpClient.post).toHaveBeenCalledWith('/outputs/out-1/archive')
     expect(httpClient.post).toHaveBeenCalledWith('/outputs/out-1/restore')
+  })
+})
+
+describe('modelingApi', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('uses the modeling project endpoints for the complete workflow', async () => {
+    const project = {
+      project_id: 'project-1',
+      name: 'Forecast',
+      slug: 'forecast',
+      workspace_path: 'C:/projects/forecast',
+      state: 'project_initialized',
+    }
+    httpClient.get.mockResolvedValueOnce({ data: { projects: [project], total: 1 } })
+    httpClient.post.mockResolvedValue({ data: project })
+    httpClient.get.mockResolvedValueOnce({ data: project })
+
+    await expect(modelingApi.list()).resolves.toEqual({ projects: [project], total: 1 })
+    await expect(modelingApi.create({ name: 'Forecast' })).resolves.toEqual(project)
+    await expect(modelingApi.get('project-1')).resolves.toEqual(project)
+    await expect(modelingApi.advance('project-1')).resolves.toEqual(project)
+    await expect(modelingApi.rollback('project-1', 'Need another pass')).resolves.toEqual(project)
+
+    expect(httpClient.get).toHaveBeenNthCalledWith(1, '/modeling/projects')
+    expect(httpClient.post).toHaveBeenNthCalledWith(1, '/modeling/projects', { name: 'Forecast' })
+    expect(httpClient.get).toHaveBeenNthCalledWith(2, '/modeling/projects/project-1')
+    expect(httpClient.post).toHaveBeenNthCalledWith(2, '/modeling/projects/project-1/advance')
+    expect(httpClient.post).toHaveBeenNthCalledWith(3, '/modeling/projects/project-1/rollback', { reason: 'Need another pass' })
   })
 })

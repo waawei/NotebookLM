@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type AppModule = 'dashboard' | 'workbench' | 'sources' | 'notes' | 'wiki' | 'outputs' | 'skills' | 'agents' | 'settings'
+export type AppModule = 'dashboard' | 'workbench' | 'sources' | 'notes' | 'wiki' | 'outputs' | 'skills' | 'agents' | 'modeling' | 'settings'
 export type ThemePreference = 'system' | 'light' | 'dark'
 export type ResolvedTheme = 'light' | 'dark'
 export type LanguagePreference = 'en' | 'zh-CN'
@@ -122,6 +122,7 @@ interface AppState {
   previewTarget: PreviewTarget
   selectedWikiPageIds: string[]
   selectedAgentId: string | null
+  selectedModelingProjectId: string | null
   pendingSkillCommand: PendingSkillCommand | null
   artifactRefreshToken: number
   setWorkbenchLeftTab: (tab: WorkbenchLeftTab) => void
@@ -131,6 +132,7 @@ interface AppState {
   setPreviewTarget: (target: PreviewTarget) => void
   toggleWikiContext: (pageId: string) => void
   setSelectedAgentId: (agentId: string | null) => void
+  setSelectedModelingProjectId: (projectId: string | null) => void
   setPendingSkillCommand: (command: PendingSkillCommand) => void
   clearPendingSkillCommand: () => void
   bumpArtifactRefreshToken: () => void
@@ -202,6 +204,7 @@ export const useStore = create<AppState>((set) => ({
   previewTarget: null,
   selectedWikiPageIds: readJsonFromStorage<string[]>('selected_wiki_page_ids', []),
   selectedAgentId: typeof window !== 'undefined' ? localStorage.getItem('selected_agent_id') : null,
+  selectedModelingProjectId: typeof window !== 'undefined' ? localStorage.getItem('selected_modeling_project_id') : null,
   pendingSkillCommand: null,
   artifactRefreshToken: 0,
 
@@ -260,6 +263,17 @@ export const useStore = create<AppState>((set) => ({
       }
     }
     set({ selectedAgentId: agentId })
+  },
+
+  setSelectedModelingProjectId: (projectId) => {
+    if (typeof window !== 'undefined') {
+      if (projectId) {
+        localStorage.setItem('selected_modeling_project_id', projectId)
+      } else {
+        localStorage.removeItem('selected_modeling_project_id')
+      }
+    }
+    set({ selectedModelingProjectId: projectId })
   },
 
   setPendingSkillCommand: (command) => set({ pendingSkillCommand: command }),

@@ -252,6 +252,17 @@ export interface AgentRun {
   steps: AgentStep[]
 }
 
+export interface ModelingProject {
+  project_id: string
+  name: string
+  slug: string
+  workspace_path: string
+  state: string
+  deadline?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
 export const documentApi = {
   upload: async (file: File): Promise<UploadResponse> => {
     const formData = new FormData()
@@ -524,6 +535,14 @@ export const agentsApi = {
     const response = await api.get(`/agents/runs/${runId}`)
     return response.data
   },
+}
+
+export const modelingApi = {
+  list: async (): Promise<{ projects: ModelingProject[]; total: number }> => (await api.get('/modeling/projects')).data,
+  create: async (data: { name: string; deadline?: string }): Promise<ModelingProject> => (await api.post('/modeling/projects', data)).data,
+  get: async (projectId: string): Promise<ModelingProject> => (await api.get(`/modeling/projects/${projectId}`)).data,
+  advance: async (projectId: string): Promise<ModelingProject> => (await api.post(`/modeling/projects/${projectId}/advance`)).data,
+  rollback: async (projectId: string, reason: string): Promise<ModelingProject> => (await api.post(`/modeling/projects/${projectId}/rollback`, { reason })).data,
 }
 
 export default api

@@ -17,6 +17,12 @@ describe('ModuleNav Reviva-style rail', () => {
     expect(screen.getByTestId('active-rail-indicator')).toBeInTheDocument()
   })
 
+  it('includes the modeling workbench entry', () => {
+    render(<ModuleNav activeModule="modeling" onModuleChange={vi.fn()} />)
+
+    expect(screen.getByRole('button', { name: 'Modeling' })).toHaveAttribute('aria-current', 'page')
+  })
+
   it('uses Chinese module labels when the language preference is Chinese', () => {
     useStore.setState({ language: 'zh-CN' })
 

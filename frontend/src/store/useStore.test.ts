@@ -144,3 +144,20 @@ describe('workbench agent and artifact state', () => {
     expect(useStore.getState().artifactRefreshToken).toBe(2)
   })
 })
+
+describe('modeling project selection', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    useStore.setState({ selectedModelingProjectId: null })
+  })
+
+  it('persists the selected modeling project id', () => {
+    useStore.getState().setSelectedModelingProjectId('project-1')
+
+    expect(useStore.getState().selectedModelingProjectId).toBe('project-1')
+    expect(localStorage.getItem('selected_modeling_project_id')).toBe('project-1')
+
+    useStore.getState().setSelectedModelingProjectId(null)
+    expect(localStorage.getItem('selected_modeling_project_id')).toBeNull()
+  })
+})

@@ -17,6 +17,7 @@ import WikiView from './views/WikiView'
 import SkillsView from './views/SkillsView'
 import AgentsView from './views/AgentsView'
 import WorkbenchView from './views/WorkbenchView'
+import ModelingProjectsView from './views/ModelingProjectsView'
 import { t } from './i18n'
 import { resolveTheme, useStore } from './store/useStore'
 import type { AppModule, LanguagePreference } from './store/useStore'
@@ -49,6 +50,10 @@ function getModuleCopy(language: LanguagePreference): Record<AppModule, { title:
     },
     skills: { title: t(language, 'module.skills.title'), subtitle: t(language, 'module.skills.subtitle') },
     agents: { title: t(language, 'module.agents.title'), subtitle: t(language, 'module.agents.subtitle') },
+    modeling: {
+      title: t(language, 'module.modeling.title'),
+      subtitle: t(language, 'module.modeling.subtitle'),
+    },
     settings: {
       title: t(language, 'module.settings.title'),
       subtitle: t(language, 'module.settings.subtitle'),
@@ -149,6 +154,10 @@ function App() {
 
     if (activeModule === 'agents') {
       return <AgentsView onOpenOutput={() => setActiveModule('outputs')} />
+    }
+
+    if (activeModule === 'modeling') {
+      return <ModelingProjectsView />
     }
 
     if (activeModule === 'settings') {

@@ -8,6 +8,7 @@ import {
   Sparkles,
   StickyNote,
   Wrench,
+  Workflow,
 } from 'lucide-react'
 import { t } from '../i18n'
 import { useStore, type AppModule } from '../store/useStore'
@@ -28,6 +29,7 @@ const modules: Array<{
     | 'nav.outputs'
     | 'nav.skills'
     | 'nav.agents'
+    | 'nav.modeling'
     | 'nav.settings'
   icon: typeof Home
 }> = [
@@ -39,6 +41,7 @@ const modules: Array<{
   { key: 'outputs', labelKey: 'nav.outputs', icon: Sparkles },
   { key: 'skills', labelKey: 'nav.skills', icon: Wrench },
   { key: 'agents', labelKey: 'nav.agents', icon: Bot },
+  { key: 'modeling', labelKey: 'nav.modeling', icon: Workflow },
   { key: 'settings', labelKey: 'nav.settings', icon: Settings },
 ]
 

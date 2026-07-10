@@ -1,0 +1,133 @@
+import { type FormEvent, useEffect, useMemo, useState } from 'react'
+import { AlertCircle, ChevronLeft, ChevronRight, Loader2, RefreshCw } from 'lucide-react'
+import { modelingApi, type ModelingProject } from '../services/api'
+import { useStore } from '../store/useStore'
+
+function replaceProject(projects: ModelingProject[], project: ModelingProject) {
+  return projects.map((item) => item.project_id === project.project_id ? project : item)
+}
+
+export default function ModelingProjectsView() {
+  const selectedModelingProjectId = useStore((state) => state.selectedModelingProjectId)
+  const setSelectedModelingProjectId = useStore((state) => state.setSelectedModelingProjectId)
+  const [projects, setProjects] = useState<ModelingProject[]>([])
+  const [name, setName] = useState('')
+  const [rollbackReason, setRollbackReason] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [transitioning, setTransitioning] = useState(false)
+  const [error, setError] = useState('')
+
+  const selectedProject = useMemo(
+    () => projects.find((project) => project.project_id === selectedModelingProjectId) || projects[0] || null,
+    [projects, selectedModelingProjectId],
+  )
+
+  const loadProjects = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const data = await modelingApi.list()
+      setProjects(data.projects)
+      setSelectedModelingProjectId(
+        selectedModelingProjectId && data.projects.some((project) => project.project_id === selectedModelingProjectId)
+          ? selectedModelingProjectId
+          : data.projects[0]?.project_id || null,
+      )
+    } catch {
+      setError('Unable to load modeling projects. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadProjects()
+  }, [])
+
+  const createProject = async (event: FormEvent) => {
+    event.preventDefault()
+    const cleanName = name.trim()
+    if (!cleanName) return
+    setSubmitting(true)
+    setError('')
+    try {
+      const project = await modelingApi.create({ name: cleanName })
+      setProjects((current) => [project, ...current])
+      setSelectedModelingProjectId(project.project_id)
+      setName('')
+    } catch {
+      setError('Unable to create the modeling project. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const transitionProject = async (direction: 'advance' | 'rollback') => {
+    if (!selectedProject) return
+    setTransitioning(true)
+    setError('')
+    try {
+      const project = direction === 'advance'
+        ? await modelingApi.advance(selectedProject.project_id)
+        : await modelingApi.rollback(selectedProject.project_id, rollbackReason.trim())
+      setProjects((current) => replaceProject(current, project))
+      setSelectedModelingProjectId(project.project_id)
+      if (direction === 'rollback') setRollbackReason('')
+    } catch {
+      setError(`Unable to ${direction} the modeling project. Please try again.`)
+    } finally {
+      setTransitioning(false)
+    }
+  }
+
+  return (
+    <div className="grid h-full grid-cols-[minmax(260px,340px)_1fr] bg-gray-100 dark:bg-gray-950">
+      <aside className="min-h-0 border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+        <div className="border-b border-gray-200 p-4 dark:border-gray-800">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-950 dark:text-gray-100">Modeling projects</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{projects.length} saved projects</p>
+            </div>
+            <button onClick={() => void loadProjects()} disabled={loading} className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800" aria-label="Refresh projects" title="Refresh projects">
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+          <form onSubmit={createProject} className="flex gap-2">
+            <label className="sr-only" htmlFor="project-name">Project name</label>
+            <input id="project-name" aria-label="Project name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Project name" className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100" />
+            <button disabled={!name.trim() || submitting} className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300 dark:disabled:bg-gray-700">
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create project'}
+            </button>
+          </form>
+        </div>
+        <div className="min-h-0 overflow-y-auto p-3">
+          {loading && projects.length === 0 ? (
+            <div className="flex justify-center gap-2 py-12 text-sm text-gray-500"><Loader2 className="h-4 w-4 animate-spin" />Loading projects</div>
+          ) : projects.length === 0 ? (
+            <p className="py-12 text-center text-sm text-gray-500">No modeling projects yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {projects.map((project) => <button key={project.project_id} onClick={() => setSelectedModelingProjectId(project.project_id)} className={`w-full rounded-lg border p-3 text-left transition-colors ${selectedProject?.project_id === project.project_id ? 'border-blue-400 bg-blue-50 dark:border-blue-800 dark:bg-blue-950' : 'border-gray-200 bg-white hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 dark:hover:bg-gray-800'}`}><p className="truncate text-sm font-medium text-gray-950 dark:text-gray-100">{project.name}</p><p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{project.state}</p></button>)}
+            </div>
+          )}
+        </div>
+      </aside>
+      <main className="min-w-0 overflow-y-auto p-6">
+        {error && <div role="alert" className="mx-auto mb-4 flex max-w-4xl items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200"><AlertCircle className="h-4 w-4 shrink-0" />{error}</div>}
+        {selectedProject ? (
+          <article className="mx-auto max-w-4xl rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
+            <div className="border-b border-gray-100 pb-4 dark:border-gray-800"><h1 className="text-xl font-semibold text-gray-950 dark:text-gray-100">{selectedProject.name}</h1><p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Current state: <span className="font-medium">{selectedProject.state}</span></p>{selectedProject.deadline && <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Deadline: {selectedProject.deadline}</p>}</div>
+            <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-medium text-gray-500">Project slug</dt><dd className="mt-1 text-gray-900 dark:text-gray-100">{selectedProject.slug}</dd></div><div><dt className="text-xs font-medium text-gray-500">Workspace</dt><dd className="mt-1 break-all text-gray-900 dark:text-gray-100">{selectedProject.workspace_path}</dd></div></dl>
+            <div className="mt-6 flex flex-wrap items-end gap-3 border-t border-gray-100 pt-5 dark:border-gray-800">
+              <button onClick={() => void transitionProject('advance')} disabled={transitioning} className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300 dark:disabled:bg-gray-700"><ChevronRight className="h-4 w-4" />Advance project</button>
+              <label className="min-w-[200px] flex-1"><span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">Rollback reason</span><input aria-label="Rollback reason" value={rollbackReason} onChange={(event) => setRollbackReason(event.target.value)} className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100" /></label>
+              <button onClick={() => void transitionProject('rollback')} disabled={transitioning} className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"><ChevronLeft className="h-4 w-4" />Rollback project</button>
+            </div>
+          </article>
+        ) : <div className="flex h-full items-center justify-center text-sm text-gray-500">Create or select a modeling project</div>}
+      </main>
+    </div>
+  )
+}
