@@ -104,6 +104,17 @@ class ModelingApiTests(unittest.TestCase):
         self.assertEqual(tasks, {"tasks": [{"task_id": "t-1", "project_id": "p-1"}], "total": 1})
         self.assertEqual(runs, {"runs": [{"run_id": "r-1", "project_id": "p-1"}], "total": 1})
 
+    def test_missing_project_task_and_run_lists_return_404(self):
+        with self.assertRaises(HTTPException) as task_error:
+            asyncio.run(modeling.list_project_tasks("missing"))
+        with self.assertRaises(HTTPException) as run_error:
+            asyncio.run(modeling.list_project_runs("missing"))
+
+        self.assertEqual(task_error.exception.status_code, 404)
+        self.assertEqual(task_error.exception.detail, "Modeling project not found")
+        self.assertEqual(run_error.exception.status_code, 404)
+        self.assertEqual(run_error.exception.detail, "Modeling project not found")
+
     def test_router_is_mounted_under_modeling_api_prefix(self):
         paths = {route.path for route in app.routes}
 

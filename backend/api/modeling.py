@@ -65,11 +65,17 @@ async def rollback_project(project_id: str, request: RollbackRequest):
 
 @router.get("/projects/{project_id}/tasks")
 async def list_project_tasks(project_id: str):
-    tasks = project_service.list_tasks(project_id)
+    try:
+        tasks = project_service.list_tasks(project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {"tasks": tasks, "total": len(tasks)}
 
 
 @router.get("/projects/{project_id}/runs")
 async def list_project_runs(project_id: str):
-    runs = project_service.list_runs(project_id)
+    try:
+        runs = project_service.list_runs(project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {"runs": runs, "total": len(runs)}
