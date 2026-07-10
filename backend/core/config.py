@@ -2,9 +2,14 @@
 Application configuration.
 """
 
+from pathlib import Path
 from typing import List
 
 from pydantic_settings import BaseSettings
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_MODELING_WORKSPACE_ROOT = str(PROJECT_ROOT.parent / "NotebookLM-modeling-projects")
 
 
 class Settings(BaseSettings):
@@ -29,6 +34,7 @@ class Settings(BaseSettings):
     LLM_MAX_TOKENS: int = 2000
 
     UPLOAD_DIR: str = "./data/uploads"
+    MODELING_WORKSPACE_ROOT: str = DEFAULT_MODELING_WORKSPACE_ROOT
     CHUNK_SIZE: int = 500
     CHUNK_OVERLAP: int = 50
     MAX_FILE_SIZE: int = 10 * 1024 * 1024
