@@ -13,8 +13,8 @@ task_status: verified
 baseline_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase1"
 last_verified_commit: 1ce74cab1216d0e8b48df1a707aa5470ee52c6d9
-last_verification: "Task 4 focused API and Agents API regression verified"
-next_action: "Task 4 review"
+last_verification: "Task 4 focused API and Agents API regression verified; task review clean"
+next_action: "Task 5: Frontend API, Navigation, and Project View"
 ```
 
 ## 启动前风险
@@ -95,7 +95,7 @@ next_action: "Task 4 review"
 - 相关回归：包含 `backend/tests/test_agents_api.py`，退出码 0，9 passed
 - 提交：实现 `1ce74cab1216d0e8b48df1a707aa5470ee52c6d9`
 - 保留的用户改动：无；隔离工作树在开始与提交后均为空
-- 备注：直接导入 API 会初始化既有 `DocumentMetadataStore`，聚焦套件耗时约 29 秒；终端的早期流输出为空并非卡死。已通过等待子进程并读取完整输出确认结果。
+- 备注：直接导入 API 会初始化既有 `DocumentMetadataStore`，聚焦套件耗时约 29 秒；终端的早期流输出为空并非卡死。已通过等待子进程并读取完整输出确认结果。任务级审查通过：路由、请求模型、错误映射、挂载和 Agents API 兼容性均符合 Task 4。
 
 ## 验证历史
 
