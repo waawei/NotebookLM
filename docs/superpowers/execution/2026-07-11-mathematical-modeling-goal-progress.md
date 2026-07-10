@@ -7,14 +7,14 @@
 ```yaml
 workflow: mathematical-modeling
 current_phase: 1
-phase_status: not_started
-current_task: null
-task_status: pending
+phase_status: in_progress
+current_task: "Task 1: Pure Workflow State Machine"
+task_status: in_progress
 baseline_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
-worktree_path: null
-last_verified_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
-last_verification: reviva_workbench_baseline_committed
-next_action: create_phase_1_worktree_from_baseline
+worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase1"
+last_verified_commit: 3ab4a3a
+last_verification: "baseline backend passed with DEBUG=false; frontend tests/build passed"
+next_action: "Task 1 commit"
 ```
 
 ## 启动前风险
@@ -37,9 +37,6 @@ next_action: create_phase_1_worktree_from_baseline
 
 ## 当前阶段 Task 记录
 
-Phase 1 尚未开始。启动后按以下格式替换本段：
-
-```markdown
 ### Task N: Task 名称
 
 - 状态：pending / in_progress / verified / blocked
@@ -51,7 +48,18 @@ Phase 1 尚未开始。启动后按以下格式替换本段：
 - 提交：commit hash
 - 保留的用户改动：
 - 备注：
-```
+
+### Task 1: Pure Workflow State Machine
+
+- 状态：in_progress
+- 预计文件：`backend/services/modeling_state.py`, `backend/tests/test_modeling_state.py`
+- 实际文件：`backend/services/modeling_state.py`, `backend/tests/test_modeling_state.py`
+- 失败测试：`DEBUG=false; python -m pytest tests/test_modeling_state.py -q`，退出码 1，预期失败 `ModuleNotFoundError: No module named 'services.modeling_state'`
+- 聚焦验证：`DEBUG=false; python -m pytest tests/test_modeling_state.py -q`，退出码 0，4 passed
+- 相关回归：`DEBUG=false; python -m pytest tests/test_config_defaults.py -q`，退出码 0，1 passed，保留既有 Pydantic deprecation warning
+- 提交：待记录
+- 保留的用户改动：无；隔离工作树启动时 `git status --short` 为空
+- 备注：基线验证使用 `DEBUG=false`，因为当前 shell 环境存在 `DEBUG=release`
 
 ## 验证历史
 
