@@ -60,6 +60,38 @@ describe('ModelingProjectsView', () => {
     await waitFor(() => expect(modelingApiMock.rollback).toHaveBeenCalledWith('project-1', 'Need another pass'))
   })
 
+  it('disables rollback at project initialization while keeping advance usable', async () => {
+    render(<ModelingProjectsView />)
+
+    await screen.findByRole('heading', { name: 'Forecast' })
+    expect(screen.getByRole('button', { name: 'Rollback project' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Advance project' })).toBeEnabled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Advance project' }))
+    await waitFor(() => expect(modelingApiMock.advance).toHaveBeenCalledWith('project-1'))
+  })
+
+  it('disables all illegal actions at completion', async () => {
+    modelingApiMock.list.mockResolvedValue({ projects: [{ ...forecast, state: 'completed' }], total: 1 })
+    render(<ModelingProjectsView />)
+
+    await screen.findByRole('heading', { name: 'Forecast' })
+    expect(screen.getByRole('button', { name: 'Advance project' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Rollback project' })).toBeDisabled()
+  })
+
+  it('keeps both legal actions usable in problem parsing', async () => {
+    modelingApiMock.list.mockResolvedValue({ projects: [{ ...forecast, state: 'problem_parsing' }], total: 1 })
+    render(<ModelingProjectsView />)
+
+    await screen.findByRole('heading', { name: 'Forecast' })
+    expect(screen.getByRole('button', { name: 'Advance project' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Rollback project' })).toBeEnabled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rollback project' }))
+    await waitFor(() => expect(modelingApiMock.rollback).toHaveBeenCalledWith('project-1', ''))
+  })
+
   it('shows an error when the project list cannot be loaded', async () => {
     modelingApiMock.list.mockRejectedValue(new Error('offline'))
     render(<ModelingProjectsView />)

@@ -3,6 +3,42 @@ import { AlertCircle, ChevronLeft, ChevronRight, Loader2, RefreshCw } from 'luci
 import { modelingApi, type ModelingProject } from '../services/api'
 import { useStore } from '../store/useStore'
 
+const MODELING_WORKFLOW_STATES = new Set([
+  'project_initialized',
+  'problem_parsing',
+  'data_profiling',
+  'model_planning',
+  'model_approval_pending',
+  'experiment_implementation',
+  'execution_approval_pending',
+  'experiment_running',
+  'result_validation',
+  'paper_drafting',
+  'consistency_review',
+  'final_approval_pending',
+  'packaging',
+  'commit_approval_pending',
+  'committing',
+  'completed',
+])
+
+const MODELING_ROLLBACK_STATES = new Set([
+  'problem_parsing',
+  'data_profiling',
+  'model_planning',
+  'model_approval_pending',
+  'experiment_implementation',
+  'execution_approval_pending',
+  'experiment_running',
+  'result_validation',
+  'paper_drafting',
+  'consistency_review',
+  'final_approval_pending',
+  'packaging',
+  'commit_approval_pending',
+  'committing',
+])
+
 function replaceProject(projects: ModelingProject[], project: ModelingProject) {
   return projects.map((item) => item.project_id === project.project_id ? project : item)
 }
@@ -22,6 +58,12 @@ export default function ModelingProjectsView() {
     () => projects.find((project) => project.project_id === selectedModelingProjectId) || projects[0] || null,
     [projects, selectedModelingProjectId],
   )
+  const canAdvance = Boolean(
+    selectedProject
+    && MODELING_WORKFLOW_STATES.has(selectedProject.state)
+    && selectedProject.state !== 'completed',
+  )
+  const canRollback = Boolean(selectedProject && MODELING_ROLLBACK_STATES.has(selectedProject.state))
 
   const loadProjects = async () => {
     setLoading(true)
@@ -121,9 +163,9 @@ export default function ModelingProjectsView() {
             <div className="border-b border-gray-100 pb-4 dark:border-gray-800"><h1 className="text-xl font-semibold text-gray-950 dark:text-gray-100">{selectedProject.name}</h1><p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Current state: <span className="font-medium">{selectedProject.state}</span></p>{selectedProject.deadline && <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Deadline: {selectedProject.deadline}</p>}</div>
             <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-medium text-gray-500">Project slug</dt><dd className="mt-1 text-gray-900 dark:text-gray-100">{selectedProject.slug}</dd></div><div><dt className="text-xs font-medium text-gray-500">Workspace</dt><dd className="mt-1 break-all text-gray-900 dark:text-gray-100">{selectedProject.workspace_path}</dd></div></dl>
             <div className="mt-6 flex flex-wrap items-end gap-3 border-t border-gray-100 pt-5 dark:border-gray-800">
-              <button onClick={() => void transitionProject('advance')} disabled={transitioning} className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300 dark:disabled:bg-gray-700"><ChevronRight className="h-4 w-4" />Advance project</button>
+              <button onClick={() => void transitionProject('advance')} disabled={transitioning || !canAdvance} className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300 dark:disabled:bg-gray-700"><ChevronRight className="h-4 w-4" />Advance project</button>
               <label className="min-w-[200px] flex-1"><span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">Rollback reason</span><input aria-label="Rollback reason" value={rollbackReason} onChange={(event) => setRollbackReason(event.target.value)} className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100" /></label>
-              <button onClick={() => void transitionProject('rollback')} disabled={transitioning} className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"><ChevronLeft className="h-4 w-4" />Rollback project</button>
+              <button onClick={() => void transitionProject('rollback')} disabled={transitioning || !canRollback} className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"><ChevronLeft className="h-4 w-4" />Rollback project</button>
             </div>
           </article>
         ) : <div className="flex h-full items-center justify-center text-sm text-gray-500">Create or select a modeling project</div>}
