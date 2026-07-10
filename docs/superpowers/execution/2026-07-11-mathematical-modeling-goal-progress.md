@@ -12,9 +12,9 @@ current_task: "Task 2: Modeling Metadata Store"
 task_status: verified
 baseline_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase1"
-last_verified_commit: 640372ed3e444e005f7150c887f71da728bcbd02
+last_verified_commit: 935ec1ec08b3b5b846d86ea1b532dd208d0b2141
 last_verification: "Task 2 focused and regression tests passed"
-next_action: "Task 2 commit"
+next_action: "Task 2 code review"
 ```
 
 ## 启动前风险
@@ -69,7 +69,7 @@ next_action: "Task 2 commit"
 - 失败测试：`DEBUG=false; python -m pytest tests/test_modeling_store.py tests/test_agent_store.py -q`，退出码 1，预期失败 `ModuleNotFoundError: No module named 'services.modeling_store'`；`DEBUG=false; python -m pytest tests/test_agent_store.py -q`，退出码 1，2 failed（缺少 `project_id` 返回字段和 `create_agent_run(project_id=...)` 支持）
 - 聚焦验证：`DEBUG=false; python -m pytest tests/test_modeling_store.py tests/test_agent_store.py -q`，退出码 0，9 passed，保留既有 Pydantic deprecation warning
 - 相关回归：`DEBUG=false; python -m pytest tests/test_agent_service.py tests/test_agents_api.py -q`，退出码 0，8 passed，保留既有 Pydantic/PyPDF2 warnings；`DEBUG=false; python -m pytest tests/test_modeling_state.py -q`，退出码 0，5 passed
-- 提交：待记录
+- 提交：`935ec1ec08b3b5b846d86ea1b532dd208d0b2141`
 - 保留的用户改动：无；Task 2 开始时 `git status --short` 为空
 - 备注：
 
