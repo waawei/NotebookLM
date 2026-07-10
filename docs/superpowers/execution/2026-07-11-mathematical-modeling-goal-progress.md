@@ -12,9 +12,9 @@ current_task: "Task 3: Safe Workspace and Project Service"
 task_status: verified
 baseline_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase1"
-last_verified_commit: 88d43699e3a20e21c44aad73757f791e8c368a7a
+last_verified_commit: 087c51955ea6d0bcc74c9ee56ebde5fd5d7b8ffe
 last_verification: "Task 3 review fixes verified"
-next_action: "Task 3 review fix commit"
+next_action: "Task 3 review re-check"
 ```
 
 ## 启动前风险
@@ -81,7 +81,7 @@ next_action: "Task 3 review fix commit"
 - 失败测试：`DEBUG=false; python -m pytest tests/test_modeling_workspace.py tests/test_modeling_project_service.py -q`，退出码 1，预期失败 `ModuleNotFoundError` for `services.modeling_workspace` and `services.modeling_project_service`
 - 聚焦验证：`DEBUG=false; python -m pytest tests/test_modeling_workspace.py tests/test_modeling_project_service.py -q`，退出码 0，5 passed；review fix 前 `DEBUG=false; python -m pytest tests/test_modeling_workspace.py tests/test_modeling_project_service.py tests/test_modeling_store.py -q` 退出码 1，4 failed（partial workspace、store failure cleanup、None rollback reason、missing transition_state）；review fix 后退出码 0，11 passed，保留既有 Pydantic deprecation warning
 - 相关回归：`DEBUG=false; python -m pytest tests/test_config_defaults.py tests/test_modeling_store.py -q`，退出码 0，3 passed；review fix 后 `DEBUG=false; python -m pytest tests/test_config_defaults.py tests/test_agent_store.py -q`，退出码 0，9 passed，保留既有 Pydantic deprecation warning
-- 提交：`88d43699e3a20e21c44aad73757f791e8c368a7a`
+- 提交：实现 `88d43699e3a20e21c44aad73757f791e8c368a7a`；review fix `087c51955ea6d0bcc74c9ee56ebde5fd5d7b8ffe`
 - 保留的用户改动：无；Task 3 开始时 `git status --short` 为空
 - 备注：Task 3 review 指出 workspace/git 初始化失败、store create 失败和 transition 两步写入存在部分状态风险；已补充回归，workspace cleanup 仅允许删除 workspace root 下的已创建项目目录，service create 失败会清理已创建 workspace，advance/rollback 使用 store 单事务 `transition_state`
 
