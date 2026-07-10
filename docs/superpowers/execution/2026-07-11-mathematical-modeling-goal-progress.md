@@ -12,9 +12,9 @@ current_task: "Task 1: Pure Workflow State Machine"
 task_status: verified
 baseline_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase1"
-last_verified_commit: 029e5ef8eaf5b4ef607e603de0b97b5f6f287316
-last_verification: "Task 1 review fixes verified"
-next_action: "Task 1 review re-check"
+last_verified_commit: 640372ed3e444e005f7150c887f71da728bcbd02
+last_verification: "Task 1 review fixes verified and re-reviewed"
+next_action: "Task 2 red test"
 ```
 
 ## 启动前风险
@@ -57,9 +57,9 @@ next_action: "Task 1 review re-check"
 - 失败测试：`DEBUG=false; python -m pytest tests/test_modeling_state.py -q`，退出码 1，预期失败 `ModuleNotFoundError: No module named 'services.modeling_state'`
 - 聚焦验证：`DEBUG=false; python -m pytest tests/test_modeling_state.py -q`，退出码 0，4 passed；review fix 后退出码 0，5 passed
 - 相关回归：`DEBUG=false; python -m pytest tests/test_config_defaults.py -q`，退出码 0，1 passed，保留既有 Pydantic deprecation warning
-- 提交：`029e5ef8eaf5b4ef607e603de0b97b5f6f287316`
+- 提交：实现 `029e5ef8eaf5b4ef607e603de0b97b5f6f287316`；review fix `640372ed3e444e005f7150c887f71da728bcbd02`
 - 保留的用户改动：无；隔离工作树启动时 `git status --short` 为空
-- 备注：基线验证使用 `DEBUG=false`，因为当前 shell 环境存在 `DEBUG=release`；Task 1 初始 review 指出测试需覆盖导出常量和 rollback 拒绝路径，已补充并验证
+- 备注：基线验证使用 `DEBUG=false`，因为当前 shell 环境存在 `DEBUG=release`；Task 1 初始 review 指出测试需覆盖导出常量和 rollback 拒绝路径，已补充并验证；re-review 剩余问题为账本未指向 review fix commit，本次已更正
 
 ## 验证历史
 
