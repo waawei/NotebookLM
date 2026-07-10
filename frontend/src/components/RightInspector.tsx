@@ -8,19 +8,24 @@ import {
   Server,
 } from 'lucide-react'
 import { noteApi, settingsApi, type NoteItem, type SettingsStatus } from '../services/api'
+import { t } from '../i18n'
 import { useStore, type Citation } from '../store/useStore'
+import ArtifactList from './ArtifactList'
+import PreviewPane from './PreviewPane'
+import TaskProgressCards from './TaskProgressCards'
+import WorkspaceToolsPanel from './WorkspaceToolsPanel'
 
-type InspectorTab = 'citations' | 'notes' | 'runtime'
-
-const tabs: Array<{ key: InspectorTab; label: string }> = [
-  { key: 'citations', label: 'Citations' },
-  { key: 'notes', label: 'Notes' },
-  { key: 'runtime', label: 'Runtime' },
-]
+type RightPanelTab = 'workspace' | 'preview'
 
 export default function RightInspector() {
-  const [activeTab, setActiveTab] = useState<InspectorTab>('citations')
-  const { messages } = useStore()
+  const { messages, previewTarget, language } = useStore()
+  const [activePanelTab, setActivePanelTab] = useState<RightPanelTab>(() => previewTarget ? 'preview' : 'workspace')
+
+  useEffect(() => {
+    if (previewTarget) {
+      setActivePanelTab('preview')
+    }
+  }, [previewTarget])
 
   const latestCitations = useMemo(() => {
     const latestAssistantWithCitations = [...messages]
@@ -31,21 +36,24 @@ export default function RightInspector() {
   }, [messages])
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-800">
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Inspector</h2>
-        <p className="text-xs text-gray-500 dark:text-gray-400">Evidence, notes, and runtime context</p>
+    <div data-testid="right-workspace-panel" className="flex h-full flex-col bg-[#f8f7f6] dark:bg-gray-950">
+      <div className="border-b border-[#e2e1de] px-4 py-3 dark:border-gray-800">
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{t(language, 'right.workspace')}</h2>
+        <p className="text-xs text-gray-500 dark:text-gray-400">{t(language, 'right.subtitle')}</p>
       </div>
 
-      <div className="grid grid-cols-3 border-b border-gray-200 p-2 dark:border-gray-800">
-        {tabs.map((tab) => (
+      <div className="grid grid-cols-2 border-b border-[#e2e1de] p-2 dark:border-gray-800">
+        {[
+          { key: 'workspace' as const, label: t(language, 'right.workspace') },
+          { key: 'preview' as const, label: t(language, 'right.preview') },
+        ].map((tab) => (
           <button
             key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => setActivePanelTab(tab.key)}
             className={`rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
-              activeTab === tab.key
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100'
+              activePanelTab === tab.key
+                ? 'bg-blue-50 text-blue-700 shadow-sm ring-1 ring-blue-100 dark:bg-blue-950 dark:text-blue-200 dark:ring-blue-900'
+                : 'text-gray-500 hover:bg-white hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100'
             }`}
           >
             {tab.label}
@@ -53,11 +61,37 @@ export default function RightInspector() {
         ))}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        {activeTab === 'citations' && <CitationsPanel citations={latestCitations} />}
-        {activeTab === 'notes' && <NotesPanel />}
-        {activeTab === 'runtime' && <RuntimePanel />}
-      </div>
+      {activePanelTab === 'workspace' ? (
+        <div data-testid="workspace-tab-panel" className="min-h-0 flex-1 overflow-y-auto">
+          <div className="space-y-5 p-4">
+            <WorkspaceToolsPanel />
+            <TaskProgressCards />
+            <ArtifactList />
+            <section aria-labelledby="workspace-evidence-heading" className="space-y-2">
+              <h3 id="workspace-evidence-heading" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Evidence
+              </h3>
+              <CitationsPanel citations={latestCitations} />
+            </section>
+            <section aria-labelledby="workspace-notes-heading" className="space-y-2">
+              <h3 id="workspace-notes-heading" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Notes
+              </h3>
+              <NotesPanel />
+            </section>
+            <section aria-labelledby="workspace-runtime-heading" className="space-y-2">
+              <h3 id="workspace-runtime-heading" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Runtime
+              </h3>
+              <RuntimePanel />
+            </section>
+          </div>
+        </div>
+      ) : (
+        <div data-testid="preview-tab-panel" className="min-h-0 flex-1 overflow-y-auto p-4">
+          <PreviewPane />
+        </div>
+      )}
     </div>
   )
 }
@@ -78,7 +112,8 @@ function CitationsPanel({ citations }: { citations: Citation[] }) {
       {citations.map((citation, index) => (
         <article
           key={`${citation.doc_id}-${citation.chunk_id}-${index}`}
-          className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900"
+          data-testid="workspace-citation-card"
+          className="rounded-lg border border-[#e2e1de] bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900"
         >
           <div className="mb-2 flex items-start justify-between gap-2">
             <div className="min-w-0">

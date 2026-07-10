@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { act } from 'react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const settingsApiMock = vi.hoisted(() => ({
   getStatus: vi.fn(),
@@ -14,6 +15,7 @@ vi.mock('../services/api', () => ({
 }))
 
 import SettingsView from './SettingsView'
+import { useStore } from '../store/useStore'
 
 const safeStatus = {
   provider: 'openai',
@@ -32,9 +34,17 @@ const safeStatus = {
 describe('SettingsView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    localStorage.clear()
+    useStore.setState({ language: 'en' })
     settingsApiMock.getStatus.mockResolvedValue(safeStatus)
     settingsApiMock.save.mockResolvedValue({ ...safeStatus, api_key_configured: true })
     settingsApiMock.listModels.mockResolvedValue({ models: ['a-model'] })
+  })
+
+  afterEach(() => {
+    act(() => {
+      useStore.setState({ language: 'en' })
+    })
   })
 
   it('submits but never renders a configured API key', async () => {
@@ -196,5 +206,15 @@ describe('SettingsView', () => {
         }),
       )
     })
+  })
+
+  it('persists the interface language preference for Chinese users', async () => {
+    render(<SettingsView />)
+
+    fireEvent.change(screen.getByLabelText('Language'), { target: { value: 'zh-CN' } })
+
+    expect(useStore.getState().language).toBe('zh-CN')
+    expect(localStorage.getItem('language_preference')).toBe('zh-CN')
+    expect(await screen.findByText('界面语言')).toBeInTheDocument()
   })
 })

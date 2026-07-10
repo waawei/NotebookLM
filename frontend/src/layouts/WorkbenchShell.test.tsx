@@ -27,4 +27,28 @@ describe('WorkbenchShell responsive panels', () => {
     expect(screen.getByTestId('mobile-source-panel')).toHaveClass('lg:hidden')
     expect(screen.getByTestId('mobile-inspector')).toHaveClass('xl:hidden')
   })
+
+  it('uses warm neutral Reviva-style shell surfaces', () => {
+    render(
+      <WorkbenchShell
+        activeModule="workbench"
+        title="Workbench"
+        leftPanel={<div>Source selector</div>}
+        centerPanel={<div>Conversation</div>}
+        rightPanel={<div>Inspector content</div>}
+        isDarkMode={false}
+        onModuleChange={vi.fn()}
+        onOpenUpload={vi.fn()}
+        onOpenSearch={vi.fn()}
+        onOpenExport={vi.fn()}
+        onOpenNotes={vi.fn()}
+        onOpenSettings={vi.fn()}
+        onToggleDarkMode={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByTestId('workbench-shell')).toHaveClass('bg-[#f8f7f6]')
+    expect(screen.getByTestId('desktop-left-panel')).toHaveClass('bg-[#f1f0ef]')
+    expect(screen.getByTestId('center-panel')).toHaveClass('bg-white')
+  })
 })

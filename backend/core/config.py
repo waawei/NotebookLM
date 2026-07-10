@@ -21,10 +21,10 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL: str = "paraphrase-multilingual-MiniLM-L12-v2"
     EMBEDDING_DEVICE: str = "cpu"
 
-    LLM_PROVIDER: str = "dashscope"
-    LLM_MODEL: str = "qwen-turbo"
+    LLM_PROVIDER: str = "ollama"
+    LLM_MODEL: str = "qwen3:8b"
     LLM_API_KEY: str = ""
-    LLM_BASE_URL: str = ""
+    LLM_BASE_URL: str = "http://localhost:11434"
     LLM_TEMPERATURE: float = 0.7
     LLM_MAX_TOKENS: int = 2000
 

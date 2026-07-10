@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Download, FileText, Loader2, RefreshCw, Sparkles, Trash2 } from 'lucide-react'
+import { Archive, Download, FileText, Loader2, RefreshCw, RotateCcw, Sparkles } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { outputApi, type OutputItem } from '../services/api'
 import type { AppModule } from '../store/useStore'
@@ -24,6 +24,7 @@ export default function OutputsView({ onModuleChange }: OutputsViewProps) {
   const [selectedKind, setSelectedKind] = useState('summary')
   const [isLoading, setIsLoading] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [showArchived, setShowArchived] = useState(false)
 
   const selectedOutput = useMemo(
     () => outputs.find((output) => output.output_id === selectedOutputId) || outputs[0] || null,
@@ -31,15 +32,19 @@ export default function OutputsView({ onModuleChange }: OutputsViewProps) {
   )
 
   useEffect(() => {
-    void loadOutputs()
+    void loadOutputs(false)
   }, [])
 
-  const loadOutputs = async () => {
+  const loadOutputs = async (includeArchived = showArchived) => {
     setIsLoading(true)
     try {
-      const data = await outputApi.list()
+      const data = await outputApi.list(undefined, includeArchived)
       setOutputs(data.outputs)
-      setSelectedOutputId((current) => current || data.outputs[0]?.output_id || null)
+      setSelectedOutputId((current) => (
+        current && data.outputs.some((output) => output.output_id === current)
+          ? current
+          : data.outputs[0]?.output_id || null
+      ))
     } catch (error) {
       console.error('Failed to load outputs:', error)
       addToast('Failed to load outputs', 'error')
@@ -60,6 +65,7 @@ export default function OutputsView({ onModuleChange }: OutputsViewProps) {
         kind: selectedKind,
         source_doc_ids: selectedDocIds,
       })
+      setShowArchived(false)
       setOutputs((current) => [output, ...current])
       setSelectedOutputId(output.output_id)
       addToast('Output generated', 'success')
@@ -71,15 +77,25 @@ export default function OutputsView({ onModuleChange }: OutputsViewProps) {
     }
   }
 
-  const handleDelete = async (outputId: string) => {
+  const handleArchive = async (outputId: string) => {
     try {
-      await outputApi.delete(outputId)
-      setOutputs((current) => current.filter((output) => output.output_id !== outputId))
-      setSelectedOutputId(null)
-      addToast('Output deleted', 'success')
+      await outputApi.archive(outputId)
+      await loadOutputs(showArchived)
+      addToast('Output archived', 'success')
     } catch (error) {
-      console.error('Failed to delete output:', error)
-      addToast('Failed to delete output', 'error')
+      console.error('Failed to archive output:', error)
+      addToast('Failed to archive output', 'error')
+    }
+  }
+
+  const handleRestore = async (outputId: string) => {
+    try {
+      await outputApi.restore(outputId)
+      await loadOutputs(showArchived)
+      addToast('Output restored', 'success')
+    } catch (error) {
+      console.error('Failed to restore output:', error)
+      addToast('Failed to restore output', 'error')
     }
   }
 
@@ -95,6 +111,7 @@ export default function OutputsView({ onModuleChange }: OutputsViewProps) {
   }
 
   const downloadFile = (content: string, filename: string, mimeType: string) => {
+    if (typeof URL === 'undefined' || !URL.createObjectURL) return
     const blob = new Blob([content], { type: mimeType })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -104,6 +121,12 @@ export default function OutputsView({ onModuleChange }: OutputsViewProps) {
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
+  }
+
+  const switchArchivedFilter = (includeArchived: boolean) => {
+    setShowArchived(includeArchived)
+    setSelectedOutputId(null)
+    void loadOutputs(includeArchived)
   }
 
   return (
@@ -116,7 +139,7 @@ export default function OutputsView({ onModuleChange }: OutputsViewProps) {
               <p className="text-xs text-gray-500 dark:text-gray-400">{outputs.length} generated artifacts</p>
             </div>
             <button
-              onClick={loadOutputs}
+              onClick={() => void loadOutputs(showArchived)}
               className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
               title="Refresh outputs"
               aria-label="Refresh outputs"
@@ -145,13 +168,33 @@ export default function OutputsView({ onModuleChange }: OutputsViewProps) {
               {selectedDocIds.length} selected sources
             </div>
 
+            <div className="grid grid-cols-2 gap-1 rounded-lg bg-gray-50 p-1 text-xs dark:bg-gray-800">
+              {[
+                { label: 'Active', value: false },
+                { label: 'Archived', value: true },
+              ].map((filter) => (
+                <button
+                  key={filter.label}
+                  type="button"
+                  onClick={() => switchArchivedFilter(filter.value)}
+                  className={`rounded-md px-2 py-1.5 font-semibold transition-colors ${
+                    showArchived === filter.value
+                      ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-100 dark:bg-blue-950 dark:text-blue-200 dark:ring-blue-900'
+                      : 'text-gray-500 hover:bg-white hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-900 dark:hover:text-gray-100'
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+
             <button
               onClick={handleGenerate}
-              disabled={isGenerating || selectedDocIds.length === 0}
+              disabled={isGenerating || selectedDocIds.length === 0 || showArchived}
               className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300 dark:disabled:bg-gray-700"
             >
               {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              Generate
+              {showArchived ? 'Archived view' : 'Generate'}
             </button>
           </div>
         </div>
@@ -189,7 +232,7 @@ export default function OutputsView({ onModuleChange }: OutputsViewProps) {
                   >
                     <p className="truncate text-sm font-medium text-gray-950 dark:text-gray-100">{output.title}</p>
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      {output.kind} - {output.source_doc_ids.length} sources
+                {output.kind} - {output.source_doc_ids.length} sources{output.status === 'archived' ? ' - archived' : ''}
                     </p>
                   </button>
                 )
@@ -218,14 +261,25 @@ export default function OutputsView({ onModuleChange }: OutputsViewProps) {
                 >
                   <Download className="h-4 w-4" />
                 </button>
-                <button
-                  onClick={() => handleDelete(selectedOutput.output_id)}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-600 dark:text-gray-400 dark:hover:bg-red-950 dark:hover:text-red-300"
-                  title="Delete output"
-                  aria-label="Delete output"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                {selectedOutput.status === 'archived' ? (
+                  <button
+                    onClick={() => handleRestore(selectedOutput.output_id)}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:bg-blue-50 hover:text-blue-700 dark:text-gray-400 dark:hover:bg-blue-950 dark:hover:text-blue-300"
+                    title="Restore output"
+                    aria-label="Restore output"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleArchive(selectedOutput.output_id)}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+                    title="Archive output"
+                    aria-label="Archive output"
+                  >
+                    <Archive className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             </div>
             <div className="prose prose-sm max-w-none dark:prose-invert">

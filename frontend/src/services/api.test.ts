@@ -13,7 +13,7 @@ vi.mock('axios', () => ({
   },
 }))
 
-import { settingsApi } from './api'
+import { chatApi, outputApi, previewApi, settingsApi } from './api'
 
 const safeStatus = {
   provider: 'openai',
@@ -95,5 +95,92 @@ describe('settingsApi', () => {
       endpoint_mode: 'auto',
     })
     expect(result).toEqual({ ok: true, message: 'LLM connection succeeded' })
+  })
+})
+
+describe('chatApi', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('loads conversation summaries from the backend conversation endpoint', async () => {
+    httpClient.get.mockResolvedValue({
+      data: {
+        conversations: [
+          {
+            conversation_id: 'conv-1',
+            title: 'Paper notes',
+            updated_at: '2026-07-10T10:00:00',
+            message_count: 2,
+            latest_message: 'Summarize chapter 2',
+          },
+        ],
+      },
+    })
+
+    const result = await chatApi.listConversations()
+
+    expect(httpClient.get).toHaveBeenCalledWith('/chat/conversations')
+    expect(result.conversations[0].title).toBe('Paper notes')
+  })
+
+  it('normalizes legacy conversation id and last message fields', async () => {
+    httpClient.get.mockResolvedValue({
+      data: {
+        conversations: [
+          {
+            id: 'conv-legacy',
+            title: 'Legacy chat',
+            updated_at: '2026-07-10T10:00:00',
+            message_count: 1,
+            last_message: 'Last question',
+          },
+        ],
+      },
+    })
+
+    const result = await chatApi.listConversations()
+
+    expect(result.conversations[0]).toMatchObject({
+      conversation_id: 'conv-legacy',
+      latest_message: 'Last question',
+    })
+  })
+})
+
+describe('previewApi and output lifecycle', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('loads typed preview data for a target', async () => {
+    httpClient.get.mockResolvedValue({
+      data: {
+        type: 'wiki',
+        id: 'wiki-1',
+        title: 'Retrieval Notes',
+        content_preview: '# Retrieval',
+        metadata: { source_count: 1 },
+        links: [{ type: 'document', id: 'doc-1', title: 'doc-1' }],
+      },
+    })
+
+    const result = await previewApi.get('wiki', 'wiki-1')
+
+    expect(httpClient.get).toHaveBeenCalledWith('/preview/wiki/wiki-1')
+    expect(result.title).toBe('Retrieval Notes')
+  })
+
+  it('passes archived filters and lifecycle actions to output endpoints', async () => {
+    httpClient.get.mockResolvedValue({ data: { outputs: [], total: 0 } })
+    httpClient.post.mockResolvedValue({ data: { message: 'ok' } })
+
+    await outputApi.list(undefined, true)
+    await outputApi.archive('out-1')
+    await outputApi.restore('out-1')
+
+    expect(httpClient.get).toHaveBeenCalledWith('/outputs', { params: { include_archived: true } })
+    expect(httpClient.post).toHaveBeenCalledWith('/outputs/out-1/archive')
+    expect(httpClient.post).toHaveBeenCalledWith('/outputs/out-1/restore')
   })
 })

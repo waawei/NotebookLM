@@ -94,6 +94,8 @@ export interface OutputItem {
   title: string
   content: string
   source_doc_ids: string[]
+  status?: 'active' | 'archived' | 'deleted'
+  deleted_at?: string | null
   created_at: string
   updated_at: string
 }
@@ -129,6 +131,23 @@ export interface WikiPageGenerateRequest {
   source_doc_ids: string[]
 }
 
+export type PreviewTargetType = 'document' | 'wiki' | 'note' | 'output'
+
+export interface PreviewLink {
+  type: string
+  id: string
+  title: string
+}
+
+export interface PreviewItem {
+  type: PreviewTargetType
+  id: string
+  title: string
+  content_preview: string
+  metadata: Record<string, unknown>
+  links: PreviewLink[]
+}
+
 export interface SettingsStatus {
   provider: string
   model: string
@@ -141,6 +160,19 @@ export interface SettingsStatus {
   embedding_device: string
   endpoint_mode: SettingsEndpointMode
   warnings: string[]
+}
+
+export interface ConversationSummary {
+  conversation_id: string
+  title: string
+  updated_at: string
+  message_count: number
+  latest_message?: string | null
+}
+
+interface RawConversationSummary extends Partial<ConversationSummary> {
+  id?: string
+  last_message?: string | null
 }
 
 export type SettingsEndpointMode = 'auto' | 'exact'
@@ -301,6 +333,19 @@ export const chatApi = {
     return response.data
   },
 
+  listConversations: async (): Promise<{ conversations: ConversationSummary[] }> => {
+    const response = await api.get('/chat/conversations')
+    return {
+      conversations: (response.data.conversations || []).map((conversation: RawConversationSummary) => ({
+        conversation_id: conversation.conversation_id || conversation.id || '',
+        title: conversation.title || 'Untitled conversation',
+        updated_at: conversation.updated_at || '',
+        message_count: conversation.message_count || 0,
+        latest_message: conversation.latest_message ?? conversation.last_message ?? null,
+      })),
+    }
+  },
+
   getConversation: async (conversationId: string) => {
     const response = await api.get(`/chat/conversations/${conversationId}`)
     return response.data
@@ -345,9 +390,12 @@ export const noteApi = {
 }
 
 export const outputApi = {
-  list: async (kind?: string): Promise<{ outputs: OutputItem[]; total: number }> => {
+  list: async (kind?: string, includeArchived = false): Promise<{ outputs: OutputItem[]; total: number }> => {
     const response = await api.get('/outputs', {
-      params: kind ? { kind } : undefined,
+      params: {
+        ...(kind ? { kind } : {}),
+        ...(includeArchived ? { include_archived: true } : {}),
+      },
     })
     return response.data
   },
@@ -369,6 +417,23 @@ export const outputApi = {
 
   export: async (outputId: string): Promise<OutputExport> => {
     const response = await api.post(`/outputs/${outputId}/export`)
+    return response.data
+  },
+
+  archive: async (outputId: string): Promise<{ message: string }> => {
+    const response = await api.post(`/outputs/${outputId}/archive`)
+    return response.data
+  },
+
+  restore: async (outputId: string): Promise<{ message: string }> => {
+    const response = await api.post(`/outputs/${outputId}/restore`)
+    return response.data
+  },
+}
+
+export const previewApi = {
+  get: async (targetType: PreviewTargetType, targetId: string): Promise<PreviewItem> => {
+    const response = await api.get(`/preview/${targetType}/${targetId}`)
     return response.data
   },
 }

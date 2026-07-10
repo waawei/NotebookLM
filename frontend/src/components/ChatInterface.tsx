@@ -2,7 +2,12 @@ import { useState, useRef, useEffect } from 'react'
 import { Send, Sparkles, Loader2, Lightbulb, ChevronDown, ChevronUp, BookOpen } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import ReactMarkdown from 'react-markdown'
-import { chatApi, noteApi, type SettingsConnectionDiagnostic } from '../services/api'
+import { agentsApi, chatApi, noteApi, type SettingsConnectionDiagnostic, type SkillItem } from '../services/api'
+import { t } from '../i18n'
+import AgentSelector from './AgentSelector'
+import ContextPillBar from './ContextPillBar'
+import ConversationTabStrip from './ConversationTabStrip'
+import SlashCommandMenu from './SlashCommandMenu'
 
 type ChatMode = 'review' | 'paper' | 'knowledge_base'
 
@@ -12,11 +17,27 @@ const modeOptions: Array<{ value: ChatMode; label: string }> = [
   { value: 'knowledge_base', label: 'Knowledge Base' },
 ]
 
+function parseSkillCommand(input: string, pendingSkillId?: string | null) {
+  const trimmed = input.trimStart()
+  if (!trimmed.startsWith('/')) return null
+
+  const [rawCommand, ...rest] = trimmed.split(/\s+/)
+  const skill_id = rawCommand.slice(1)
+  if (!skill_id) return null
+
+  return {
+    skill_id: pendingSkillId || skill_id,
+    request: rest.join(' ').trim(),
+  }
+}
+
 export default function ChatInterface() {
   const [input, setInput] = useState('')
   const [chatMode, setChatMode] = useState<ChatMode>('knowledge_base')
   const [expandedCitations, setExpandedCitations] = useState<Set<string>>(new Set())
   const [inlineError, setInlineError] = useState<string | null>(null)
+  const [agentRunNotice, setAgentRunNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [isSlashMenuOpen, setIsSlashMenuOpen] = useState(false)
   const [streamDiagnostic, setStreamDiagnostic] = useState<SettingsConnectionDiagnostic | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -32,7 +53,13 @@ export default function ChatInterface() {
     setConversationId,
     setLoading,
     setSuggestedQuestions,
-    addToast
+    addToast,
+    pendingSkillCommand,
+    setPendingSkillCommand,
+    clearPendingSkillCommand,
+    bumpArtifactRefreshToken,
+    setActiveModule,
+    language,
   } = useStore()
 
   useEffect(() => {
@@ -45,6 +72,16 @@ export default function ChatInterface() {
       textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 200) + 'px'
     }
   }, [input])
+
+  useEffect(() => {
+    if (!pendingSkillCommand) return
+    if (input === pendingSkillCommand.text) return
+    if (input.trim() && !input.startsWith('/')) return
+
+    setInput(pendingSkillCommand.text)
+    setIsSlashMenuOpen(false)
+    textareaRef.current?.focus()
+  }, [pendingSkillCommand, input])
 
   // 当文档选择改变时，获取建议问题
   useEffect(() => {
@@ -65,6 +102,40 @@ export default function ChatInterface() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!input.trim() || isLoading) return
+
+    const skillCommand = parseSkillCommand(input, pendingSkillCommand?.skill_id)
+
+    if (skillCommand) {
+      if (selectedDocIds.length === 0) {
+        setInlineError('Select at least one source before running a skill.')
+        setAgentRunNotice(null)
+        return
+      }
+
+      setInlineError(null)
+      setStreamDiagnostic(null)
+      setAgentRunNotice(null)
+      setLoading(true)
+
+      try {
+        await agentsApi.createRun({
+          skill_id: skillCommand.skill_id,
+          doc_ids: selectedDocIds,
+          request: skillCommand.request,
+        })
+        setInput('')
+        setIsSlashMenuOpen(false)
+        clearPendingSkillCommand()
+        bumpArtifactRefreshToken()
+        setAgentRunNotice({ type: 'success', message: 'Agent run started' })
+      } catch (error) {
+        console.error('Failed to create agent run:', error)
+        setAgentRunNotice({ type: 'error', message: 'Agent run failed. Review the request and try again.' })
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
 
     if (selectedDocIds.length === 0) {
       setInlineError('Select at least one source before asking a question.')
@@ -216,23 +287,44 @@ export default function ChatInterface() {
     }
   }
 
+  const handleInputChange = (value: string) => {
+    setInput(value)
+    setIsSlashMenuOpen(value.trimStart().startsWith('/') && !value.trimStart().includes(' '))
+    if (pendingSkillCommand && !value.startsWith(pendingSkillCommand.text)) {
+      clearPendingSkillCommand()
+    }
+  }
+
+  const handleSkillSelect = (skill: SkillItem) => {
+    const commandText = `/${skill.skill_id} `
+    setInput(commandText)
+    setPendingSkillCommand({ skill_id: skill.skill_id, text: commandText })
+    setIsSlashMenuOpen(false)
+    textareaRef.current?.focus()
+  }
+
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col bg-gray-50 dark:bg-gray-950">
+    <div className="flex h-full min-h-0 flex-1 flex-col bg-[#f8f7f6] dark:bg-gray-950">
+      <ConversationTabStrip />
+
       {/* Messages Area */}
       <div data-testid="message-timeline" className="min-h-0 flex-1 overflow-y-auto">
         {messages.length === 0 ? (
           <div className="h-full flex items-center justify-center p-8">
             <div className="text-center max-w-2xl">
               <div className="relative mb-6">
-                <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-700 rounded-3xl flex items-center justify-center mx-auto shadow-xl">
-                  <Sparkles className="w-10 h-10 text-white" strokeWidth={2} />
+                <div
+                  data-testid="empty-state-icon"
+                  className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-blue-100 bg-blue-50 shadow-sm"
+                >
+                  <Sparkles className="h-8 w-8 text-blue-600" strokeWidth={2} />
                 </div>
               </div>
-              <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-3">
-                Ready to explore your sources
+              <h2 className="text-2xl font-semibold text-slate-900 dark:text-gray-100 mb-3">
+                {t(language, 'chat.readyTitle')}
               </h2>
               <p className="text-base text-gray-600 dark:text-gray-400 leading-relaxed mb-8">
-                Upload documents and ask questions. I'll provide answers with citations from your sources.
+                {t(language, 'chat.readyDescription')}
               </p>
 
               {/* 建议问题 */}
@@ -247,7 +339,7 @@ export default function ChatInterface() {
                       <button
                         key={idx}
                         onClick={() => setInput(question)}
-                        className="p-4 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all text-left group shadow-sm hover:shadow-md"
+                        className="p-4 bg-white rounded-xl border border-[#e2e1de] hover:border-blue-200 hover:bg-blue-50 transition-all text-left group shadow-sm hover:shadow-md"
                       >
                         <p className="text-sm text-gray-800 group-hover:text-blue-900 font-medium">
                           {question}
@@ -267,14 +359,15 @@ export default function ChatInterface() {
                 className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
+                  data-message-role={message.role}
                   className={`max-w-[80%] ${
                     message.role === 'user'
-                      ? 'bg-blue-600 text-white rounded-3xl rounded-br-md shadow-lg'
-                      : 'bg-white dark:bg-gray-800 rounded-3xl rounded-bl-md shadow-lg border border-gray-100 dark:border-gray-700'
+                      ? 'bg-slate-100 text-slate-900 rounded-2xl rounded-br-md border border-slate-200 shadow-sm dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700'
+                      : 'bg-white text-slate-900 dark:bg-gray-900 dark:text-slate-100 rounded-2xl rounded-bl-md shadow-sm border border-slate-200 dark:border-gray-700'
                   } px-6 py-4`}
                 >
                   <div className={`prose prose-sm max-w-none ${
-                    message.role === 'user' ? 'prose-invert' : 'prose-gray'
+                    message.role === 'user' ? 'prose-slate' : 'prose-slate dark:prose-invert'
                   }`}>
                     <ReactMarkdown>{message.content}</ReactMarkdown>
                   </div>
@@ -301,7 +394,8 @@ export default function ChatInterface() {
                           return (
                             <div
                               key={citIndex}
-                              className="bg-blue-50 rounded-xl border-2 border-blue-200 hover:border-blue-400 transition-all hover:shadow-md overflow-hidden"
+                              data-testid="citation-card"
+                              className="bg-white rounded-xl border border-slate-200 hover:border-slate-300 transition-all hover:shadow-sm overflow-hidden dark:bg-gray-900 dark:border-gray-700 dark:hover:border-gray-600"
                             >
                               <button
                                 onClick={() => toggleCitationExpand(index, citIndex)}
@@ -312,35 +406,35 @@ export default function ChatInterface() {
                                     <span className="inline-flex items-center justify-center w-6 h-6 bg-blue-600 text-white text-xs font-bold rounded-full flex-shrink-0">
                                       {citation.number}
                                     </span>
-                                    <p className="text-xs font-bold text-blue-900">
+                                    <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">
                                       {citation.doc_name}
-                                      {citation.page && <span className="ml-2 text-blue-700">Page {citation.page}</span>}
+                                      {citation.page && <span className="ml-2 text-blue-700 dark:text-blue-300">Page {citation.page}</span>}
                                       {!citation.page && citation.section && (
-                                        <span className="ml-2 text-blue-700">Section {citation.section}</span>
+                                        <span className="ml-2 text-blue-700 dark:text-blue-300">Section {citation.section}</span>
                                       )}
                                     </p>
                                   </div>
                                   <div className="flex items-center gap-2">
-                                    <span className="text-xs font-bold text-blue-700 bg-blue-200 px-2 py-1 rounded-full">
+                                    <span className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-1 rounded-full dark:text-blue-200 dark:bg-blue-950 dark:border-blue-900">
                                       {Math.round(citation.relevance_score * 100)}%
                                     </span>
                                     {isExpanded ? (
-                                      <ChevronUp className="w-4 h-4 text-blue-600" />
+                                      <ChevronUp className="w-4 h-4 text-slate-500 dark:text-slate-300" />
                                     ) : (
-                                      <ChevronDown className="w-4 h-4 text-blue-600" />
+                                      <ChevronDown className="w-4 h-4 text-slate-500 dark:text-slate-300" />
                                     )}
                                   </div>
                                 </div>
-                                <p className={`text-xs text-gray-800 leading-relaxed ${isExpanded ? '' : 'line-clamp-2'}`}>
+                                <p className={`text-xs text-slate-700 leading-relaxed dark:text-slate-300 ${isExpanded ? '' : 'line-clamp-2'}`}>
                                   {citation.content}
                                 </p>
                               </button>
 
                               {/* 展开的完整内容 */}
                               {isExpanded && (
-                                <div className="px-3 pb-3 pt-0 border-t border-blue-200 bg-blue-25">
-                                  <div className="mt-2 p-3 bg-white rounded-lg border border-blue-100">
-                                    <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">
+                                <div className="px-3 pb-3 pt-0 border-t border-slate-200 bg-slate-50 dark:border-gray-700 dark:bg-gray-950">
+                                  <div className="mt-2 p-3 bg-white rounded-lg border border-slate-200 dark:bg-gray-900 dark:border-gray-700">
+                                    <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap dark:text-slate-300">
                                       {citation.content}
                                     </p>
                                   </div>
@@ -357,7 +451,7 @@ export default function ChatInterface() {
             ))}
             {isLoading && (
               <div className="flex justify-start">
-                <div className="bg-white rounded-3xl rounded-bl-md shadow-lg border border-gray-100 px-6 py-4 flex items-center space-x-3">
+                <div className="bg-white rounded-2xl rounded-bl-md shadow-sm border border-slate-200 px-6 py-4 flex items-center space-x-3">
                   <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
                   <span className="text-sm text-gray-700 font-medium">Thinking...</span>
                 </div>
@@ -369,32 +463,67 @@ export default function ChatInterface() {
       </div>
 
       {/* Input Area */}
-      <div data-testid="chat-composer" className="sticky bottom-0 border-t border-gray-200 bg-white p-4 shadow-[0_-8px_20px_-18px_rgba(15,23,42,0.45)] dark:border-gray-800 dark:bg-gray-900">
+      <div data-testid="chat-composer" className="sticky bottom-0 border-t border-[#e2e1de] bg-[#f8f7f6] p-4 shadow-[0_-8px_20px_-18px_rgba(15,23,42,0.35)] dark:border-gray-800 dark:bg-gray-900">
         <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
-          <p className="mb-3 text-xs font-medium text-gray-500 dark:text-gray-400">Selected sources: {selectedDocIds.length}</p>
+          <ContextPillBar />
+          <p className="mb-3 text-xs font-medium text-gray-500 dark:text-gray-400">
+            {t(language, 'chat.selectedSources')}: {selectedDocIds.length}
+          </p>
           {inlineError && <p role="alert" className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100">{inlineError}</p>}
-          {streamDiagnostic && <details open className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900 dark:border-red-900 dark:bg-red-950 dark:text-red-100"><summary className="cursor-pointer font-semibold">Connection details</summary><dl className="mt-2 grid gap-1 sm:grid-cols-[8rem_1fr]"><dt className="font-semibold">Request phase</dt><dd>{streamDiagnostic.phase}</dd>{streamDiagnostic.status_code !== null && <><dt className="font-semibold">HTTP status</dt><dd>{streamDiagnostic.status_code}</dd></>}<dt className="font-semibold">Category</dt><dd>{streamDiagnostic.category}</dd><dt className="font-semibold">Summary</dt><dd className="break-words">{streamDiagnostic.summary}</dd></dl><p className="mt-2">Open Settings to test the connection.</p></details>}
-          <div className="mb-3 inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 dark:border-gray-700 dark:bg-gray-800">
-            {modeOptions.map((option) => (
+          {agentRunNotice && (
+            <div
+              role="status"
+              className={`mb-3 flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm ${
+                agentRunNotice.type === 'success'
+                  ? 'border-green-200 bg-green-50 text-green-900 dark:border-green-900 dark:bg-green-950 dark:text-green-100'
+                  : 'border-red-200 bg-red-50 text-red-900 dark:border-red-900 dark:bg-red-950 dark:text-red-100'
+              }`}
+            >
+              <span>{agentRunNotice.message}</span>
               <button
-                key={option.value}
                 type="button"
-                onClick={() => setChatMode(option.value)}
-                className={`h-8 rounded-md px-3 text-xs font-semibold transition-colors ${
-                  chatMode === option.value
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-600 hover:bg-white dark:text-gray-300 dark:hover:bg-gray-700'
-                }`}
+                onClick={() => setActiveModule('agents')}
+                className="rounded-md border border-current/20 bg-white/60 px-2 py-1 text-xs font-semibold hover:bg-white dark:bg-black/20 dark:hover:bg-black/30"
               >
-                {option.label}
+                Open Agents
               </button>
-            ))}
+            </div>
+          )}
+          {streamDiagnostic && <details open className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900 dark:border-red-900 dark:bg-red-950 dark:text-red-100"><summary className="cursor-pointer font-semibold">Connection details</summary><dl className="mt-2 grid gap-1 sm:grid-cols-[8rem_1fr]"><dt className="font-semibold">Request phase</dt><dd>{streamDiagnostic.phase}</dd>{streamDiagnostic.status_code !== null && <><dt className="font-semibold">HTTP status</dt><dd>{streamDiagnostic.status_code}</dd></>}<dt className="font-semibold">Category</dt><dd>{streamDiagnostic.category}</dd><dt className="font-semibold">Summary</dt><dd className="break-words">{streamDiagnostic.summary}</dd></dl><p className="mt-2">Open Settings to test the connection.</p></details>}
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <AgentSelector />
+            <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 dark:border-gray-700 dark:bg-gray-800">
+              {modeOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setChatMode(option.value)}
+                  className={`h-8 rounded-md px-3 text-xs font-semibold transition-colors ${
+                    chatMode === option.value
+                      ? 'bg-blue-50 text-blue-700 shadow-sm ring-1 ring-blue-100 dark:bg-blue-950 dark:text-blue-200 dark:ring-blue-900'
+                      : 'text-gray-600 hover:bg-white dark:text-gray-300 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-xl border-2 border-gray-300 dark:border-gray-600 focus-within:border-blue-500 dark:focus-within:border-blue-400 transition-all">
+          <div
+            data-testid="composer-frame"
+            className="relative rounded-xl border border-[#d8d6d2] bg-white shadow-sm transition-all focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 dark:border-gray-700 dark:bg-gray-800 dark:focus-within:border-blue-400 dark:focus-within:ring-blue-950"
+          >
+            {isSlashMenuOpen && (
+              <SlashCommandMenu
+                query={input}
+                onSelect={handleSkillSelect}
+                onClose={() => setIsSlashMenuOpen(false)}
+              />
+            )}
             <textarea
               ref={textareaRef}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => handleInputChange(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()

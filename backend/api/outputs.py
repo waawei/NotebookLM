@@ -19,9 +19,9 @@ class OutputGenerateRequest(BaseModel):
 
 
 @router.get("")
-async def list_outputs(kind: Optional[str] = None):
+async def list_outputs(kind: Optional[str] = None, include_archived: bool = False):
     try:
-        outputs = output_service.list_outputs(kind)
+        outputs = output_service.list_outputs(kind, include_archived=include_archived)
         return {"outputs": outputs, "total": len(outputs)}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -53,6 +53,22 @@ async def export_output(output_id: str):
         raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/{output_id}/archive")
+async def archive_output(output_id: str):
+    archived = output_service.archive_output(output_id)
+    if not archived:
+        raise HTTPException(status_code=404, detail="Output not found")
+    return {"message": "Output archived successfully"}
+
+
+@router.post("/{output_id}/restore")
+async def restore_output(output_id: str):
+    restored = output_service.restore_output(output_id)
+    if not restored:
+        raise HTTPException(status_code=404, detail="Output not found")
+    return {"message": "Output restored successfully"}
 
 
 @router.get("/{output_id}")

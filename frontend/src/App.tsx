@@ -4,9 +4,9 @@ import NotesModal from './components/NotesModal'
 import RightInspector from './components/RightInspector'
 import SearchModal from './components/SearchModal'
 import SettingsModal from './components/SettingsModal'
-import Sidebar from './components/Sidebar'
 import Toast from './components/Toast'
 import UploadModal from './components/UploadModal'
+import WorkbenchContextPanel from './components/WorkbenchContextPanel'
 import WorkbenchShell from './layouts/WorkbenchShell'
 import DashboardView from './views/DashboardView'
 import NotesView from './views/NotesView'
@@ -17,40 +17,43 @@ import WikiView from './views/WikiView'
 import SkillsView from './views/SkillsView'
 import AgentsView from './views/AgentsView'
 import WorkbenchView from './views/WorkbenchView'
+import { t } from './i18n'
 import { resolveTheme, useStore } from './store/useStore'
-import type { AppModule } from './store/useStore'
+import type { AppModule, LanguagePreference } from './store/useStore'
 
-const moduleCopy: Record<AppModule, { title: string; subtitle: string }> = {
-  dashboard: {
-    title: 'Dashboard',
-    subtitle: 'Recent sources, model status, and workspace activity',
-  },
-  workbench: {
-    title: 'Workbench',
-    subtitle: 'Ask grounded questions across selected sources',
-  },
-  sources: {
-    title: 'Sources',
-    subtitle: 'Manage local documents and source processing state',
-  },
-  notes: {
-    title: 'Notes',
-    subtitle: 'Capture useful answers and source references',
-  },
-  wiki: {
-    title: 'Wiki',
-    subtitle: 'Source-grounded pages built from selected documents',
-  },
-  outputs: {
-    title: 'Outputs',
-    subtitle: 'Generated summaries, outlines, and study artifacts',
-  },
-  skills: { title: 'Skills', subtitle: 'Local skill manifests with explicit safe tools' },
-  agents: { title: 'Agents', subtitle: 'Inspectable runs, steps, errors, and outputs' },
-  settings: {
-    title: 'Settings',
-    subtitle: 'Configure a local model connection and inspect safe runtime status',
-  },
+function getModuleCopy(language: LanguagePreference): Record<AppModule, { title: string; subtitle: string }> {
+  return {
+    dashboard: {
+      title: t(language, 'module.dashboard.title'),
+      subtitle: t(language, 'module.dashboard.subtitle'),
+    },
+    workbench: {
+      title: t(language, 'module.workbench.title'),
+      subtitle: t(language, 'module.workbench.subtitle'),
+    },
+    sources: {
+      title: t(language, 'module.sources.title'),
+      subtitle: t(language, 'module.sources.subtitle'),
+    },
+    notes: {
+      title: t(language, 'module.notes.title'),
+      subtitle: t(language, 'module.notes.subtitle'),
+    },
+    wiki: {
+      title: t(language, 'module.wiki.title'),
+      subtitle: t(language, 'module.wiki.subtitle'),
+    },
+    outputs: {
+      title: t(language, 'module.outputs.title'),
+      subtitle: t(language, 'module.outputs.subtitle'),
+    },
+    skills: { title: t(language, 'module.skills.title'), subtitle: t(language, 'module.skills.subtitle') },
+    agents: { title: t(language, 'module.agents.title'), subtitle: t(language, 'module.agents.subtitle') },
+    settings: {
+      title: t(language, 'module.settings.title'),
+      subtitle: t(language, 'module.settings.subtitle'),
+    },
+  }
 }
 
 function App() {
@@ -67,6 +70,7 @@ function App() {
     removeToast,
     theme,
     setTheme,
+    language,
   } = useStore()
   const [systemIsDark, setSystemIsDark] = useState(() =>
     typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches,
@@ -91,6 +95,10 @@ function App() {
   }, [resolvedTheme])
 
   useEffect(() => {
+    document.documentElement.lang = language === 'zh-CN' ? 'zh-CN' : 'en'
+  }, [language])
+
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault()
@@ -106,7 +114,7 @@ function App() {
     setActiveModule(module)
   }
 
-  const activeCopy = moduleCopy[activeModule]
+  const activeCopy = getModuleCopy(language)[activeModule]
 
   const renderCenterPanel = () => {
     if (activeModule === 'dashboard') {
@@ -176,7 +184,7 @@ function App() {
         onOpenSettings={() => setIsSettingsModalOpen(true)}
         onToggleDarkMode={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
         leftPanel={
-          <Sidebar
+          <WorkbenchContextPanel
             isCollapsed={isSidebarCollapsed}
             onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
             onUploadClick={() => setIsUploadModalOpen(true)}

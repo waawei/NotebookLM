@@ -179,11 +179,15 @@ class DocumentMetadataStore:
                     title TEXT NOT NULL,
                     content TEXT NOT NULL,
                     source_doc_ids_json TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'active',
+                    deleted_at TEXT,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 )
                 """
             )
+            self._ensure_table_column(conn, "outputs", "status", "TEXT NOT NULL DEFAULT 'active'")
+            self._ensure_table_column(conn, "outputs", "deleted_at", "TEXT")
             self._ensure_document_column(
                 conn, "summary_status", "TEXT NOT NULL DEFAULT 'pending'"
             )
@@ -742,6 +746,8 @@ class DocumentMetadataStore:
             "title": title,
             "content": content,
             "source_doc_ids": source_doc_ids,
+            "status": "active",
+            "deleted_at": None,
             "created_at": now,
             "updated_at": now,
         }
@@ -749,9 +755,9 @@ class DocumentMetadataStore:
             conn.execute(
                 """
                 INSERT INTO outputs (
-                    output_id, kind, title, content, source_doc_ids_json, created_at, updated_at
+                    output_id, kind, title, content, source_doc_ids_json, status, deleted_at, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     output["output_id"],
@@ -759,18 +765,23 @@ class DocumentMetadataStore:
                     output["title"],
                     output["content"],
                     json.dumps(output["source_doc_ids"], ensure_ascii=False),
+                    output["status"],
+                    output["deleted_at"],
                     output["created_at"],
                     output["updated_at"],
                 ),
             )
         return output
 
-    def list_outputs(self, kind: Optional[str] = None) -> list[dict]:
+    def list_outputs(self, kind: Optional[str] = None, include_archived: bool = False) -> list[dict]:
         params = []
-        where_sql = ""
+        filters = []
         if kind:
-            where_sql = "WHERE kind = ?"
+            filters.append("kind = ?")
             params.append(kind)
+        if not include_archived:
+            filters.append("status = 'active'")
+        where_sql = f"WHERE {' AND '.join(filters)}" if filters else ""
 
         with self._connect() as conn:
             rows = conn.execute(
@@ -795,6 +806,32 @@ class DocumentMetadataStore:
                 (output_id,),
             ).fetchone()
         return self._artifact_row_to_dict(row, "output_id", "source_doc_ids_json")
+
+    def archive_output(self, output_id: str) -> bool:
+        now = datetime.now().isoformat()
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE outputs
+                SET status = 'archived', deleted_at = ?, updated_at = ?
+                WHERE output_id = ?
+                """,
+                (now, now, output_id),
+            )
+            return cursor.rowcount > 0
+
+    def restore_output(self, output_id: str) -> bool:
+        now = datetime.now().isoformat()
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE outputs
+                SET status = 'active', deleted_at = NULL, updated_at = ?
+                WHERE output_id = ?
+                """,
+                (now, output_id),
+            )
+            return cursor.rowcount > 0
 
     def delete_output(self, output_id: str) -> bool:
         with self._connect() as conn:
@@ -968,12 +1005,16 @@ class DocumentMetadataStore:
 
     @staticmethod
     def _ensure_document_column(conn, name: str, definition: str) -> None:
+        DocumentMetadataStore._ensure_table_column(conn, "documents", name, definition)
+
+    @staticmethod
+    def _ensure_table_column(conn, table: str, name: str, definition: str) -> None:
         columns = {
             row["name"]
-            for row in conn.execute("PRAGMA table_info(documents)").fetchall()
+            for row in conn.execute(f"PRAGMA table_info({table})").fetchall()
         }
         if name not in columns:
-            conn.execute(f"ALTER TABLE documents ADD COLUMN {name} {definition}")
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
 
     def _artifact_row_to_dict(
         self,

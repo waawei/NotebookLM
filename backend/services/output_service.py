@@ -57,16 +57,22 @@ class OutputService:
             source_doc_ids=source_doc_ids,
         )
 
-    def list_outputs(self, kind: Optional[str] = None) -> list[dict]:
+    def list_outputs(self, kind: Optional[str] = None, include_archived: bool = False) -> list[dict]:
         if kind:
             self._validate_kind(kind)
-        return self.metadata_store.list_outputs(kind)
+        return self.metadata_store.list_outputs(kind, include_archived=include_archived)
 
     def get_output(self, output_id: str) -> Optional[dict]:
         return self.metadata_store.get_output(output_id)
 
     def delete_output(self, output_id: str) -> bool:
         return self.metadata_store.delete_output(output_id)
+
+    def archive_output(self, output_id: str) -> bool:
+        return self.metadata_store.archive_output(output_id)
+
+    def restore_output(self, output_id: str) -> bool:
+        return self.metadata_store.restore_output(output_id)
 
     def export_output(self, output_id: str) -> Optional[dict]:
         output = self.get_output(output_id)

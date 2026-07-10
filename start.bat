@@ -37,13 +37,24 @@ echo ========================================
 echo.
 
 REM Start backend (in new window)
-start "NotebookLM-Backend" cmd /k "cd backend && call venv\Scripts\activate.bat && python main.py"
+start "NotebookLM-Backend" cmd /k "cd /d %~dp0backend && call venv\Scripts\activate.bat && python main.py"
 
-REM Wait 3 seconds for backend to start
-timeout /t 3 /nobreak >nul
+REM Wait until backend is actually ready instead of sleeping a fixed time.
+echo Waiting for backend health check...
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$deadline=(Get-Date).AddSeconds(60); " ^
+  "do { " ^
+  "  try { $r=Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 'http://127.0.0.1:8000/health'; if ($r.StatusCode -eq 200) { Write-Host 'Backend is ready'; exit 0 } } catch { Start-Sleep -Seconds 1 } " ^
+  "} while ((Get-Date) -lt $deadline); " ^
+  "Write-Host 'Backend did not become ready at http://127.0.0.1:8000/health within 60 seconds'; exit 1"
+if errorlevel 1 (
+    echo [ERROR] Backend did not become ready. Check the NotebookLM-Backend window.
+    pause
+    exit /b 1
+)
 
 REM Start frontend (in new window)
-start "NotebookLM-Frontend" cmd /k "cd frontend && npm run dev"
+start "NotebookLM-Frontend" cmd /k "cd /d %~dp0frontend && npm.cmd run dev"
 
 echo.
 echo Two service windows have been started!

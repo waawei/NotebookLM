@@ -65,7 +65,7 @@ export default function Sidebar({ isCollapsed, onToggle, onUploadClick }: Sideba
 
   if (isCollapsed) {
     return (
-      <div className="w-14 border-r border-gray-200 dark:border-gray-800 flex flex-col items-center py-4 bg-gray-50 dark:bg-gray-900">
+      <div className="w-14 border-r border-[#dddcd9] dark:border-gray-800 flex flex-col items-center py-4 bg-[#f1f0ef] dark:bg-gray-900">
         <button
           onClick={onToggle}
           className="p-2 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-lg transition-colors"
@@ -78,14 +78,14 @@ export default function Sidebar({ isCollapsed, onToggle, onUploadClick }: Sideba
   }
 
   return (
-    <div className="w-72 border-r border-gray-200 dark:border-gray-800 flex flex-col bg-gray-50 dark:bg-gray-900">
+    <div data-testid="sources-sidebar" className="w-72 border-r border-[#dddcd9] dark:border-gray-800 flex flex-col bg-[#f1f0ef] dark:bg-gray-900">
       {/* Header */}
-      <div className="p-5 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+      <div className="p-5 border-b border-[#dddcd9] dark:border-gray-800 bg-[#f8f7f6] dark:bg-gray-900">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Sources</h2>
           <button
             onClick={onToggle}
-            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+            className="p-1.5 hover:bg-[#ebeae8] dark:hover:bg-gray-800 rounded-lg transition-colors"
             aria-label="Collapse sidebar"
           >
             <ChevronLeft className="w-4 h-4 text-gray-400 dark:text-gray-500" />
@@ -105,7 +105,7 @@ export default function Sidebar({ isCollapsed, onToggle, onUploadClick }: Sideba
       <div className="flex-1 overflow-y-auto p-4">
         {documents.length === 0 ? (
           <div className="text-center py-12">
-            <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-blue-200 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <div data-testid="empty-source-icon" className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4 ring-1 ring-blue-100">
               <FileText className="w-8 h-8 text-blue-600" strokeWidth={1.5} />
             </div>
             <p className="text-sm font-semibold text-gray-800 mb-2">No sources yet</p>
@@ -118,15 +118,16 @@ export default function Sidebar({ isCollapsed, onToggle, onUploadClick }: Sideba
               return (
                 <div
                   key={doc.doc_id}
-                  className={`group relative p-4 rounded-xl border-2 transition-all cursor-pointer ${
+                  data-testid="source-card"
+                  className={`group relative p-4 rounded-xl border transition-all cursor-pointer ${
                     isSelected
-                      ? 'border-blue-500 bg-blue-50 shadow-md'
-                      : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-lg'
+                      ? 'border-blue-200 bg-blue-50 shadow-sm'
+                      : 'border-[#e2e1de] bg-white hover:border-blue-200 hover:shadow-sm'
                   }`}
                   onClick={() => toggleDocumentSelection(doc.doc_id)}
                 >
                   <div className="flex items-start space-x-3">
-                    <div className={`p-2.5 rounded-lg ${isSelected ? 'bg-blue-200' : 'bg-gray-100'} transition-colors`}>
+                    <div className={`p-2.5 rounded-lg ${isSelected ? 'bg-blue-100' : 'bg-[#f5f4f3]'} transition-colors`}>
                       <FileText className={`w-5 h-5 ${isSelected ? 'text-blue-700' : 'text-gray-600'}`} strokeWidth={2} />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -179,7 +180,7 @@ export default function Sidebar({ isCollapsed, onToggle, onUploadClick }: Sideba
 
       {/* Footer */}
       {documents.length > 0 && (
-        <div className="p-4 border-t border-gray-200 bg-white">
+        <div className="p-4 border-t border-[#dddcd9] bg-[#f8f7f6]">
           <p className="text-xs text-gray-600 font-medium">
             <span className="text-blue-600 font-bold">{visibleSelectedCount}</span> of {documents.length} visible selected
           </p>

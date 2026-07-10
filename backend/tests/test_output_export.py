@@ -35,6 +35,30 @@ class OutputExportTests(unittest.TestCase):
         self.assertIn("- doc-1", exported["content"])
         self.assertIn("- doc-2", exported["content"])
 
+    def test_archive_hides_output_until_archived_filter_and_restore_reactivates(self):
+        output = self.store.create_output(
+            "summary",
+            "Summary",
+            "Generated body.",
+            ["doc-1"],
+        )
+
+        archived = self.service.archive_output(output["output_id"])
+
+        self.assertTrue(archived)
+        self.assertEqual(self.service.list_outputs(), [])
+        archived_outputs = self.service.list_outputs(include_archived=True)
+        self.assertEqual(len(archived_outputs), 1)
+        self.assertEqual(archived_outputs[0]["status"], "archived")
+
+        exported = self.service.export_output(output["output_id"])
+        self.assertIn("Generated body.", exported["content"])
+
+        restored = self.service.restore_output(output["output_id"])
+
+        self.assertTrue(restored)
+        self.assertEqual(self.service.list_outputs()[0]["status"], "active")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -9,7 +9,8 @@ import {
   Upload,
 } from 'lucide-react'
 import ModuleNav from '../components/ModuleNav'
-import type { AppModule } from '../store/useStore'
+import { t } from '../i18n'
+import { useStore, type AppModule } from '../store/useStore'
 
 interface WorkbenchShellProps {
   activeModule: AppModule
@@ -44,13 +45,15 @@ export default function WorkbenchShell({
   onOpenSettings,
   onToggleDarkMode,
 }: WorkbenchShellProps) {
+  const language = useStore((state) => state.language)
+
   return (
-    <div className="h-screen overflow-hidden bg-gray-100 text-gray-950 dark:bg-gray-950 dark:text-gray-100">
+    <div data-testid="workbench-shell" className="h-screen overflow-hidden bg-[#f8f7f6] text-[#1a1a2e] dark:bg-gray-950 dark:text-gray-100">
       <div className="flex h-full min-w-0">
         <ModuleNav activeModule={activeModule} onModuleChange={onModuleChange} />
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex h-16 flex-shrink-0 items-center gap-4 border-b border-gray-200 bg-white px-4 dark:border-gray-800 dark:bg-gray-900">
+          <header className="flex h-16 flex-shrink-0 items-center gap-4 border-b border-[#dddcd9] bg-white px-4 dark:border-gray-800 dark:bg-gray-900">
             <div className="min-w-0">
               <h1 className="truncate text-base font-semibold text-gray-950 dark:text-gray-100">
                 {title}
@@ -64,19 +67,19 @@ export default function WorkbenchShell({
 
             <div className="ml-auto flex items-center gap-2">
               <details className="relative lg:hidden">
-                <summary aria-label="Open source selector" className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 [&::-webkit-details-marker]:hidden">
+                <summary aria-label={t(language, 'shell.openSourceSelector')} className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 [&::-webkit-details-marker]:hidden">
                   <FileText className="h-5 w-5" />
                 </summary>
-                <div data-testid="mobile-source-panel" className="absolute right-0 top-12 z-50 max-h-[calc(100vh-5rem)] w-72 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900 lg:hidden">
+                <div data-testid="mobile-source-panel" className="fixed right-3 top-16 z-50 max-h-[calc(100vh-5rem)] w-72 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900 lg:hidden">
                   {leftPanel}
                 </div>
               </details>
               {rightPanel && (
                 <details className="relative xl:hidden">
-                  <summary aria-label="Open citation inspector" className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 [&::-webkit-details-marker]:hidden">
+                  <summary aria-label={t(language, 'shell.openInspector')} className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 [&::-webkit-details-marker]:hidden">
                     <Search className="h-5 w-5" />
                   </summary>
-                  <div data-testid="mobile-inspector" className="absolute right-0 top-12 z-50 max-h-[calc(100vh-5rem)] w-80 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900 xl:hidden">
+                  <div data-testid="mobile-inspector" className="fixed right-3 top-16 z-50 max-h-[calc(100vh-5rem)] w-80 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900 xl:hidden">
                     {rightPanel}
                   </div>
                 </details>
@@ -86,7 +89,7 @@ export default function WorkbenchShell({
                 className="hidden items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 md:flex"
               >
                 <Upload className="h-4 w-4" />
-                Add source
+                {t(language, 'shell.addSource')}
               </button>
               <IconButton
                 label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -94,7 +97,7 @@ export default function WorkbenchShell({
               >
                 {isDarkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
               </IconButton>
-              <IconButton label="Settings" onClick={onOpenSettings}>
+              <IconButton label={t(language, 'shell.settings')} onClick={onOpenSettings}>
                 <Settings className="h-5 w-5" />
               </IconButton>
               <button
@@ -103,31 +106,31 @@ export default function WorkbenchShell({
                 title="Search (Ctrl+K)"
               >
                 <Search className="h-4 w-4" />
-                Search
+                {t(language, 'shell.search')}
                 <kbd className="hidden rounded border border-gray-300 bg-white px-1.5 py-0.5 text-[10px] font-mono text-gray-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-400 lg:inline">
                   Ctrl K
                 </kbd>
               </button>
-              <IconButton label="Export" onClick={onOpenExport}>
+              <IconButton label={t(language, 'shell.export')} onClick={onOpenExport}>
                 <Download className="h-5 w-5" />
               </IconButton>
-              <IconButton label="Notes" onClick={onOpenNotes}>
+              <IconButton label={t(language, 'shell.notes')} onClick={onOpenNotes}>
                 <FileText className="h-5 w-5" />
               </IconButton>
             </div>
           </header>
 
           <main className="flex min-h-0 flex-1 overflow-hidden">
-            <aside className="hidden min-h-0 flex-shrink-0 border-r border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900 lg:block">
+            <aside data-testid="desktop-left-panel" className="hidden min-h-0 flex-shrink-0 border-r border-[#dddcd9] bg-[#f1f0ef] dark:border-gray-800 dark:bg-gray-900 lg:block">
               {leftPanel}
             </aside>
 
-            <section className="min-w-0 flex-1 overflow-hidden">
+            <section data-testid="center-panel" className="min-w-0 flex-1 overflow-hidden bg-white dark:bg-gray-950">
               {centerPanel}
             </section>
 
             {rightPanel && (
-              <aside className="hidden w-80 flex-shrink-0 border-l border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 xl:block">
+              <aside className="hidden w-80 flex-shrink-0 border-l border-[#dddcd9] bg-[#f1f0ef] dark:border-gray-800 dark:bg-gray-900 xl:block">
                 {rightPanel}
               </aside>
             )}

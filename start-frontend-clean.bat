@@ -15,17 +15,31 @@ echo.
 
 echo [2/3] Clearing npm cache...
 cd frontend
-npm cache clean --force
+npm.cmd cache clean --force
 echo Done!
 echo.
 
-echo [3/3] Starting Vite dev server...
+echo [3/4] Waiting for backend health check...
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$deadline=(Get-Date).AddSeconds(60); " ^
+  "do { " ^
+  "  try { $r=Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 'http://127.0.0.1:8000/health'; if ($r.StatusCode -eq 200) { Write-Host 'Backend is ready'; exit 0 } } catch { Start-Sleep -Seconds 1 } " ^
+  "} while ((Get-Date) -lt $deadline); " ^
+  "Write-Host 'Backend did not become ready at http://127.0.0.1:8000/health within 60 seconds'; exit 1"
+if errorlevel 1 (
+    echo [ERROR] Backend is not ready. Start backend\start_backend.bat first.
+    pause
+    exit /b 1
+)
+echo.
+
+echo [4/4] Starting Vite dev server...
 echo.
 echo ================================
 echo Frontend will be available at:
 echo http://localhost:3000
 echo ================================
 echo.
-npm run dev
+npm.cmd run dev
 
 pause

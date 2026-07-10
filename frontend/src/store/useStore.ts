@@ -3,6 +3,23 @@ import { create } from 'zustand'
 export type AppModule = 'dashboard' | 'workbench' | 'sources' | 'notes' | 'wiki' | 'outputs' | 'skills' | 'agents' | 'settings'
 export type ThemePreference = 'system' | 'light' | 'dark'
 export type ResolvedTheme = 'light' | 'dark'
+export type LanguagePreference = 'en' | 'zh-CN'
+export type WorkbenchLeftTab = 'conversations' | 'sources' | 'knowledge_base'
+export type PreviewTarget = { type: 'document' | 'wiki' | 'note' | 'output'; id: string; title: string } | null
+
+export interface OpenConversationTab {
+  conversation_id: string | null
+  title: string
+  isDirty?: boolean
+}
+
+export interface PendingSkillCommand {
+  skill_id: string
+  text: string
+}
+
+const defaultConversationTabs: OpenConversationTab[] = [{ conversation_id: null, title: 'New conversation' }]
+const newConversationTabId = 'new'
 
 export function resolveTheme(theme: ThemePreference, systemIsDark: boolean): ResolvedTheme {
   return theme === 'system' ? (systemIsDark ? 'dark' : 'light') : theme
@@ -12,6 +29,32 @@ function initialThemePreference(): ThemePreference {
   if (typeof window === 'undefined') return 'system'
   const value = localStorage.getItem('theme_preference')
   return value === 'light' || value === 'dark' || value === 'system' ? value : 'system'
+}
+
+function initialLanguagePreference(): LanguagePreference {
+  if (typeof window === 'undefined') return 'en'
+  const value = localStorage.getItem('language_preference')
+  return value === 'zh-CN' || value === 'en' ? value : 'en'
+}
+
+function readJsonFromStorage<T>(key: string, fallback: T): T {
+  if (typeof window === 'undefined') return fallback
+  try {
+    const value = localStorage.getItem(key)
+    return value ? JSON.parse(value) as T : fallback
+  } catch {
+    return fallback
+  }
+}
+
+function persistJson(key: string, value: unknown) {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(key, JSON.stringify(value))
+  }
+}
+
+function tabId(tab: OpenConversationTab) {
+  return tab.conversation_id ?? newConversationTabId
 }
 
 export interface Document {
@@ -73,6 +116,25 @@ interface AppState {
   setSourceStatusFilter: (status: string | null) => void
   setSourceTagFilter: (tags: string[]) => void
 
+  workbenchLeftTab: WorkbenchLeftTab
+  openConversationTabs: OpenConversationTab[]
+  activeConversationTabId: string
+  previewTarget: PreviewTarget
+  selectedWikiPageIds: string[]
+  selectedAgentId: string | null
+  pendingSkillCommand: PendingSkillCommand | null
+  artifactRefreshToken: number
+  setWorkbenchLeftTab: (tab: WorkbenchLeftTab) => void
+  openConversationTab: (tab: OpenConversationTab) => void
+  closeConversationTab: (conversationTabId: string) => void
+  setActiveConversationTab: (conversationTabId: string) => void
+  setPreviewTarget: (target: PreviewTarget) => void
+  toggleWikiContext: (pageId: string) => void
+  setSelectedAgentId: (agentId: string | null) => void
+  setPendingSkillCommand: (command: PendingSkillCommand) => void
+  clearPendingSkillCommand: () => void
+  bumpArtifactRefreshToken: () => void
+
   messages: Message[]
   conversationId: string | null
   isLoading: boolean
@@ -91,6 +153,8 @@ interface AppState {
 
   theme: ThemePreference
   setTheme: (theme: ThemePreference) => void
+  language: LanguagePreference
+  setLanguage: (language: LanguagePreference) => void
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -131,6 +195,79 @@ export const useStore = create<AppState>((set) => ({
   setSourceStatusFilter: (status) => set({ sourceStatusFilter: status }),
 
   setSourceTagFilter: (tags) => set({ sourceTagFilter: tags }),
+
+  workbenchLeftTab: 'conversations',
+  openConversationTabs: readJsonFromStorage<OpenConversationTab[]>('open_conversation_tabs', defaultConversationTabs),
+  activeConversationTabId: readJsonFromStorage<string>('active_conversation_tab_id', newConversationTabId),
+  previewTarget: null,
+  selectedWikiPageIds: readJsonFromStorage<string[]>('selected_wiki_page_ids', []),
+  selectedAgentId: typeof window !== 'undefined' ? localStorage.getItem('selected_agent_id') : null,
+  pendingSkillCommand: null,
+  artifactRefreshToken: 0,
+
+  setWorkbenchLeftTab: (tab) => set({ workbenchLeftTab: tab }),
+
+  openConversationTab: (tab) =>
+    set((state) => {
+      const nextTab = { conversation_id: tab.conversation_id, title: tab.title, ...(tab.isDirty ? { isDirty: tab.isDirty } : {}) }
+      const nextTabId = tabId(nextTab)
+      const exists = state.openConversationTabs.some((item) => tabId(item) === nextTabId)
+      const openConversationTabs = exists
+        ? state.openConversationTabs.map((item) => (tabId(item) === nextTabId ? { ...item, ...nextTab } : item))
+        : [...state.openConversationTabs, nextTab]
+      persistJson('open_conversation_tabs', openConversationTabs)
+      persistJson('active_conversation_tab_id', nextTabId)
+      return { openConversationTabs, activeConversationTabId: nextTabId }
+    }),
+
+  closeConversationTab: (conversationTabId) =>
+    set((state) => {
+      const currentIndex = state.openConversationTabs.findIndex((item) => tabId(item) === conversationTabId)
+      const remainingTabs = state.openConversationTabs.filter((item) => tabId(item) !== conversationTabId)
+      const openConversationTabs = remainingTabs.length > 0 ? remainingTabs : defaultConversationTabs
+      let activeConversationTabId = state.activeConversationTabId
+      if (state.activeConversationTabId === conversationTabId) {
+        const fallbackIndex = Math.min(Math.max(currentIndex, 0), openConversationTabs.length - 1)
+        activeConversationTabId = tabId(openConversationTabs[fallbackIndex])
+      }
+      persistJson('open_conversation_tabs', openConversationTabs)
+      persistJson('active_conversation_tab_id', activeConversationTabId)
+      return { openConversationTabs, activeConversationTabId }
+    }),
+
+  setActiveConversationTab: (conversationTabId) => {
+    persistJson('active_conversation_tab_id', conversationTabId)
+    set({ activeConversationTabId: conversationTabId })
+  },
+
+  setPreviewTarget: (target) => set({ previewTarget: target }),
+
+  toggleWikiContext: (pageId) =>
+    set((state) => {
+      const selectedWikiPageIds = state.selectedWikiPageIds.includes(pageId)
+        ? state.selectedWikiPageIds.filter((id) => id !== pageId)
+        : [...state.selectedWikiPageIds, pageId]
+      persistJson('selected_wiki_page_ids', selectedWikiPageIds)
+      return { selectedWikiPageIds }
+    }),
+
+  setSelectedAgentId: (agentId) => {
+    if (typeof window !== 'undefined') {
+      if (agentId) {
+        localStorage.setItem('selected_agent_id', agentId)
+      } else {
+        localStorage.removeItem('selected_agent_id')
+      }
+    }
+    set({ selectedAgentId: agentId })
+  },
+
+  setPendingSkillCommand: (command) => set({ pendingSkillCommand: command }),
+
+  clearPendingSkillCommand: () => set({ pendingSkillCommand: null }),
+
+  bumpArtifactRefreshToken: () =>
+    set((state) => ({ artifactRefreshToken: state.artifactRefreshToken + 1 })),
 
   messages: typeof window !== 'undefined'
     ? JSON.parse(localStorage.getItem('chat_messages') || '[]')
@@ -188,7 +325,9 @@ export const useStore = create<AppState>((set) => ({
       conversationId: null,
       isLoading: false,
       suggestedQuestions: [],
+      activeConversationTabId: newConversationTabId,
     })
+    persistJson('active_conversation_tab_id', newConversationTabId)
   },
 
   toasts: [],
@@ -213,5 +352,14 @@ export const useStore = create<AppState>((set) => ({
       localStorage.setItem('theme_preference', theme)
     }
     set({ theme })
+  },
+
+  language: initialLanguagePreference(),
+
+  setLanguage: (language) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('language_preference', language)
+    }
+    set({ language })
   },
 }))

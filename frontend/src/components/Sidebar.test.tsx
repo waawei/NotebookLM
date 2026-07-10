@@ -34,4 +34,24 @@ describe('Sidebar document status', () => {
     expect(screen.getByText('Processing failed')).toBeInTheDocument()
     expect(screen.getByText('Selected')).toBeInTheDocument()
   })
+
+  it('uses a neutral Reviva-style context panel with pale selected sources', () => {
+    render(<Sidebar isCollapsed={false} onToggle={vi.fn()} onUploadClick={vi.fn()} />)
+
+    expect(screen.getByTestId('sources-sidebar')).toHaveClass('bg-[#f1f0ef]')
+    expect(screen.getByRole('button', { name: /Add source/i })).toHaveClass('bg-blue-600')
+
+    const selectedCard = screen.getByText('indexed.pdf').closest('[data-testid="source-card"]')
+    expect(selectedCard).toHaveClass('bg-blue-50')
+    expect(selectedCard).not.toHaveClass('bg-blue-600')
+  })
+
+  it('uses a quiet empty source state without a blue gradient block', () => {
+    useStore.setState({ documents: [], selectedDocIds: [] })
+
+    render(<Sidebar isCollapsed={false} onToggle={vi.fn()} onUploadClick={vi.fn()} />)
+
+    expect(screen.getByTestId('empty-source-icon')).toHaveClass('bg-blue-50')
+    expect(screen.getByTestId('empty-source-icon')).not.toHaveClass('bg-gradient-to-br')
+  })
 })
