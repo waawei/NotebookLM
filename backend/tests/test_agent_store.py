@@ -178,6 +178,61 @@ class AgentStoreTests(unittest.TestCase):
         self.assertNotIn(bearer_token, raw_run[1])
         self.assertEqual(raw_steps, [])
 
+    def test_redacts_compound_sensitive_field_names_before_returning_or_storing(self):
+        input_api_key = "opaque input credential value"
+        input_authorization = "opaque input authorization value"
+        step_secret = "opaque step credential value"
+        step_token = "opaque step session value"
+        step_password = "opaque step password value"
+        run = self.store.create_agent_run(
+            "paper_planner",
+            {
+                "doc_ids": ["doc-1"],
+                "model": "test-model",
+                "openai_api_key": input_api_key,
+                "upstream_authorization": input_authorization,
+            },
+        )
+        self.store.append_agent_step(
+            run["run_id"],
+            {
+                "kind": "tool",
+                "title": "Retrieved selected sources",
+                "payload": {
+                    "tool": "retrieve_sources",
+                    "source_count": 2,
+                    "client_secret": step_secret,
+                    "session_token": step_token,
+                    "proxy_password": step_password,
+                },
+            },
+        )
+
+        loaded = self.store.get_agent_run(run["run_id"])
+        raw_run, raw_steps = self._raw_agent_values(run["run_id"])
+        sentinels = [
+            input_api_key,
+            input_authorization,
+            step_secret,
+            step_token,
+            step_password,
+        ]
+
+        self.assertEqual(loaded["input_payload"]["doc_ids"], ["doc-1"])
+        self.assertEqual(loaded["input_payload"]["model"], "test-model")
+        self.assertEqual(loaded["input_payload"]["openai_api_key"], "***")
+        self.assertEqual(loaded["input_payload"]["upstream_authorization"], "***")
+        self.assertEqual(loaded["steps"][0]["payload"]["tool"], "retrieve_sources")
+        self.assertEqual(loaded["steps"][0]["payload"]["source_count"], 2)
+        self.assertEqual(loaded["steps"][0]["payload"]["client_secret"], "***")
+        self.assertEqual(loaded["steps"][0]["payload"]["session_token"], "***")
+        self.assertEqual(loaded["steps"][0]["payload"]["proxy_password"], "***")
+        for sentinel in sentinels:
+            self.assertNotIn(sentinel, str(run))
+            self.assertNotIn(sentinel, str(loaded))
+            self.assertNotIn(sentinel, raw_run[0])
+            self.assertNotIn(sentinel, raw_steps[0][0])
+
 
 if __name__ == "__main__":
     unittest.main()

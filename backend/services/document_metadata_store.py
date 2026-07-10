@@ -1037,7 +1037,10 @@ class DocumentMetadataStore:
         if not isinstance(name, str):
             return False
         normalized = re.sub(r"[^a-z0-9]", "", name.lower())
-        return normalized in cls._SENSITIVE_AGENT_FIELD_NAMES
+        return any(
+            normalized.endswith(sensitive)
+            for sensitive in cls._SENSITIVE_AGENT_FIELD_NAMES
+        )
 
     def _decorate_document(
         self,
