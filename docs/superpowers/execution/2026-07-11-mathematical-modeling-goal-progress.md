@@ -8,13 +8,13 @@
 workflow: mathematical-modeling
 current_phase: 1
 phase_status: in_progress
-current_task: "Task 4: Modeling REST API"
+current_task: "Task 5: Frontend API, Navigation, and Project View"
 task_status: verified
 baseline_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase1"
-last_verified_commit: 1ce74cab1216d0e8b48df1a707aa5470ee52c6d9
-last_verification: "Task 4 focused API and Agents API regression verified; task review clean"
-next_action: "Task 5: Frontend API, Navigation, and Project View"
+last_verified_commit: 335c892
+last_verification: "Task 5 focused and full frontend tests plus production build verified; task review clean"
+next_action: "Task 6: Phase 1 Vertical Verification"
 ```
 
 ## 启动前风险
@@ -96,6 +96,16 @@ next_action: "Task 5: Frontend API, Navigation, and Project View"
 - 提交：实现 `1ce74cab1216d0e8b48df1a707aa5470ee52c6d9`
 - 保留的用户改动：无；隔离工作树在开始与提交后均为空
 - 备注：直接导入 API 会初始化既有 `DocumentMetadataStore`，聚焦套件耗时约 29 秒；终端的早期流输出为空并非卡死。已通过等待子进程并读取完整输出确认结果。任务级审查通过：路由、请求模型、错误映射、挂载和 Agents API 兼容性均符合 Task 4。
+
+### Task 5: Frontend API, Navigation, and Project View
+
+- Status: verified
+- Planned and actual files: `frontend/src/services/api.ts`, `frontend/src/services/api.test.ts`, `frontend/src/store/useStore.ts`, `frontend/src/store/useStore.test.ts`, `frontend/src/i18n.ts`, `frontend/src/components/ModuleNav.tsx`, `frontend/src/components/ModuleNav.test.tsx`, `frontend/src/App.tsx`, `frontend/src/views/ModelingProjectsView.tsx`, `frontend/src/views/ModelingProjectsView.test.tsx`
+- RED evidence: `Set-Location frontend; npm test -- --run src/services/api.test.ts src/views/ModelingProjectsView.test.tsx src/components/ModuleNav.test.tsx src/store/useStore.test.ts` exited 1 as expected: missing `modelingApi`, `setSelectedModelingProjectId`, Workflow navigation entry, and ModelingProjectsView module.
+- GREEN evidence: the same focused command exited 0 with 4 files and 26 tests passed; `Set-Location frontend; npm test -- --run` exited 0 with 21 files and 89 tests passed; `Set-Location frontend; npm run build` exited 0.
+- Review: independent Task 5 review found no actionable findings.
+- Commit: implementation `335c892`.
+- Notes: production build retains the pre-existing Vite chunk-size warning only; no task files were dirty after the implementation commit.
 
 ## 验证历史
 
