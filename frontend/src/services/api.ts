@@ -421,8 +421,8 @@ export const settingsApi = {
     return response.data
   },
 
-  testLlm: async (): Promise<SettingsTestResult> => {
-    const response = await api.post('/settings/test-llm')
+  testLlm: async (data?: SettingsConfigUpdate): Promise<SettingsTestResult> => {
+    const response = await api.post('/settings/test-llm', data)
     return response.data
   },
 

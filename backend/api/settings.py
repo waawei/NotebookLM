@@ -48,6 +48,14 @@ class LLMTestResult(BaseModel):
     diagnostic: Optional[LLMConnectionDiagnostic] = None
 
 
+class LLMConnectionTestRequest(BaseModel):
+    provider: Optional[str] = None
+    model: Optional[str] = None
+    base_url: Optional[str] = None
+    api_key: Optional[str] = Field(default=None, repr=False)
+    endpoint_mode: Optional[str] = None
+
+
 class LLMModelDiscoveryRequest(BaseModel):
     provider: Optional[str] = None
     base_url: Optional[str] = None
@@ -87,12 +95,17 @@ async def clear_llm_configuration():
 
 
 @router.post("/test-llm", response_model=LLMTestResult)
-async def test_llm_connection():
+async def test_llm_connection(request: Optional[LLMConnectionTestRequest] = None):
     """Validate the current configuration without exposing provider details."""
-    if _safe_status().warnings:
+    preview_values = request.model_dump(exclude_none=True) if request else None
+    config = (
+        configuration_service.preview(preview_values)
+        if preview_values
+        else configuration_service.effective_config()
+    )
+    if not preview_values and _safe_status().warnings:
         return LLMTestResult(ok=False, message="LLM configuration needs attention")
 
-    config = configuration_service.effective_config()
     try:
         service = LLMService(config)
         await service.test_connection()

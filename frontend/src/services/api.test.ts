@@ -77,4 +77,23 @@ describe('settingsApi', () => {
     expect(result).toEqual({ models: ['a-model'] })
     expect(JSON.stringify(result)).not.toContain(temporaryKey)
   })
+
+  it('sends current form values only in the test connection request', async () => {
+    httpClient.post.mockResolvedValue({ data: { ok: true, message: 'LLM connection succeeded' } })
+
+    const result = await settingsApi.testLlm({
+      provider: 'ollama',
+      model: 'qwen3:8b',
+      base_url: 'http://localhost:11434',
+      endpoint_mode: 'auto',
+    })
+
+    expect(httpClient.post).toHaveBeenCalledWith('/settings/test-llm', {
+      provider: 'ollama',
+      model: 'qwen3:8b',
+      base_url: 'http://localhost:11434',
+      endpoint_mode: 'auto',
+    })
+    expect(result).toEqual({ ok: true, message: 'LLM connection succeeded' })
+  })
 })

@@ -113,6 +113,14 @@ class RaisingListingLLMService:
         raise RuntimeError("upstream rejected temporary-key")
 
 
+class SuccessfulLLMService:
+    def __init__(self, config):
+        self.config = config
+
+    async def test_connection(self):
+        return "OK"
+
+
 class SettingsApiTests(unittest.TestCase):
     def setUp(self):
         self.original_configuration_service = settings.configuration_service
@@ -184,6 +192,27 @@ class SettingsApiTests(unittest.TestCase):
         self.assertEqual(result.diagnostic.category, "rate_limited")
         self.assertNotIn("saved-secret", result.model_dump_json())
         self.assertNotIn("gateway.test", result.model_dump_json())
+
+    def test_connection_can_use_preview_values_without_persisting(self):
+        settings.LLMService = SuccessfulLLMService
+
+        result = asyncio.run(
+            settings.test_llm_connection(
+                settings.LLMConnectionTestRequest(
+                    provider="ollama",
+                    model="qwen3:8b",
+                    base_url="http://localhost:11434",
+                    endpoint_mode="auto",
+                )
+            )
+        )
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.message, "LLM connection succeeded")
+        self.assertEqual(self.configuration_service.previewed["provider"], "ollama")
+        self.assertEqual(self.configuration_service.previewed["model"], "qwen3:8b")
+        self.assertEqual(self.configuration_service.previewed["base_url"], "http://localhost:11434")
+        self.assertEqual(self.configuration_service.saved, [])
 
     def test_model_discovery_uses_preview_and_returns_only_ids(self):
         settings.LLMService = ListingLLMService

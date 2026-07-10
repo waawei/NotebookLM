@@ -132,6 +132,31 @@ describe('SettingsView', () => {
     })
   })
 
+  it('tests the current Ollama form values without requiring a save first', async () => {
+    settingsApiMock.testLlm.mockResolvedValue({
+      ok: true,
+      message: 'LLM connection succeeded',
+    })
+
+    render(<SettingsView />)
+    await screen.findByText('Runtime settings')
+
+    fireEvent.change(screen.getByLabelText('Provider'), { target: { value: 'ollama' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Test connection' }))
+
+    await waitFor(() => {
+      expect(settingsApiMock.testLlm).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: 'ollama',
+          model: 'qwen3:8b',
+          base_url: 'http://localhost:11434',
+          endpoint_mode: 'auto',
+        }),
+      )
+    })
+    expect(settingsApiMock.save).not.toHaveBeenCalled()
+  })
+
   it('applies the Ollama preset and saves a local qwen model without a key', async () => {
     render(<SettingsView />)
     await screen.findByText('Runtime settings')

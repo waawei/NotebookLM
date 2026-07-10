@@ -108,8 +108,11 @@ export default function LLMSettingsPanel() {
   const testConnection = async () => {
     setIsTesting(true)
     setMessage(null)
+    const payload: SettingsConfigUpdate = { provider, model, endpoint_mode: endpointMode }
+    if (baseUrlTouched) payload.base_url = baseUrl.trim()
+    if (apiKey) payload.api_key = apiKey
     try {
-      setMessage(await settingsApi.testLlm())
+      setMessage(await settingsApi.testLlm(payload))
     } catch {
       setMessage({ ok: false, message: 'Unable to test the LLM connection.' })
     } finally {
