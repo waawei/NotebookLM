@@ -12,8 +12,8 @@ current_task: "Task 6: Phase 1 Vertical Verification"
 task_status: verified
 baseline_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase1"
-last_verified_commit: 6de550c
-last_verification: "Post-Gate review fixes passed: missing task/run resources return 404 and the workbench exposes only legal workflow actions"
+last_verified_commit: e698df6
+last_verification: "Post-Gate review fixes passed: missing task/run resources return 404 and the workbench exposes only legal workflow actions for all declared states"
 next_action: "Phase 1 complete; do not start Phase 2 in this Goal"
 ```
 
@@ -123,6 +123,7 @@ next_action: "Phase 1 complete; do not start Phase 2 in this Goal"
 - 状态：verified；仅修复 Phase 1 review findings，未开始 Task 6 或 Phase 2 工作。
 - 后端：缺失项目的 task/run 列表现在统一为 `404 Modeling project not found`；TDD 红灯后 `tests/test_modeling_api.py` 7 passed；提交 `1e67945`。
 - 前端：已知状态机状态驱动 Advance/Rollback 可用性，未知状态也保守地禁用动作；初始化、完成态和 `problem_parsing` 回归 6 passed；生产构建通过；提交 `6de550c`。
+- 覆盖强化：re-review 要求逐一覆盖所有声明状态，新增 16 状态表驱动断言；`npm test -- --run` 退出码 0，21 files、108 passed，`npm run build` 退出码 0；提交 `e698df6`。
 - 账本：本次文档提交记录上述发现、红绿证据和提交。
 
 ## 验证历史
