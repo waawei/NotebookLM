@@ -12,8 +12,8 @@ current_task: "Task 6: Phase 1 Vertical Verification"
 task_status: verified
 baseline_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase1"
-last_verified_commit: 335c892
-last_verification: "Task 6 vertical verification passed: backend, frontend, build, cold-restart persistence, and workspace layout"
+last_verified_commit: 6de550c
+last_verification: "Post-Gate review fixes passed: missing task/run resources return 404 and the workbench exposes only legal workflow actions"
 next_action: "Phase 1 complete; do not start Phase 2 in this Goal"
 ```
 
@@ -95,7 +95,7 @@ next_action: "Phase 1 complete; do not start Phase 2 in this Goal"
 - 相关回归：包含 `backend/tests/test_agents_api.py`，退出码 0，9 passed
 - 提交：实现 `1ce74cab1216d0e8b48df1a707aa5470ee52c6d9`
 - 保留的用户改动：无；隔离工作树在开始与提交后均为空
-- 备注：直接导入 API 会初始化既有 `DocumentMetadataStore`，聚焦套件耗时约 29 秒；终端的早期流输出为空并非卡死。已通过等待子进程并读取完整输出确认结果。任务级审查通过：路由、请求模型、错误映射、挂载和 Agents API 兼容性均符合 Task 4。
+- 备注：直接导入 API 会初始化既有 `DocumentMetadataStore`，聚焦套件耗时约 29 秒；终端的早期流输出为空并非卡死。已通过等待子进程并读取完整输出确认结果。Post-Gate review 发现 `GET /projects/{id}/tasks` 和 `/runs` 会将服务层缺失项目 `ValueError` 传播为 500；先新增缺失项目的 404 回归，`DEBUG=false; python -m pytest tests/test_modeling_api.py -q` 预期失败 1 项，之后只在两个端点映射为 404。修复后同一命令退出码 0，7 passed（保留既有 Pydantic、PyPDF2 和 FastAPI deprecation warnings）；review-fix 提交 `1e67945`。
 
 ### Task 5: Frontend API, Navigation, and Project View
 
@@ -105,7 +105,7 @@ next_action: "Phase 1 complete; do not start Phase 2 in this Goal"
 - GREEN evidence: the same focused command exited 0 with 4 files and 26 tests passed; `Set-Location frontend; npm test -- --run` exited 0 with 21 files and 89 tests passed; `Set-Location frontend; npm run build` exited 0.
 - Review: independent Task 5 review found no actionable findings.
 - Commit: implementation `335c892`.
-- Notes: production build retains the pre-existing Vite chunk-size warning only; no task files were dirty after the implementation commit.
+- Notes: production build retains the pre-existing Vite chunk-size warning only; no task files were dirty after the implementation commit. Post-Gate review found the controls only respected in-flight requests: `project_initialized` could still roll back and `completed` could still advance. First, `ModelingProjectsView.test.tsx` added initialization, completion, and `problem_parsing` legality regressions; `npm test -- --run src/views/ModelingProjectsView.test.tsx` failed 2 assertions as expected. The view now derives availability from the backend state machine's fixed states and rollback set; the same command exited 0 with 6 passed and `npm run build` exited 0. Review-fix commit `6de550c`.
 
 ### Task 6: Phase 1 Vertical Verification
 
@@ -117,6 +117,13 @@ next_action: "Phase 1 complete; do not start Phase 2 in this Goal"
 - Cleanup: temporary server processes were stopped and ports released. A root-level test invocation created an untracked relative `data/` directory; it was verified as this run's generated SQLite/Chroma data and removed. The source worktree was clean before this ledger update.
 - Gate 1: passed. Phase 2 is `not_started` and is not started by this Goal.
 - Commit: this docs-only Task 6 ledger commit.
+
+### Post-Gate Task 4/5 Review Fixes
+
+- 状态：verified；仅修复 Phase 1 review findings，未开始 Task 6 或 Phase 2 工作。
+- 后端：缺失项目的 task/run 列表现在统一为 `404 Modeling project not found`；TDD 红灯后 `tests/test_modeling_api.py` 7 passed；提交 `1e67945`。
+- 前端：已知状态机状态驱动 Advance/Rollback 可用性，未知状态也保守地禁用动作；初始化、完成态和 `problem_parsing` 回归 6 passed；生产构建通过；提交 `6de550c`。
+- 账本：本次文档提交记录上述发现、红绿证据和提交。
 
 ## 验证历史
 
