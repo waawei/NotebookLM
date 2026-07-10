@@ -1,9 +1,19 @@
 import unittest
 
-from services.modeling_state import WorkflowTransitionError, next_state, previous_state
+from services.modeling_state import (
+    INITIAL_STATE,
+    TERMINAL_STATE,
+    WorkflowTransitionError,
+    next_state,
+    previous_state,
+)
 
 
 class ModelingStateTests(unittest.TestCase):
+    def test_exports_initial_and_terminal_states(self):
+        self.assertEqual(INITIAL_STATE, "project_initialized")
+        self.assertEqual(TERMINAL_STATE, "completed")
+
     def test_advances_only_to_declared_successor(self):
         self.assertEqual(next_state("project_initialized"), "problem_parsing")
         self.assertEqual(next_state("model_approval_pending"), "experiment_implementation")
@@ -19,3 +29,7 @@ class ModelingStateTests(unittest.TestCase):
     def test_unknown_state_is_rejected(self):
         with self.assertRaises(WorkflowTransitionError):
             next_state("made_up")
+        with self.assertRaises(WorkflowTransitionError):
+            previous_state("made_up")
+        with self.assertRaises(WorkflowTransitionError):
+            previous_state("project_initialized")

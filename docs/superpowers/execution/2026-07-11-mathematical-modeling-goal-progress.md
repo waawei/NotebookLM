@@ -13,8 +13,8 @@ task_status: verified
 baseline_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase1"
 last_verified_commit: 029e5ef8eaf5b4ef607e603de0b97b5f6f287316
-last_verification: "Task 1 focused and regression tests passed"
-next_action: "Task 1 code review"
+last_verification: "Task 1 review fixes verified"
+next_action: "Task 1 review re-check"
 ```
 
 ## 启动前风险
@@ -28,7 +28,7 @@ next_action: "Task 1 code review"
 
 | 阶段 | 状态 | 计划 | Gate | 完成提交 |
 | --- | --- | --- | --- | --- |
-| 1 | not_started | `2026-07-10-mathematical-modeling-phase1-foundation.md` | pending | — |
+| 1 | in_progress | `2026-07-10-mathematical-modeling-phase1-foundation.md` | pending | — |
 | 2 | blocked_by_phase_1 | `2026-07-10-mathematical-modeling-phase2-intake-planning.md` | pending | — |
 | 3 | blocked_by_phase_2 | `2026-07-10-mathematical-modeling-phase3-experiments.md` | pending | — |
 | 4 | blocked_by_phase_3 | `2026-07-10-mathematical-modeling-phase4-paper.md` | pending | — |
@@ -55,11 +55,11 @@ next_action: "Task 1 code review"
 - 预计文件：`backend/services/modeling_state.py`, `backend/tests/test_modeling_state.py`
 - 实际文件：`backend/services/modeling_state.py`, `backend/tests/test_modeling_state.py`
 - 失败测试：`DEBUG=false; python -m pytest tests/test_modeling_state.py -q`，退出码 1，预期失败 `ModuleNotFoundError: No module named 'services.modeling_state'`
-- 聚焦验证：`DEBUG=false; python -m pytest tests/test_modeling_state.py -q`，退出码 0，4 passed
+- 聚焦验证：`DEBUG=false; python -m pytest tests/test_modeling_state.py -q`，退出码 0，4 passed；review fix 后退出码 0，5 passed
 - 相关回归：`DEBUG=false; python -m pytest tests/test_config_defaults.py -q`，退出码 0，1 passed，保留既有 Pydantic deprecation warning
 - 提交：`029e5ef8eaf5b4ef607e603de0b97b5f6f287316`
 - 保留的用户改动：无；隔离工作树启动时 `git status --short` 为空
-- 备注：基线验证使用 `DEBUG=false`，因为当前 shell 环境存在 `DEBUG=release`
+- 备注：基线验证使用 `DEBUG=false`，因为当前 shell 环境存在 `DEBUG=release`；Task 1 初始 review 指出测试需覆盖导出常量和 rollback 拒绝路径，已补充并验证
 
 ## 验证历史
 
