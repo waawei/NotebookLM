@@ -6,7 +6,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api import agents, chat, documents, notes, outputs, preview, settings as settings_api, skills, spaces, wiki
+from api import agents, chat, documents, modeling, notes, outputs, preview, settings as settings_api, skills, spaces, wiki
 from core.config import settings
 from services.local_llm_config import LLMConfigurationService
 
@@ -34,6 +34,7 @@ app.include_router(settings_api.router, prefix="/api/settings", tags=["Settings"
 app.include_router(spaces.router, prefix="/api/spaces", tags=["Spaces"])
 app.include_router(skills.router, prefix="/api/skills", tags=["Skills"])
 app.include_router(agents.router, prefix="/api/agents", tags=["Agents"])
+app.include_router(modeling.router, prefix="/api/modeling", tags=["Modeling"])
 
 
 @app.on_event("startup")
