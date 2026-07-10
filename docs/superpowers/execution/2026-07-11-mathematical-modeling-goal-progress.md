@@ -8,13 +8,13 @@
 workflow: mathematical-modeling
 current_phase: 1
 phase_status: in_progress
-current_task: "Task 3: Safe Workspace and Project Service"
+current_task: "Task 4: Modeling REST API"
 task_status: verified
 baseline_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase1"
-last_verified_commit: 087c51955ea6d0bcc74c9ee56ebde5fd5d7b8ffe
-last_verification: "Task 3 review fixes verified"
-next_action: "Task 3 review re-check"
+last_verified_commit: 1ce74cab1216d0e8b48df1a707aa5470ee52c6d9
+last_verification: "Task 4 focused API and Agents API regression verified"
+next_action: "Task 4 review"
 ```
 
 ## 启动前风险
@@ -84,6 +84,18 @@ next_action: "Task 3 review re-check"
 - 提交：实现 `88d43699e3a20e21c44aad73757f791e8c368a7a`；review fix `087c51955ea6d0bcc74c9ee56ebde5fd5d7b8ffe`
 - 保留的用户改动：无；Task 3 开始时 `git status --short` 为空
 - 备注：Task 3 review 指出 workspace/git 初始化失败、store create 失败和 transition 两步写入存在部分状态风险；已补充回归，workspace cleanup 仅允许删除 workspace root 下的已创建项目目录，service create 失败会清理已创建 workspace，advance/rollback 使用 store 单事务 `transition_state`
+
+### Task 4: Modeling REST API
+
+- 状态：verified
+- 预计文件：`backend/api/modeling.py`, `backend/main.py`, `backend/tests/test_modeling_api.py`
+- 实际文件：`backend/api/modeling.py`, `backend/main.py`, `backend/tests/test_modeling_api.py`
+- 失败测试：`DEBUG=false; python -m pytest tests/test_modeling_api.py -q`，退出码 1，预期失败 `ModuleNotFoundError: No module named 'api.modeling'`
+- 聚焦验证：`DEBUG=false; python -m pytest tests/test_modeling_api.py tests/test_agents_api.py -q`，退出码 0，9 passed；保留既有 Pydantic、PyPDF2 与 FastAPI `on_event` deprecation warnings
+- 相关回归：包含 `backend/tests/test_agents_api.py`，退出码 0，9 passed
+- 提交：实现 `1ce74cab1216d0e8b48df1a707aa5470ee52c6d9`
+- 保留的用户改动：无；隔离工作树在开始与提交后均为空
+- 备注：直接导入 API 会初始化既有 `DocumentMetadataStore`，聚焦套件耗时约 29 秒；终端的早期流输出为空并非卡死。已通过等待子进程并读取完整输出确认结果。
 
 ## 验证历史
 
