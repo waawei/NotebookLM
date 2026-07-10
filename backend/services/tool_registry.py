@@ -85,16 +85,19 @@ class ToolRegistry:
 
     async def run_tool(self, tool_name: str, params: dict) -> dict:
         """Run a registered tool and always return a structured result."""
+        if not isinstance(tool_name, str):
+            return {"ok": False, "error": "Tool name must be a string"}
+
         handler = self._handlers.get(tool_name)
         if handler is None:
-            return {"ok": False, "error": f"Unknown tool: {tool_name}"}
+            return {"ok": False, "error": "Unknown tool"}
         if not isinstance(params, dict):
             return {"ok": False, "error": "Tool parameters must be an object"}
 
         try:
             return {"ok": True, "result": await handler(params)}
-        except (TypeError, ValueError) as exc:
-            return {"ok": False, "error": str(exc)}
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "Tool parameters are invalid"}
         except Exception:
             return {"ok": False, "error": f"{tool_name} failed"}
 

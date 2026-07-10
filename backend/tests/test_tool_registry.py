@@ -32,6 +32,11 @@ class FakeOutputService:
         }
 
 
+class SecretBearingValidationOutputService:
+    def create_output(self, kind, title, content, source_doc_ids):
+        raise ValueError(f"Unsupported output kind: {kind}")
+
+
 class FakeWikiService:
     def create_page(self, title, content, source_doc_ids):
         return {
@@ -68,6 +73,38 @@ class ToolRegistryTests(unittest.TestCase):
         self.assertEqual(result["ok"], False)
         self.assertIn("Unknown tool", result["error"])
 
+    def test_does_not_reflect_secret_like_unknown_tool_name(self):
+        sentinel = "SYNTHETIC_SECRET_9f2a"
+
+        result = asyncio.run(self.registry.run_tool(f"unknown-{sentinel}", {}))
+
+        self.assertEqual(result, {"ok": False, "error": "Unknown tool"})
+        self.assertNotIn(sentinel, result["error"])
+
+    def test_redacts_secret_like_validation_error_from_registered_tool(self):
+        sentinel = "SYNTHETIC_SECRET_9f2a"
+        self.registry.output_service = SecretBearingValidationOutputService()
+
+        result = asyncio.run(
+            self.registry.run_tool(
+                "create_output",
+                {
+                    "kind": sentinel,
+                    "title": "Title",
+                    "content": "Content",
+                    "source_doc_ids": [],
+                },
+            )
+        )
+
+        self.assertEqual(result, {"ok": False, "error": "Tool parameters are invalid"})
+        self.assertNotIn(sentinel, result["error"])
+
+    def test_returns_structured_error_for_unhashable_tool_name(self):
+        result = asyncio.run(self.registry.run_tool([], {}))
+
+        self.assertEqual(result, {"ok": False, "error": "Tool name must be a string"})
+
     def test_returns_structured_success_for_registered_tool(self):
         result = asyncio.run(
             self.registry.run_tool(
@@ -83,7 +120,7 @@ class ToolRegistryTests(unittest.TestCase):
         result = asyncio.run(self.registry.run_tool("create_output", {"title": "Missing fields"}))
 
         self.assertEqual(result["ok"], False)
-        self.assertIn("kind", result["error"])
+        self.assertEqual(result["error"], "Tool parameters are invalid")
 
 
 if __name__ == "__main__":
