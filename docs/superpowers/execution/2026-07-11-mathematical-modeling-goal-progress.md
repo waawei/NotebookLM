@@ -7,14 +7,14 @@
 ```yaml
 workflow: mathematical-modeling
 current_phase: 1
-phase_status: in_progress
-current_task: "Task 5: Frontend API, Navigation, and Project View"
+phase_status: completed
+current_task: "Task 6: Phase 1 Vertical Verification"
 task_status: verified
 baseline_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase1"
 last_verified_commit: 335c892
-last_verification: "Task 5 focused and full frontend tests plus production build verified; task review clean"
-next_action: "Task 6: Phase 1 Vertical Verification"
+last_verification: "Task 6 vertical verification passed: backend, frontend, build, cold-restart persistence, and workspace layout"
+next_action: "Phase 1 complete; do not start Phase 2 in this Goal"
 ```
 
 ## 启动前风险
@@ -28,8 +28,8 @@ next_action: "Task 6: Phase 1 Vertical Verification"
 
 | 阶段 | 状态 | 计划 | Gate | 完成提交 |
 | --- | --- | --- | --- | --- |
-| 1 | in_progress | `2026-07-10-mathematical-modeling-phase1-foundation.md` | pending | — |
-| 2 | blocked_by_phase_1 | `2026-07-10-mathematical-modeling-phase2-intake-planning.md` | pending | — |
+| 1 | completed | `2026-07-10-mathematical-modeling-phase1-foundation.md` | passed | Task 6 ledger commit |
+| 2 | not_started | `2026-07-10-mathematical-modeling-phase2-intake-planning.md` | pending | — |
 | 3 | blocked_by_phase_2 | `2026-07-10-mathematical-modeling-phase3-experiments.md` | pending | — |
 | 4 | blocked_by_phase_3 | `2026-07-10-mathematical-modeling-phase4-paper.md` | pending | — |
 | 5 | blocked_by_phase_4 | `2026-07-10-mathematical-modeling-phase5-delivery-git.md` | pending | — |
@@ -106,6 +106,17 @@ next_action: "Task 6: Phase 1 Vertical Verification"
 - Review: independent Task 5 review found no actionable findings.
 - Commit: implementation `335c892`.
 - Notes: production build retains the pre-existing Vite chunk-size warning only; no task files were dirty after the implementation commit.
+
+### Task 6: Phase 1 Vertical Verification
+
+- Status: verified; no production-code changes were required.
+- Modeling backend suite: from `backend`, `DEBUG=false; python -m pytest tests/test_modeling_state.py tests/test_modeling_store.py tests/test_modeling_workspace.py tests/test_modeling_project_service.py tests/test_modeling_api.py -q` exited 0 with 22 passed in 28.09s.
+- Entire backend suite: from `backend`, `DEBUG=false; python -m pytest tests -q` exited 0 with 114 passed and 12 subtests passed in 28.91s. The repository-root Gate command also exited 0 with the explicit import path, `DEBUG=false; PYTHONPATH=backend; python -m pytest backend/tests -q`, with 114 passed and 12 subtests passed in 42.21s.
+- Frontend: `Set-Location frontend; npm test -- --run` exited 0 with 21 files and 89 tests passed; `Set-Location frontend; npm run build` exited 0. The build keeps the pre-existing Vite chunk-size warning only.
+- Cold restart: an isolated temporary runtime and SQLite database created `Sales Forecast`, advanced it once to `problem_parsing`, stopped the first backend process and confirmed port release, then restarted with the same database. The project remained visible as `problem_parsing`; its external workspace contained `.git`, `problem/original`, `data/raw`, `experiments`, `paper`, `deliverables`, and `.workflow/runs`.
+- Cleanup: temporary server processes were stopped and ports released. A root-level test invocation created an untracked relative `data/` directory; it was verified as this run's generated SQLite/Chroma data and removed. The source worktree was clean before this ledger update.
+- Gate 1: passed. Phase 2 is `not_started` and is not started by this Goal.
+- Commit: this docs-only Task 6 ledger commit.
 
 ## 验证历史
 
