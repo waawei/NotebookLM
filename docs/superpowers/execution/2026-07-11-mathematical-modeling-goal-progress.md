@@ -9,12 +9,12 @@ workflow: mathematical-modeling
 current_phase: 1
 phase_status: in_progress
 current_task: "Task 1: Pure Workflow State Machine"
-task_status: in_progress
+task_status: verified
 baseline_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase1"
-last_verified_commit: 3ab4a3a
-last_verification: "baseline backend passed with DEBUG=false; frontend tests/build passed"
-next_action: "Task 1 commit"
+last_verified_commit: 029e5ef8eaf5b4ef607e603de0b97b5f6f287316
+last_verification: "Task 1 focused and regression tests passed"
+next_action: "Task 1 code review"
 ```
 
 ## 启动前风险
@@ -51,13 +51,13 @@ next_action: "Task 1 commit"
 
 ### Task 1: Pure Workflow State Machine
 
-- 状态：in_progress
+- 状态：verified
 - 预计文件：`backend/services/modeling_state.py`, `backend/tests/test_modeling_state.py`
 - 实际文件：`backend/services/modeling_state.py`, `backend/tests/test_modeling_state.py`
 - 失败测试：`DEBUG=false; python -m pytest tests/test_modeling_state.py -q`，退出码 1，预期失败 `ModuleNotFoundError: No module named 'services.modeling_state'`
 - 聚焦验证：`DEBUG=false; python -m pytest tests/test_modeling_state.py -q`，退出码 0，4 passed
 - 相关回归：`DEBUG=false; python -m pytest tests/test_config_defaults.py -q`，退出码 0，1 passed，保留既有 Pydantic deprecation warning
-- 提交：待记录
+- 提交：`029e5ef8eaf5b4ef607e603de0b97b5f6f287316`
 - 保留的用户改动：无；隔离工作树启动时 `git status --short` 为空
 - 备注：基线验证使用 `DEBUG=false`，因为当前 shell 环境存在 `DEBUG=release`
 
