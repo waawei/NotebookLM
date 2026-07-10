@@ -8,6 +8,8 @@
 
 **Tech Stack:** Python 3.10+, FastAPI 0.104.1, Pydantic 2.5.0, SQLite, React 18, TypeScript 5.2, Zustand 4.4, Vitest 1.6, pytest/unittest, local Git, XeLaTeX.
 
+**Goal-mode execution:** Use `docs/superpowers/execution/2026-07-11-mathematical-modeling-goal-loop.md` for one-phase-per-Goal execution and `docs/superpowers/execution/2026-07-11-mathematical-modeling-goal-progress.md` for cross-session recovery.
+
 ## Global Constraints
 
 - The first release supports data-driven modeling only: cleaning, statistics, prediction, classification, evaluation, and visualization.
