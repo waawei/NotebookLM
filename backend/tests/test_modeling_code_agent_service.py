@@ -75,3 +75,51 @@ def test_code_agent_creates_hashed_bounded_experiment_draft(tmp_path):
     assert (workspace / "src" / "train.py").is_file()
     assert (workspace / "experiments" / "exp-0001" / "config.json").is_file()
     assert "exp-0001" in (workspace / "reproduce.ps1").read_text(encoding="utf-8")
+
+
+def test_code_agent_rejects_modified_input_and_incomplete_pipeline(tmp_path):
+    service, project, workspace = code_agent_context(tmp_path)
+    service.llm.generate = AsyncMock(
+        return_value=json.dumps(
+            {
+                "files": [{"path": "requirements.txt", "content": "numpy==1.26.4\n"}],
+                "commands": [["python", "src/train.py"]],
+            }
+        )
+    )
+
+    with pytest.raises(ValueError, match="pipeline test"):
+        asyncio.run(service.prepare_experiment(project["project_id"], 0))
+
+    (workspace / "data" / "raw" / "sales.csv").write_text("price,sales\n9,9\n", encoding="utf-8")
+    service.llm.generate = AsyncMock(
+        return_value=json.dumps(
+            {
+                "files": [
+                    {"path": "src/train.py", "content": "print('train')\n"},
+                    {"path": "tests/test_pipeline.py", "content": "def test_pipeline():\n    assert True\n"},
+                    {"path": "requirements.txt", "content": "numpy==1.26.4\n"},
+                ],
+                "commands": [["python", "src/train.py"]],
+            }
+        )
+    )
+
+    with pytest.raises(ValueError, match="input hash does not match"):
+        asyncio.run(service.prepare_experiment(project["project_id"], 0))
+
+
+def test_code_hash_changes_when_generated_config_changes(tmp_path):
+    service, project, _ = code_agent_context(tmp_path)
+    files = [
+        {"path": "src/train.py", "content": "print('train')\n"},
+        {"path": "tests/test_pipeline.py", "content": "def test_pipeline():\n    assert True\n"},
+        {"path": "requirements.txt", "content": "numpy==1.26.4\n"},
+    ]
+    service.llm.generate = AsyncMock(return_value=json.dumps({"files": files, "commands": [["python", "src/train.py"]]}))
+    first = asyncio.run(service.prepare_experiment(project["project_id"], 0))
+    service.llm.generate = AsyncMock(return_value=json.dumps({"files": files, "commands": [["python", "src/train.py"]]}))
+    second = asyncio.run(service.prepare_experiment(project["project_id"], 0))
+
+    assert first["experiment"]["config"]["experiment_id"] != second["experiment"]["config"]["experiment_id"]
+    assert first["batch"]["code_hash"] != second["batch"]["code_hash"]

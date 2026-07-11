@@ -4,7 +4,7 @@ import os
 import tempfile
 from pathlib import Path, PurePosixPath
 
-from pydantic import Field, ValidationError, field_validator
+from pydantic import Field, ValidationError, field_validator, model_validator
 
 from services.approval_service import canonical_hash
 from services.experiment_contracts import ExecutionBatch, ExperimentConfig
@@ -36,6 +36,17 @@ class GeneratedFile(StrictModel):
 class GeneratedExperiment(StrictModel):
     files: list[GeneratedFile] = Field(min_length=1)
     commands: list[list[str]] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def complete_pipeline(self):
+        paths = {file.path for file in self.files}
+        if "tests/test_pipeline.py" not in paths:
+            raise ValueError("Generated experiment requires a pipeline test")
+        if "requirements.txt" not in paths:
+            raise ValueError("Generated experiment requires requirements.txt")
+        if not any(path.startswith("src/") for path in paths):
+            raise ValueError("Generated experiment requires source files")
+        return self
 
 
 class ModelingCodeAgentService:
@@ -69,8 +80,12 @@ class ModelingCodeAgentService:
         self._validate_commands(generated.commands)
         root = Path(project["workspace_path"]).resolve()
         config = self._config(experiment_id, candidate, plan_payload)
-        source_hash = self._source_hash(generated.files)
-        input_hashes = self._input_hashes(project_id)
+        input_hashes = self._input_hashes(project)
+        source_hash = self._source_hash(
+            generated.files,
+            f"experiments/{experiment_id}/config.json",
+            json.dumps(config, ensure_ascii=False, sort_keys=True),
+        )
         batch = ExecutionBatch(
             experiment_id=experiment_id,
             commands=generated.commands,
@@ -133,20 +148,32 @@ class ModelingCodeAgentService:
         self.approval_service.require_approved(project["project_id"], "model_approval", canonical_hash(payload))
         return plan, json.loads(target.read_text(encoding="utf-8"))
 
-    def _input_hashes(self, project_id: str) -> dict[str, str]:
-        return {
-            artifact["relative_path"]: artifact["sha256"]
-            for artifact in self.store.list_artifacts(project_id)
-            if artifact["artifact_type"] in {"data_input", "data_profile", "model_plan"}
-        }
+    def _input_hashes(self, project: dict) -> dict[str, str]:
+        root = Path(project["workspace_path"]).resolve()
+        hashes = {}
+        for artifact in self.store.list_artifacts(project["project_id"]):
+            if artifact["artifact_type"] not in {"data_input", "data_profile", "model_plan"}:
+                continue
+            path = (root / artifact["relative_path"]).resolve()
+            if path == root or root not in path.parents or not path.is_file():
+                raise ValueError("Experiment input is unavailable")
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            if digest != artifact["sha256"]:
+                raise ValueError("Experiment input hash does not match registered artifact")
+            hashes[artifact["relative_path"]] = digest
+        return hashes
 
     @staticmethod
-    def _source_hash(files: list[GeneratedFile]) -> str:
+    def _source_hash(
+        files: list[GeneratedFile], config_path: str, config_content: str
+    ) -> str:
         digest = hashlib.sha256()
-        for file in sorted(files, key=lambda item: item.path):
-            digest.update(file.path.encode("utf-8"))
+        content = {file.path: file.content for file in files}
+        content[config_path] = config_content
+        for path in sorted(content):
+            digest.update(path.encode("utf-8"))
             digest.update(b"\0")
-            digest.update(file.content.encode("utf-8"))
+            digest.update(content[path].encode("utf-8"))
             digest.update(b"\0")
         return digest.hexdigest()
 
