@@ -24,7 +24,8 @@ export default function ExperimentApprovalCard({ projectId, approval, batch, onD
     <p className="mt-1 break-all text-xs">Approval hash: {approval.payload_hash}</p>
     <p className="break-all text-xs">Code hash: {batch.code_hash}</p>
     <p className="mt-1 break-all text-xs">Inputs: {Object.entries(batch.input_hashes).map(([path, hash]) => `${path} (${hash})`).join(', ') || 'no registered inputs'}</p>
-    <p className="break-all text-xs">Dependencies: {batch.commands.some((command) => command.slice(1, 4).join(' ') === '-m pip install') ? 'Install request included' : 'No dependency installation in this batch'}</p>
+    <p className="break-all text-xs">Dependency lock: {batch.source_hashes['requirements.txt'] || 'No generated requirements lock'}</p>
+    <p className="break-all text-xs">Dependency change: {batch.commands.some((command) => command.slice(1, 4).join(' ') === '-m pip install') ? 'Install the displayed lock in this batch' : 'No dependency installation in this batch'}</p>
     <p className="mt-2 text-xs">Timeout: {batch.timeout_seconds}s | Output cap: {batch.max_output_bytes} bytes | Network: {batch.network_allowed ? 'Allowed for this batch' : 'Denied'}</p>
     <ul className="mt-2 list-disc pl-5 text-xs">{batch.commands.map((command) => <li key={command.join('\u0000')}><code>{command.join(' ')}</code></li>)}</ul>
     {error && <p role="alert" className="mt-2 text-sm text-red-700">{error}</p>}

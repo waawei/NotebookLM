@@ -25,7 +25,7 @@ class RestrictedRunner:
         max_output_bytes: int, network_allowed: bool, on_started=None,
     ) -> RunResult:
         cwd = Path(cwd).resolve()
-        if not network_allowed and any(argument in {"-S", "-I"} for argument in command[1:]):
+        if not network_allowed and any(argument in {"-S", "-I", "-E"} for argument in command[1:]):
             return RunResult(-1, "", "Python startup options bypass network policy", False, "policy_error")
         env = {
             key: value for key, value in os.environ.items()

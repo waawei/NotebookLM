@@ -111,7 +111,11 @@ class ExperimentService:
         ]
         for relative in declared:
             path = (root / relative).resolve()
-            if path == root or root not in path.parents or not path.is_file():
+            if (
+                path == directory
+                or directory not in path.parents
+                or not path.is_file()
+            ):
                 raise ValueError("schema_error")
             kind = "experiment_figure" if path.suffix.lower() in {".png", ".jpg", ".svg"} else "experiment_table"
             outputs.append((kind, path))

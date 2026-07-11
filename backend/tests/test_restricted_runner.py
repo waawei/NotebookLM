@@ -59,3 +59,8 @@ def test_runner_rejects_sitecustomize_bypass_options(tmp_path):
     )
 
     assert result.error_code == "policy_error"
+
+    environment = RestrictedRunner().run(
+        [sys.executable, "-E", "-c", "print('unsafe')"], tmp_path, 10, 1024, False
+    )
+    assert environment.error_code == "policy_error"

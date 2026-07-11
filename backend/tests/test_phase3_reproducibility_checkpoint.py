@@ -31,9 +31,8 @@ class DeterministicProgrammingLLM:
                             "import json\nfrom pathlib import Path\n"
                             f"root = Path('experiments/exp-{self.calls:04d}')\n"
                             f"(root / 'metrics.json').write_text(json.dumps([{{'name':'rmse','value':{value},'split':'validation'}}]))\n"
-                            "Path('figures').mkdir(exist_ok=True)\n"
-                            f"Path('figures/exp-{self.calls:04d}.png').write_bytes(b'figure')\n"
-                            f"(root / 'artifacts.json').write_text(json.dumps(['figures/exp-{self.calls:04d}.png']))\n"
+                            f"(root / 'exp-{self.calls:04d}.png').write_bytes(b'figure')\n"
+                            f"(root / 'artifacts.json').write_text(json.dumps(['experiments/exp-{self.calls:04d}/exp-{self.calls:04d}.png']))\n"
                         ),
                     },
                     {"path": "tests/test_pipeline.py", "content": "def test_pipeline():\n    assert True\n"},

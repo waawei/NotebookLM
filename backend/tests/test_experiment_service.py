@@ -21,8 +21,8 @@ def experiment_context(tmp_path):
     script.write_text(
         "import json, pathlib\nroot = pathlib.Path('experiments/exp-0001')\n"
         "(root / 'metrics.json').write_text(json.dumps([{'name':'rmse','value':1.0,'split':'validation'}]))\n"
-        "pathlib.Path('figures/chart.png').write_bytes(b'figure')\n"
-        "(root / 'artifacts.json').write_text(json.dumps(['figures/chart.png']))\n",
+        "(root / 'chart.png').write_bytes(b'figure')\n"
+        "(root / 'artifacts.json').write_text(json.dumps(['experiments/exp-0001/chart.png']))\n",
         encoding="utf-8",
     )
     store = ModelingStore(str(tmp_path / "modeling.db"))
