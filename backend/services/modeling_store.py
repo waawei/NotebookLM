@@ -5,6 +5,10 @@ from contextlib import contextmanager
 from datetime import datetime
 
 from services.modeling_state import INITIAL_STATE
+from services.experiment_contracts import ExperimentConfig
+
+
+_UNSET = object()
 
 
 class ModelingStore:
@@ -550,10 +554,23 @@ class ModelingStore:
         config: dict,
         execution_payload_hash: str | None,
     ) -> dict:
+        try:
+            validated_config = ExperimentConfig.model_validate(config)
+        except Exception as error:
+            raise ValueError("Experiment config is invalid") from error
+        if validated_config.experiment_id != experiment_id:
+            raise ValueError("Experiment ID does not match config")
+        if execution_payload_hash is not None and (
+            len(execution_payload_hash) != 64
+            or any(character not in "0123456789abcdef" for character in execution_payload_hash)
+        ):
+            raise ValueError("Execution payload hash is invalid")
         experiment = {
             "experiment_id": experiment_id,
             "project_id": project_id,
-            "config_json": json.dumps(config, ensure_ascii=False, sort_keys=True),
+            "config_json": json.dumps(
+                validated_config.model_dump(mode="json"), ensure_ascii=False, sort_keys=True
+            ),
             "execution_payload_hash": execution_payload_hash,
             "status": "prepared",
             "pid": None,
@@ -598,19 +615,23 @@ class ModelingStore:
         experiment_id: str,
         status: str,
         *,
-        pid: int | None = None,
-        exit_code: int | None = None,
-        error_code: str | None = None,
-        started_at: str | None = None,
-        finished_at: str | None = None,
+        pid: int | None | object = _UNSET,
+        exit_code: int | None | object = _UNSET,
+        error_code: str | None | object = _UNSET,
+        started_at: str | None | object = _UNSET,
+        finished_at: str | None | object = _UNSET,
     ) -> None:
+        fields = {
+            "status": status,
+            "pid": pid,
+            "exit_code": exit_code,
+            "error_code": error_code,
+            "started_at": started_at,
+            "finished_at": finished_at,
+        }
+        updates = [(name, value) for name, value in fields.items() if value is not _UNSET]
         with self._connect() as conn:
             conn.execute(
-                """
-                UPDATE experiment_runs
-                SET status = ?, pid = ?, exit_code = ?, error_code = ?,
-                    started_at = ?, finished_at = ?
-                WHERE experiment_id = ?
-                """,
-                (status, pid, exit_code, error_code, started_at, finished_at, experiment_id),
+                f"UPDATE experiment_runs SET {', '.join(f'{name} = ?' for name, _ in updates)} WHERE experiment_id = ?",
+                tuple(value for _, value in updates) + (experiment_id,),
             )
