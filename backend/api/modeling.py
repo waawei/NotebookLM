@@ -28,6 +28,10 @@ from services.paper_claim_service import PaperClaimService
 from services.paper_placeholder_service import PaperPlaceholderService
 from services.review_agent_service import ReviewAgentService
 from services.latex_service import LatexService
+from services.delivery_service import DeliveryService
+from services.git_policy_service import GitPolicyService
+from services.git_commit_service import GitCommitService
+from services.output_service import OutputService
 
 
 router = APIRouter()
@@ -62,6 +66,9 @@ paper_placeholder_service = PaperPlaceholderService(modeling_store, artifact_ser
 paper_agent_service = PaperAgentService(modeling_store, artifact_service, approval_service, run_service, LLMService())
 review_agent_service = ReviewAgentService(modeling_store, artifact_service, LLMService())
 latex_service = LatexService(modeling_store, artifact_service, approval_service, paper_placeholder_service)
+delivery_service = DeliveryService(modeling_store, artifact_service, OutputService())
+git_policy_service = GitPolicyService()
+git_commit_service = GitCommitService(modeling_store, approval_service, git_policy_service, delivery_service.reproducibility)
 
 
 class ProjectCreate(BaseModel):
@@ -85,6 +92,14 @@ class ApprovalDecision(BaseModel):
 
 class PaperSaveRequest(BaseModel):
     markdown: str
+
+
+class GitReviewRequest(BaseModel):
+    paths: list[str]
+
+
+class GitCommitRequest(GitReviewRequest):
+    commit_message: str
 
 
 async def validate_input_kind(request: InputUploadKind) -> str:
@@ -439,6 +454,72 @@ async def get_paper_pdf(project_id: str):
     if root not in path.parents or not path.is_file():
         raise HTTPException(status_code=404, detail="Paper PDF not found")
     return FileResponse(path, media_type="application/pdf", filename="paper.pdf")
+
+
+@router.post("/projects/{project_id}/deliverables/check")
+async def check_deliverables(project_id: str):
+    _require_project(project_id)
+    try:
+        return delivery_service.reproducibility.check(project_id)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.post("/projects/{project_id}/deliverables/build")
+async def build_deliverables(project_id: str):
+    _require_project(project_id)
+    try:
+        return delivery_service.build(project_id)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@router.get("/projects/{project_id}/deliverables")
+async def list_deliverables(project_id: str):
+    _require_project(project_id)
+    artifacts = [item for item in artifact_service.list_for_project(project_id) if item["artifact_type"] in {"delivery_manifest", "delivery_code_archive"}]
+    return {"artifacts": artifacts, "total": len(artifacts)}
+
+
+@router.post("/projects/{project_id}/git/review")
+async def review_git(project_id: str, request: GitReviewRequest):
+    project = _require_project(project_id)
+    try:
+        return git_policy_service.review(project, request.paths)
+    except ValueError as error:
+        status = 400 if "path" in str(error).lower() or "repository" in str(error).lower() else 409
+        raise HTTPException(status_code=status, detail=str(error)) from error
+
+
+@router.get("/projects/{project_id}/git/status")
+async def git_status(project_id: str):
+    project = _require_project(project_id)
+    try:
+        return git_policy_service.status(project)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.post("/projects/{project_id}/git/request-commit")
+async def request_commit(project_id: str, request: GitCommitRequest):
+    _require_project(project_id)
+    try:
+        return git_commit_service.request_commit(project_id, request.paths, request.commit_message)
+    except ValueError as error:
+        detail = str(error)
+        status = 400 if "message" in detail.lower() or "path" in detail.lower() else 409
+        raise HTTPException(status_code=status, detail=detail) from error
+
+
+@router.post("/projects/{project_id}/git/commit")
+async def commit_git(project_id: str, request: GitCommitRequest):
+    _require_project(project_id)
+    try:
+        return git_commit_service.commit(project_id, request.paths, request.commit_message)
+    except ValueError as error:
+        detail = str(error)
+        status = 400 if "message" in detail.lower() or "path" in detail.lower() else 409
+        raise HTTPException(status_code=status, detail=detail) from error
 
 
 def _paper_content(project_id: str, artifact: dict) -> str:

@@ -1,0 +1,17 @@
+import { useEffect, useState } from 'react'
+import { modelingApi, type GitReview } from '../services/api'
+
+export default function GitCommitApprovalCard({ projectId, review, approval, onChanged }: { projectId: string; review: GitReview; approval?: { approval_id: string; payload_hash: string; status: string }; onChanged: () => void | Promise<void> }) {
+  const [message, setMessage] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [paths, setPaths] = useState(review.paths)
+  const [reviewed, setReviewed] = useState(review)
+  useEffect(() => { setPaths(review.paths); setReviewed(review) }, [review])
+  const refreshReview = async () => { setBusy(true); try { setReviewed(await modelingApi.reviewGit(projectId, paths)) } finally { setBusy(false) } }
+  const request = async () => { setBusy(true); try { await modelingApi.requestCommit(projectId, { paths: reviewed.paths, commit_message: message }); await onChanged() } finally { setBusy(false) } }
+  const approve = async () => { if (!approval) return; setBusy(true); try { await modelingApi.decideApproval(projectId, approval.approval_id, { decision: 'approved', payload_hash: approval.payload_hash, comment: '' }); await onChanged() } finally { setBusy(false) } }
+  const commit = async () => { setBusy(true); try { await modelingApi.commit(projectId, { paths: reviewed.paths, commit_message: message }); await onChanged() } finally { setBusy(false) } }
+  const current = approval?.status === 'pending'
+  const approved = approval?.status === 'approved'
+  return <section className="rounded border border-gray-200 p-3 dark:border-gray-800"><h2 className="text-sm font-semibold">Git commit approval</h2><fieldset className="mt-3"><legend className="text-sm">Reviewed files</legend>{review.paths.map((path) => <label key={path} className="block text-xs"><input type="checkbox" checked={paths.includes(path)} disabled={Boolean(approval)} onChange={() => setPaths((currentPaths) => currentPaths.includes(path) ? currentPaths.filter((item) => item !== path) : [...currentPaths, path])} /> {path}</label>)}</fieldset><button type="button" disabled={busy || Boolean(approval) || paths.length === 0} onClick={() => void refreshReview()} className="mt-2 rounded border px-2 py-1 text-xs">Refresh diff</button><label className="mt-3 block text-sm">Commit message<input aria-label="Commit message" value={message} onChange={(event) => setMessage(event.target.value)} disabled={Boolean(approval)} className="mt-1 w-full rounded border p-2" /></label><pre className="mt-3 max-h-48 overflow-auto text-xs">{reviewed.diff}</pre><button type="button" disabled={!reviewed.ok || !message.trim() || busy || Boolean(approval)} onClick={() => void request()} className="mt-3 rounded bg-green-700 px-3 py-2 text-sm text-white disabled:bg-gray-400">Request commit approval</button>{current && <button type="button" disabled={busy} onClick={() => void approve()} className="ml-2 mt-3 rounded bg-amber-700 px-3 py-2 text-sm text-white">Approve commit</button>}{approved && <button type="button" disabled={busy} onClick={() => void commit()} className="ml-2 mt-3 rounded bg-blue-700 px-3 py-2 text-sm text-white">Commit approved files</button>}</section>
+}

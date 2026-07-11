@@ -356,6 +356,8 @@ export interface PaperReview {
   issues: PaperReviewIssue[]
 }
 
+export interface GitReview { ok: boolean; paths: string[]; diff: string; issues: Array<{ path?: string; code: string; message: string }> }
+
 export const documentApi = {
   upload: async (file: File): Promise<UploadResponse> => {
     const formData = new FormData()
@@ -660,6 +662,12 @@ export const modelingApi = {
   requestExecution: async (projectId: string, experimentId: string): Promise<ApprovalRequest> => (await api.post(`/modeling/projects/${projectId}/experiments/${experimentId}/request-execution`)).data,
   executeExperiment: async (projectId: string, experimentId: string): Promise<ExperimentRun> => (await api.post(`/modeling/projects/${projectId}/experiments/${experimentId}/execute`)).data,
   createPaperDraft: async (projectId: string) => (await api.post(`/modeling/projects/${projectId}/paper/draft`)).data,
+  checkDeliverables: async (projectId: string) => (await api.post(`/modeling/projects/${projectId}/deliverables/check`)).data,
+  buildDeliverables: async (projectId: string) => (await api.post(`/modeling/projects/${projectId}/deliverables/build`)).data,
+  gitStatus: async (projectId: string): Promise<{ paths: string[] }> => (await api.get(`/modeling/projects/${projectId}/git/status`)).data,
+  reviewGit: async (projectId: string, paths: string[]): Promise<GitReview> => (await api.post(`/modeling/projects/${projectId}/git/review`, { paths })).data,
+  requestCommit: async (projectId: string, data: { paths: string[]; commit_message: string }) => (await api.post(`/modeling/projects/${projectId}/git/request-commit`, data)).data,
+  commit: async (projectId: string, data: { paths: string[]; commit_message: string }) => (await api.post(`/modeling/projects/${projectId}/git/commit`, data)).data,
   savePaperMarkdown: async (projectId: string, markdown: string): Promise<ModelingArtifact> => (await api.put(`/modeling/projects/${projectId}/paper/markdown`, { markdown })).data,
   renderPaper: async (projectId: string): Promise<{ rendered: string; claims: PaperClaim[] }> => (await api.post(`/modeling/projects/${projectId}/paper/render`)).data,
   reviewPaper: async (projectId: string): Promise<PaperReview> => (await api.post(`/modeling/projects/${projectId}/paper/review`)).data,
