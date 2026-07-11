@@ -47,7 +47,10 @@ def checkpoint_context(tmp_path):
     workspace = tmp_path / "workspace"
     for relative in ("analysis", "data/raw", "src", "tests", "experiments", "figures"):
         (workspace / relative).mkdir(parents=True, exist_ok=True)
-    (workspace / "analysis" / "data_profile.json").write_text("{}", encoding="utf-8")
+    (workspace / "analysis" / "data_profile.json").write_text(
+        json.dumps({"columns": {"price": {}, "sales": {}}}),
+        encoding="utf-8",
+    )
     (workspace / "data" / "raw" / "sales.csv").write_text("price,sales\n1,1\n", encoding="utf-8")
     plan = {
         "candidates": [

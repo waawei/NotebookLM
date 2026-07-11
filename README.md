@@ -383,3 +383,45 @@ MIT License
 ---
 
 **祝你开发顺利！🎉**
+
+## Mathematical Modeling Workflow
+
+The Modeling workspace is a gated, local workflow for turning a problem statement and CSV data into reproducible experiments, a reviewed paper, delivery artifacts, and an approved commit in the project's independent Git repository.
+
+### Requirements
+
+- Python 3.10 or later and Node.js 18 or later.
+- Git must be available for the delivery and commit stages.
+- Configure a writable `MODELING_WORKSPACE_ROOT` outside the application source tree. Each project receives its own workspace and Git repository there.
+- XeLaTeX is required only to compile the final PDF. Paper drafting, review, final-paper approval, delivery validation, and Git approval remain available when it is not installed.
+
+The Modeling page displays runtime readiness for the workspace, Python, Git, and XeLaTeX. A missing workspace disables all project write actions. A missing Python disables experiment preparation and execution. A missing Git disables Git review and commit actions. A missing XeLaTeX disables only PDF compilation.
+
+### User Flow
+
+1. Create a project, import a `.txt`, `.md`, or `.pdf` problem statement, and import `.csv` data.
+2. Parse the problem, profile the data, and create a model plan. Approve the plan before preparing experiments.
+3. Prepare each experiment, review the command, dependency lock, input hashes, timeout, output cap, and network policy, then approve execution before running it.
+4. Validate results, generate and review the paper, resolve blocking review issues, request final approval, and compile the PDF when XeLaTeX is available.
+5. Build delivery artifacts, review the exact Git diff, request and approve a commit, refresh the review immediately before committing, then commit only the approved files.
+
+There are four approval gates: model plan, experiment execution, final paper, and Git commit. Changing the approved plan, execution payload, paper claims, selected Git paths, diff, file hashes, delivery manifest, or commit message invalidates the relevant approval.
+
+### Data and Recovery
+
+- Original inputs are copied into the project workspace with a SHA-256 manifest and are treated as immutable evidence.
+- Generated code is constrained to approved project-relative paths. Experiment execution removes sensitive environment variables, denies network access by default, and applies output, timeout, and child-process limits.
+- On backend startup, interrupted running work is recorded and returned to a safe prior workflow state. The Modeling page shows a recovery notice with the interrupted run; dismissing it hides the notice but preserves recovery history.
+- The project repository is local-only. Delivery commands never push, reset, clean, rebase, change remotes, or check out branches.
+
+### Fixture Verification
+
+Run the deterministic 24-row sales forecasting workflow test from the repository root:
+
+```powershell
+$env:DEBUG = 'false'
+$env:PYTHONPATH = 'backend'
+python -m pytest backend/tests/test_modeling_workflow_e2e.py -q
+```
+
+The fixture uses deterministic Fake LLM responses, compares baseline and linear-regression experiments, verifies traceable paper claims and delivery evidence, and produces an approved local Git commit. When XeLaTeX is unavailable, only the compilation case is skipped with the explicit `xelatex is not installed` reason.

@@ -296,3 +296,45 @@ const API_BASE_URL = 'http://localhost:8000'
 ---
 
 **祝测试顺利！🚀**
+
+## Mathematical Modeling Release Checks
+
+Run these commands from the repository root before releasing a modeling workflow change:
+
+```powershell
+$env:DEBUG = 'false'
+$env:PYTHONPATH = 'backend'
+python -m pytest backend/tests -q
+
+Set-Location frontend
+npm test -- --run
+npm run build
+```
+
+The backend suite includes interruption recovery, runtime redaction, adversarial path/network/resource/Git controls, the deterministic 24-row fixture, and full workflow E2E coverage. XeLaTeX may be absent only when the affected compilation test is skipped with `xelatex is not installed`; paper rendering, review, approval, delivery, and Git assertions must still pass.
+
+### Modeling Manual Audit
+
+1. Start the backend with a writable `MODELING_WORKSPACE_ROOT`, create a modeling project, and confirm the runtime panel reports workspace, Python, and Git as ready.
+2. Import a problem and CSV, then progress through model approval, two execution approvals, paper review, final approval, delivery build, and Git approval.
+3. During one prepared or running experiment, stop the backend process. Restart it using the same database and confirm the recovery notice identifies the interrupted work and the project returns to a safe state before preparing a new experiment.
+4. Before committing, verify the review displays the intended files and commit message. Change a selected file or the delivery manifest, refresh the diff, and confirm the approved commit action disappears until a new approval is obtained.
+5. Inspect the project workspace: `git remote -v` must be empty. Inspect `deliverables/manifest.json`, the persisted artifact records, and paper claims; every paper metric and figure claim must resolve to registered evidence.
+
+### Capability Expectations
+
+- Workspace unavailable: all modeling write controls are disabled.
+- Python unavailable: experiment preparation and Run are disabled.
+- Git unavailable: Git review, approval, and commit controls are disabled.
+- XeLaTeX unavailable: only Compile is disabled; paper review and final approval remain available.
+
+### Focused Commands
+
+```powershell
+$env:DEBUG = 'false'
+$env:PYTHONPATH = 'backend'
+python -m pytest backend/tests/test_modeling_recovery_service.py backend/tests/test_modeling_runtime_status.py backend/tests/test_modeling_security_regression.py backend/tests/test_modeling_workflow_e2e.py -q
+
+Set-Location frontend
+npm test -- --run src/components/ModelingRuntimeStatus.test.tsx src/components/ModelingRecoveryBanner.test.tsx src/views/ModelingWorkflow.integration.test.tsx
+```
