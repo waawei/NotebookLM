@@ -8,13 +8,13 @@
 workflow: mathematical-modeling
 current_phase: 6
 phase_status: in_progress
-current_task: "Task 4: Deterministic Competition Fixture and Fake LLM"
-task_status: verified
+current_task: "Task 5: Full Backend Workflow E2E"
+task_status: in_progress
 baseline_commit: fd74c07a9b0b8e34c3b4c71bf8fef3f1a63420ae
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase6"
-last_verified_commit: f701b0be3fd89fab8fb3f139eed4358f87966902
-last_verification: "Task 4 fixture regression: 3 passed; Task 3 adversarial plus Runner/Git/input regression: 39 passed/2 skipped (Windows symlink permissions)"
-next_action: "Complete Task 4 review and continue Phase 6 Task 5"
+last_verified_commit: 890fe5bc9d6a52d4397297639f1431b6f1e3bb62
+last_verification: "Task 4 fixture/review regressions: 8 passed; role/code/paper regressions: 22 passed"
+next_action: "Implement and verify Phase 6 Task 5 backend workflow E2E"
 ```
 
 ## 启动前风险
@@ -36,6 +36,31 @@ next_action: "Complete Task 4 review and continue Phase 6 Task 5"
 | 6 | in_progress | `2026-07-10-mathematical-modeling-phase6-hardening.md` | pending | — |
 
 ## 当前阶段 Task 记录
+
+### Phase 6 / Task 1: Idempotent Startup Recovery
+
+- 状态：verified；提交：`9d9745d`、`49ef622`、`90427f9`、`fa714ef`、`56e6d28`
+- 聚焦验证：`DEBUG=false; python -m pytest tests/test_modeling_recovery_service.py -q`，退出码 0，22 passed。
+- 备注：恢复运行中的实验、任务和 Agent run；持久化恢复历史；仅终止受项目工作目录归属的 PID，并处理进程退出竞态和补偿失败。
+
+### Phase 6 / Task 2: Runtime Capability Diagnostics
+
+- 状态：verified；提交：`5bb2c53`、`2b09292`
+- 聚焦验证：`DEBUG=false; python -m pytest tests/test_modeling_runtime_status.py tests/test_settings_api.py -q`，退出码 0，11 passed。
+- 备注：`GET /api/modeling/runtime` 使用有界探测并对输出实施严格脱敏。
+
+### Phase 6 / Task 3: Adversarial Security and Resource Regression Suite
+
+- 状态：verified；提交：`df597ae`、`1d3926d`、`f701b0b`
+- 聚焦验证：`DEBUG=false; python -m pytest tests/test_modeling_security_regression.py -q`，退出码 0，39 passed、2 skipped（Windows symlink 权限）。
+- 备注：覆盖路径逃逸、网络拒绝、敏感环境清除、输出/超时/子进程资源限制和 Git 策略。
+
+### Phase 6 / Task 4: Deterministic Competition Fixture and Fake LLM
+
+- 状态：verified；提交：`30da3f9`、`3f00aec`、`890fe5b`
+- 红灯：`DEBUG=false; python -m pytest tests/test_modeling_fixture.py tests/test_review_agent_service.py -q` 初始退出码 1，`ReviewAgentService` 未声明 `STAGE:reviewer`，Fake LLM 因此拒绝提示词。
+- 聚焦验证：同一命令退出码 0，8 passed；`DEBUG=false; python -m pytest tests/test_modeling_role_service.py tests/test_modeling_code_agent_service.py tests/test_paper_agent_service.py -q` 退出码 0，22 passed。
+- 审查：独立复审批准；固定 24 行 CSV、七个生成路径、确定性拆分、MetricRecord、图像成果声明和审稿 Fake 全部可执行。
 
 ### Phase 5 / Task 1: Reproducibility and Delivery Contracts
 
