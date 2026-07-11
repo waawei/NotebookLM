@@ -97,7 +97,8 @@ class GitPolicyService:
 
 
 def resolve_git_path(root: Path, relative: str) -> Path:
-    if Path(relative).is_absolute():
+    relative_path = Path(relative)
+    if relative_path.is_absolute() or ".." in relative_path.parts:
         raise ValueError("Git path must be project-relative")
     target = (root / relative).resolve()
     if target == root or root not in target.parents:
