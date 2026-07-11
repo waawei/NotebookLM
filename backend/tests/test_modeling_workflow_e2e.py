@@ -1,4 +1,5 @@
 import asyncio
+import json
 import shutil
 import subprocess
 import sys
@@ -34,6 +35,9 @@ from services.review_agent_service import ReviewAgentService
 
 
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "modeling_competition"
+FIXTURE_CONTRACT = json.loads(
+    (FIXTURE_ROOT / "expected_contracts.json").read_text(encoding="utf-8")
+)
 
 
 @pytest.fixture
@@ -222,6 +226,10 @@ class ModelingHarness:
         prepared = self.prepare_experiment(project, candidate_index)
         batch = ExperimentConfig.model_validate(prepared["experiment"]["config"])
         assert batch.experiment_id == prepared["experiment"]["experiment_id"]
+        assert batch.target == FIXTURE_CONTRACT["target"]
+        assert batch.features == FIXTURE_CONTRACT["features"]
+        assert batch.seed == FIXTURE_CONTRACT["seed"]
+        assert [metric.name for metric in batch.metrics] == FIXTURE_CONTRACT["validation_metrics"]
         from services.experiment_contracts import ExecutionBatch
 
         execution = ExecutionBatch.model_validate(prepared["batch"])

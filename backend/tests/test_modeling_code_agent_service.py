@@ -17,9 +17,11 @@ def code_agent_context(tmp_path):
     (workspace / "analysis").mkdir(parents=True)
     (workspace / "data" / "raw").mkdir(parents=True)
     (workspace / "analysis" / "model_plan.json").write_text(
-        json.dumps({"candidates": [{"name": "Baseline"}]}), encoding="utf-8"
+        json.dumps({"candidates": [{"name": "Baseline", "features": ["price"]}]}), encoding="utf-8"
     )
-    (workspace / "analysis" / "data_profile.json").write_text("{}", encoding="utf-8")
+    (workspace / "analysis" / "data_profile.json").write_text(
+        json.dumps({"columns": {"price": {}, "sales": {}}}), encoding="utf-8"
+    )
     (workspace / "data" / "raw" / "sales.csv").write_text("price,sales\n1,2\n", encoding="utf-8")
     store = ModelingStore(str(tmp_path / "modeling.db"))
     project = store.create_project("Forecast", "forecast", str(workspace), None)
@@ -70,6 +72,7 @@ def test_code_agent_creates_hashed_bounded_experiment_draft(tmp_path):
     result = asyncio.run(service.prepare_experiment(project["project_id"], 0))
 
     assert result["experiment"]["experiment_id"] == "exp-0001"
+    assert result["experiment"]["config"]["target"] == "sales"
     assert result["batch"]["commands"][0][0].endswith(".venv\\Scripts\\python.exe")
     assert result["batch"]["commands"][0][1:] == ["src/train.py", "--config", "experiments/exp-0001/config.json"]
     assert len(result["batch"]["code_hash"]) == 64

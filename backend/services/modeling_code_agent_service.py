@@ -80,7 +80,11 @@ class ModelingCodeAgentService:
             raise ValueError(self._validation_message(error)) from error
         root = Path(project["workspace_path"]).resolve()
         commands = self._normalize_commands(project, generated.commands)
-        config = self._config(experiment_id, candidate, plan_payload)
+        config = self._config(
+            experiment_id,
+            candidate,
+            self._target_from_profile(project, candidate),
+        )
         config_content = json.dumps(config, ensure_ascii=False, indent=2) + "\n"
         input_hashes = self._input_hashes(project)
         source_hashes = self._source_hashes(
@@ -219,14 +223,43 @@ class ModelingCodeAgentService:
             normalized_commands.append([project_python, *command[1:]])
         return normalized_commands
 
+    def _target_from_profile(self, project: dict, candidate: dict) -> str:
+        profiles = [
+            artifact
+            for artifact in self.store.list_artifacts(project["project_id"])
+            if artifact["artifact_type"] == "data_profile"
+        ]
+        if not profiles:
+            raise ValueError("Data profile is required to identify experiment target")
+        profile = max(profiles, key=lambda item: (item["created_at"], item["artifact_id"]))
+        root = Path(project["workspace_path"]).resolve()
+        path = (root / profile["relative_path"]).resolve()
+        if path == root or root not in path.parents or not path.is_file():
+            raise ValueError("Data profile is unavailable")
+        if hashlib.sha256(path.read_bytes()).hexdigest() != profile["sha256"]:
+            raise ValueError("Data profile hash does not match registered artifact")
+        try:
+            columns = json.loads(path.read_text(encoding="utf-8")).get("columns")
+        except (OSError, json.JSONDecodeError) as error:
+            raise ValueError("Data profile is unavailable") from error
+        if not isinstance(columns, dict) or not all(isinstance(name, str) for name in columns):
+            raise ValueError("Data profile does not identify experiment columns")
+        features = [str(feature) for feature in candidate.get("features") or []]
+        if not features or any(feature not in columns for feature in features):
+            raise ValueError("Approved model plan features do not match data profile")
+        targets = [column for column in columns if column not in features]
+        if len(targets) != 1:
+            raise ValueError("Data profile does not identify a unique experiment target")
+        return targets[0]
+
     @staticmethod
-    def _config(experiment_id: str, candidate: dict, plan: dict) -> dict:
+    def _config(experiment_id: str, candidate: dict, target: str) -> dict:
         features = candidate.get("features") or ["feature"]
         metrics = candidate.get("metrics") or ["rmse"]
         return ExperimentConfig(
             experiment_id=experiment_id,
             seed=42,
-            target="target",
+            target=target,
             features=[str(feature) for feature in features],
             model={
                 "kind": "baseline" if "baseline" in candidate.get("name", "").lower() else str(candidate.get("algorithm", "candidate")),
