@@ -174,6 +174,19 @@ class ModelingStore:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS workflow_recoveries (
+                    recovery_id TEXT PRIMARY KEY,
+                    project_id TEXT NOT NULL,
+                    from_state TEXT NOT NULL,
+                    to_state TEXT NOT NULL,
+                    interrupted_run_ids_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    dismissed_at TEXT
+                )
+                """
+            )
             columns = {
                 row[1] for row in conn.execute("PRAGMA table_info(experiment_runs)")
             }
@@ -224,6 +237,17 @@ class ModelingStore:
         with self._connect() as conn:
             rows = conn.execute(
                 "SELECT * FROM modeling_projects ORDER BY updated_at DESC"
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def list_projects_in_states(self, states: list[str]) -> list[dict]:
+        if not states:
+            return []
+        placeholders = ", ".join("?" for _ in states)
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"SELECT * FROM modeling_projects WHERE state IN ({placeholders}) ORDER BY updated_at, project_id",
+                tuple(states),
             ).fetchall()
         return [dict(row) for row in rows]
 
@@ -317,6 +341,19 @@ class ModelingStore:
                 (project_id,),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def latest_transition(self, project_id: str) -> dict | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT * FROM workflow_transitions
+                WHERE project_id = ?
+                ORDER BY created_at DESC, transition_id DESC
+                LIMIT 1
+                """,
+                (project_id,),
+            ).fetchone()
+        return dict(row) if row else None
 
     def create_task(
         self,
@@ -726,6 +763,164 @@ class ModelingStore:
                 (project_id,),
             ).fetchall()
         return [self._experiment_from_row(row) for row in rows]
+
+    def active_experiments(self, project_id: str) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM experiment_runs
+                WHERE project_id = ? AND status = 'running'
+                ORDER BY created_at, experiment_id
+                """,
+                (project_id,),
+            ).fetchall()
+        return [self._experiment_from_row(row) for row in rows]
+
+    def project_has_active_run(self, project_id: str) -> bool:
+        return bool(self.active_experiments(project_id))
+
+    def mark_experiment_interrupted(self, experiment_id: str) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE experiment_runs
+                SET status = 'failed', pid = NULL, error_code = 'interrupted',
+                    finished_at = ?
+                WHERE experiment_id = ? AND status = 'running'
+                """,
+                (datetime.now().isoformat(), experiment_id),
+            )
+
+    def create_recovery(
+        self,
+        project_id: str,
+        from_state: str,
+        to_state: str,
+        interrupted_run_ids: list[str],
+    ) -> dict:
+        recovery = {
+            "recovery_id": str(uuid.uuid4()),
+            "project_id": project_id,
+            "from_state": from_state,
+            "to_state": to_state,
+            "interrupted_run_ids_json": json.dumps(interrupted_run_ids),
+            "created_at": datetime.now().isoformat(),
+            "dismissed_at": None,
+        }
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO workflow_recoveries (
+                    recovery_id, project_id, from_state, to_state,
+                    interrupted_run_ids_json, created_at, dismissed_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                tuple(recovery.values()),
+            )
+        return self._recovery_from_row(recovery)
+
+    def list_recoveries(self) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM workflow_recoveries
+                WHERE dismissed_at IS NULL
+                ORDER BY created_at, recovery_id
+                """
+            ).fetchall()
+        return [self._recovery_from_row(row) for row in rows]
+
+    def dismiss_recovery(self, recovery_id: str) -> dict | None:
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE workflow_recoveries
+                SET dismissed_at = ?
+                WHERE recovery_id = ? AND dismissed_at IS NULL
+                """,
+                (datetime.now().isoformat(), recovery_id),
+            )
+            if cursor.rowcount == 0:
+                return None
+            row = conn.execute(
+                "SELECT * FROM workflow_recoveries WHERE recovery_id = ?",
+                (recovery_id,),
+            ).fetchone()
+        return self._recovery_from_row(row)
+
+    def interrupt_active_runs_and_transition(
+        self, project_id: str, from_state: str, to_state: str
+    ) -> dict | None:
+        now = datetime.now().isoformat()
+        with self._connect() as conn:
+            project = conn.execute(
+                "SELECT state FROM modeling_projects WHERE project_id = ?", (project_id,)
+            ).fetchone()
+            if not project:
+                raise ValueError("Modeling project not found")
+            if project["state"] != from_state:
+                return None
+            experiments = conn.execute(
+                """
+                SELECT experiment_id FROM experiment_runs
+                WHERE project_id = ? AND status = 'running'
+                ORDER BY created_at, experiment_id
+                """,
+                (project_id,),
+            ).fetchall()
+            interrupted_run_ids = [row["experiment_id"] for row in experiments]
+            conn.execute(
+                """
+                UPDATE experiment_runs
+                SET status = 'failed', pid = NULL, error_code = 'interrupted', finished_at = ?
+                WHERE project_id = ? AND status = 'running'
+                """,
+                (now, project_id),
+            )
+            recovery = {
+                "recovery_id": str(uuid.uuid4()),
+                "project_id": project_id,
+                "from_state": from_state,
+                "to_state": to_state,
+                "interrupted_run_ids_json": json.dumps(interrupted_run_ids),
+                "created_at": now,
+                "dismissed_at": None,
+            }
+            conn.execute(
+                """
+                INSERT INTO workflow_recoveries (
+                    recovery_id, project_id, from_state, to_state,
+                    interrupted_run_ids_json, created_at, dismissed_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                tuple(recovery.values()),
+            )
+            conn.execute(
+                """
+                INSERT INTO workflow_transitions (
+                    transition_id, project_id, from_state, to_state, reason, created_at
+                ) VALUES (?, ?, ?, ?, 'interrupted', ?)
+                """,
+                (str(uuid.uuid4()), project_id, from_state, to_state, now),
+            )
+            conn.execute(
+                """
+                UPDATE modeling_projects SET state = ?, updated_at = ?
+                WHERE project_id = ? AND state = ?
+                """,
+                (to_state, now, project_id, from_state),
+            )
+        return self._recovery_from_row(recovery)
+
+    @staticmethod
+    def _recovery_from_row(row) -> dict | None:
+        if not row:
+            return None
+        recovery = dict(row)
+        recovery["interrupted_run_ids"] = json.loads(
+            recovery.pop("interrupted_run_ids_json")
+        )
+        return recovery
 
     def update_experiment_status(
         self,

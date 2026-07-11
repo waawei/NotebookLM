@@ -32,6 +32,7 @@ from services.delivery_service import DeliveryService
 from services.git_policy_service import GitPolicyService
 from services.git_commit_service import GitCommitService
 from services.output_service import OutputService
+from services.modeling_recovery_service import ModelingRecoveryService
 
 
 router = APIRouter()
@@ -69,6 +70,7 @@ latex_service = LatexService(modeling_store, artifact_service, approval_service,
 delivery_service = DeliveryService(modeling_store, artifact_service, OutputService())
 git_policy_service = GitPolicyService()
 git_commit_service = GitCommitService(modeling_store, approval_service, git_policy_service, delivery_service.reproducibility)
+recovery_service = ModelingRecoveryService(modeling_store)
 
 
 class ProjectCreate(BaseModel):
@@ -100,6 +102,20 @@ class GitReviewRequest(BaseModel):
 
 class GitCommitRequest(GitReviewRequest):
     commit_message: str
+
+
+@router.get("/recoveries")
+async def list_recoveries():
+    recoveries = modeling_store.list_recoveries()
+    return {"recoveries": recoveries, "total": len(recoveries)}
+
+
+@router.post("/recoveries/{recovery_id}/dismiss")
+async def dismiss_recovery(recovery_id: str):
+    recovery = modeling_store.dismiss_recovery(recovery_id)
+    if not recovery:
+        raise HTTPException(status_code=404, detail="Recovery record not found")
+    return recovery
 
 
 async def validate_input_kind(request: InputUploadKind) -> str:

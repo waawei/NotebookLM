@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api import agents, chat, documents, modeling, notes, outputs, preview, settings as settings_api, skills, spaces, wiki
 from core.config import settings
 from services.local_llm_config import LLMConfigurationService
+from api.modeling import recovery_service
 
 app = FastAPI(
     title="NotebookLM Clone API",
@@ -39,12 +40,18 @@ app.include_router(modeling.router, prefix="/api/modeling", tags=["Modeling"])
 
 @app.on_event("startup")
 async def startup_event():
-    """Log startup configuration."""
+    """Log startup configuration and reconcile interrupted modeling workflows."""
     effective_llm = LLMConfigurationService().effective_config()
     print("NotebookLM Clone API starting...")
     print(f"Vector database path: {settings.VECTOR_DB_PATH}")
     print(f"LLM provider: {effective_llm.provider}")
     print(f"LLM model: {effective_llm.model}")
+    for recovery in recovery_service.recover_interrupted_projects():
+        print(
+            "Recovered modeling project "
+            f"{recovery['project_id']}: {recovery['recovered_from']} -> "
+            f"{recovery['recovered_to']}"
+        )
 
 
 @app.on_event("shutdown")

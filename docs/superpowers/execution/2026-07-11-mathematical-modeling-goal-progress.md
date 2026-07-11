@@ -6,15 +6,15 @@
 
 ```yaml
 workflow: mathematical-modeling
-current_phase: 5
-phase_status: completed
-current_task: "Task 6: Phase 5 Independent-Repository Checkpoint"
-task_status: verified
-baseline_commit: 1a6a55a7c95cfd26a6568dbfda66d19f3a688c49
-worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase5"
-last_verified_commit: 9de6eb81b634b1701413f42af010787690500c3d
-last_verification: "Gate 5 passed: backend 238 passed/3 skipped/13 subtests; frontend 30 files/127 tests; production build passed; independent repository checkpoint passed"
-next_action: "Stop after Phase 5 and wait for user review; do not start Phase 6"
+current_phase: 6
+phase_status: in_progress
+current_task: "Task 1: Idempotent Startup Recovery"
+task_status: in_progress
+baseline_commit: fd74c07a9b0b8e34c3b4c71bf8fef3f1a63420ae
+worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase6"
+last_verified_commit: fd74c07a9b0b8e34c3b4c71bf8fef3f1a63420ae
+last_verification: "Phase 5 Gate rechecked: backend 238 passed/3 skipped/13 subtests; frontend 30 files/127 tests; production build passed"
+next_action: "Complete Phase 6 Task 1 review and continue Task 2"
 ```
 
 ## 启动前风险
@@ -33,7 +33,7 @@ next_action: "Stop after Phase 5 and wait for user review; do not start Phase 6"
 | 3 | completed | `2026-07-10-mathematical-modeling-phase3-experiments.md` | passed | `0a6e542` + `c72749f` + completion ledger commit |
 | 4 | completed | `2026-07-10-mathematical-modeling-phase4-paper.md` | passed | Task 1 `34fea97` + `ee6ed66`; Task 2 `313e66c` + `b0c167b`; Task 3 `9d2e4cd` + `fc0205e`; Task 4 `4648b01` + `f38bbd2`; Task 5 `a645dda`; Task 6 `54f3fc8` + `8363a3e` |
 | 5 | completed | `2026-07-10-mathematical-modeling-phase5-delivery-git.md` | passed | Task 1 `eab060d`; Task 2 `155d8e5` + `6e311ce`; Task 3 `d7099da`; Task 4 `b3906df`; Task 5 `cd59950`; Task 6 `64cb92d`; review fixes `9de6eb8` |
-| 6 | not_started | `2026-07-10-mathematical-modeling-phase6-hardening.md` | pending | — |
+| 6 | in_progress | `2026-07-10-mathematical-modeling-phase6-hardening.md` | pending | — |
 
 ## 当前阶段 Task 记录
 
