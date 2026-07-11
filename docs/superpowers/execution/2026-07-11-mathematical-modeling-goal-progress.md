@@ -12,9 +12,9 @@ current_task: "Task 6: Phase 5 Independent-Repository Checkpoint"
 task_status: verified
 baseline_commit: 1a6a55a7c95cfd26a6568dbfda66d19f3a688c49
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase5"
-last_verified_commit: 2b5459147b94d72a8a4ed4d71a563fe18fd6b76c
-last_verification: "Phase 4 Gate regression 9 passed; Phase 5 Task 1 3 passed; Task 2 review regression 7 passed/1 skipped; Task 3 2 passed/1 skipped; Task 4 5 passed; Task 5 backend 10 passed/2 skipped and frontend 3 files/11 tests/build; Task 6 checkpoint 4 passed; Gate 5 frontend 30 files/127 tests and production build passed"
-next_action: "Run final Phase 5 backend Gate and whole-branch review; do not start Phase 6"
+last_verified_commit: 9de6eb81b634b1701413f42af010787690500c3d
+last_verification: "Phase 4 Gate regression 9 passed; Phase 5 Task 1 3 passed; Task 2 review regression 7 passed/1 skipped; Task 3 2 passed/1 skipped; Task 4 5 passed; Task 5 backend 10 passed/2 skipped and frontend 3 files/11 tests/build; Task 6 checkpoint 4 passed; review fixes backend 18 passed/2 skipped, frontend 30 files/127 tests, production build passed"
+next_action: "Resolve repeatable full-backend pytest runner hang before Phase 5 completion; do not start Phase 6"
 ```
 
 ## 启动前风险
@@ -105,6 +105,23 @@ next_action: "Run final Phase 5 backend Gate and whole-branch review; do not sta
 - 红灯：完整前端 suite 1 failed、1 unhandled error；具体为 `modelingApi.checkDeliverables is not a function`。
 - 绿灯：`ModelingProjectsView.test.tsx` 29 passed；完整前端 30 files、127 tests passed；`npm run build` 退出码 0。
 - 提交：`2b5459147b94d72a8a4ed4d71a563fe18fd6b76c`
+
+### Phase 5 Review Integrity Fixes
+
+- 状态：verified
+- 独立审查 P1：预暂存 index 内容可能混入批准提交；审批未校验实际 staged blob；delivery manifest 变更可绕过历史 artifact 校验。
+- 修复：request/commit 均拒绝非空 index，`git add --` 后严格比对 cached paths 与 Git blob object IDs；可复现检查验证每个 artifact 路径的最新版本（包括 delivery manifest/archive）。
+- 独立审查 P2：Delivery UI 未列出 manifest 文件与受限数据排除原因；Git UI 未显示 policy issues 或审批/当前 payload mismatch。
+- 修复：DeliveryChecklist 读取 manifest artifact 并列出路径/hash/Git inclusion/exclusion；commit card 显示 issue/mismatch，选中路径必须刷新 review 才可申请审批。
+- 验证：后端 `test_reproducibility_service.py test_delivery_service.py test_git_policy_service.py test_git_commit_service.py test_commit_gate.py test_delivery_git_api.py test_phase5_delivery_checkpoint.py` 退出码 0，18 passed、2 skipped；前端完整 30 files、127 tests；生产 build 退出码 0。
+- 提交：`9de6eb81b634b1701413f42af010787690500c3d`
+
+### Phase 5 Full Backend Gate Blocker
+
+- 状态：blocked_pending_environment_diagnosis
+- 现象：`DEBUG=false; python -m pytest tests -q` 从 `backend/` 执行时，runner 在约 25 秒后失去会话输出并留下 pytest 子进程；排除 `test_phase3_reproducibility_checkpoint.py` 后仍复现。
+- 已排除：单独 `test_phase3_reproducibility_checkpoint.py` 退出码 0，1 passed；阶段 5 全部聚焦 backend 回归退出码 0，18 passed、2 skipped；阶段 4 Gate 聚焦回归 9 passed。
+- 处理：已在每次诊断后终止仅由本次 pytest 启动的遗留 Python 子进程；未改动或删除仓库文件。必须在后续 Goal 回合继续诊断，当前不得将 Gate 5 或 Phase 5 标记为完成。
 
 ### Phase 5 / Task 2 Review Fixes
 
