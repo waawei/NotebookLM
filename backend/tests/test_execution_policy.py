@@ -56,3 +56,16 @@ def test_install_batch_requires_explicit_network_permission(tmp_path):
 
     with pytest.raises(ValueError, match="network_allowed"):
         policy.validate_batch(project, install)
+
+
+def test_policy_rejects_relative_path_escape_and_noncanonical_pip(tmp_path):
+    policy, _, project, batch = policy_context(tmp_path)
+    escaped = batch.model_copy(update={"commands": [[batch.commands[0][0], "..\\outside.py"]]})
+    with pytest.raises(ValueError, match="escapes project workspace"):
+        policy.validate_batch(project, escaped)
+
+    pip_download = batch.model_copy(
+        update={"commands": [[batch.commands[0][0], "-m", "pip", "download", "package"]], "network_allowed": True}
+    )
+    with pytest.raises(ValueError, match="pip command"):
+        policy.validate_batch(project, pip_download)
