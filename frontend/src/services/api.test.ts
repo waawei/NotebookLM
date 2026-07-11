@@ -214,4 +214,44 @@ describe('modelingApi', () => {
     expect(httpClient.post).toHaveBeenNthCalledWith(2, '/modeling/projects/project-1/advance')
     expect(httpClient.post).toHaveBeenNthCalledWith(3, '/modeling/projects/project-1/rollback', { reason: 'Need another pass' })
   })
+
+  it('uses intake, artifact, planning, and approval endpoints', async () => {
+    const artifact = { artifact_id: 'artifact-1', project_id: 'project-1', artifact_type: 'data_input' }
+    const approval = { approval_id: 'approval-1', project_id: 'project-1', payload_hash: 'hash-1' }
+    httpClient.post.mockResolvedValue({ data: artifact })
+    httpClient.get
+      .mockResolvedValueOnce({ data: { artifacts: [artifact], total: 1 } })
+      .mockResolvedValueOnce({ data: artifact })
+      .mockResolvedValueOnce({ data: { approvals: [approval], total: 1 } })
+    const file = new File(['x,y\n1,2\n'], 'train.csv', { type: 'text/csv' })
+
+    await modelingApi.uploadInput('project-1', 'data', file)
+    await modelingApi.parseProblem('project-1')
+    await modelingApi.profileData('project-1', 'artifact-1')
+    await modelingApi.createModelPlan('project-1')
+    await modelingApi.listArtifacts('project-1')
+    await modelingApi.getArtifact('project-1', 'artifact-1')
+    await modelingApi.listApprovals('project-1')
+    await modelingApi.decideApproval('project-1', 'approval-1', {
+      decision: 'approved',
+      payload_hash: 'hash-1',
+      comment: 'ok',
+    })
+
+    expect(httpClient.post).toHaveBeenCalledWith(
+      '/modeling/projects/project-1/inputs',
+      expect.any(FormData),
+      { headers: { 'Content-Type': 'multipart/form-data' }, params: { kind: 'data' } },
+    )
+    expect(httpClient.post).toHaveBeenCalledWith('/modeling/projects/project-1/problem/parse')
+    expect(httpClient.post).toHaveBeenCalledWith('/modeling/projects/project-1/data/profile/artifact-1')
+    expect(httpClient.post).toHaveBeenCalledWith('/modeling/projects/project-1/model-plan')
+    expect(httpClient.get).toHaveBeenCalledWith('/modeling/projects/project-1/artifacts')
+    expect(httpClient.get).toHaveBeenCalledWith('/modeling/projects/project-1/artifacts/artifact-1')
+    expect(httpClient.get).toHaveBeenCalledWith('/modeling/projects/project-1/approvals')
+    expect(httpClient.post).toHaveBeenCalledWith(
+      '/modeling/projects/project-1/approvals/approval-1/decide',
+      { decision: 'approved', payload_hash: 'hash-1', comment: 'ok' },
+    )
+  })
 })

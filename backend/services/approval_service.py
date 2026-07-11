@@ -52,3 +52,8 @@ class ApprovalService:
         if not request or request["project_id"] != project_id:
             raise ValueError("Approval request not found")
         self.store.delete_approval_request(approval_id)
+
+    def list_for_project(self, project_id: str) -> list[dict]:
+        if not self.store.get_project(project_id):
+            raise ValueError("Modeling project not found")
+        return self.store.list_approval_requests(project_id)

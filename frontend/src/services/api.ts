@@ -263,6 +263,44 @@ export interface ModelingProject {
   updated_at?: string
 }
 
+export interface ModelingArtifact {
+  artifact_id: string
+  project_id: string
+  artifact_type: string
+  relative_path: string
+  sha256: string
+  source_run_id?: string | null
+  source_experiment_id?: string | null
+  version: number
+  created_at: string
+  content?: unknown
+}
+
+export interface ApprovalRequest {
+  approval_id: string
+  project_id: string
+  gate: string
+  payload_hash: string
+  payload: { artifact_id: string; artifact_sha256: string; version: number }
+  status: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface ModelCandidate {
+  name: string
+  assumptions: string[]
+  features: string[]
+  algorithm: string
+  metrics: string[]
+  risks: string[]
+}
+
+export interface ModelPlan {
+  problem_summary: string
+  candidates: ModelCandidate[]
+}
+
 export const documentApi = {
   upload: async (file: File): Promise<UploadResponse> => {
     const formData = new FormData()
@@ -543,6 +581,25 @@ export const modelingApi = {
   get: async (projectId: string): Promise<ModelingProject> => (await api.get(`/modeling/projects/${projectId}`)).data,
   advance: async (projectId: string): Promise<ModelingProject> => (await api.post(`/modeling/projects/${projectId}/advance`)).data,
   rollback: async (projectId: string, reason: string): Promise<ModelingProject> => (await api.post(`/modeling/projects/${projectId}/rollback`, { reason })).data,
+  uploadInput: async (projectId: string, kind: 'problem' | 'data', file: File): Promise<ModelingArtifact> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return (await api.post(`/modeling/projects/${projectId}/inputs`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      params: { kind },
+    })).data
+  },
+  parseProblem: async (projectId: string) => (await api.post(`/modeling/projects/${projectId}/problem/parse`)).data,
+  profileData: async (projectId: string, artifactId: string) => (await api.post(`/modeling/projects/${projectId}/data/profile/${artifactId}`)).data,
+  createModelPlan: async (projectId: string) => (await api.post(`/modeling/projects/${projectId}/model-plan`)).data,
+  listArtifacts: async (projectId: string): Promise<{ artifacts: ModelingArtifact[]; total: number }> => (await api.get(`/modeling/projects/${projectId}/artifacts`)).data,
+  getArtifact: async (projectId: string, artifactId: string): Promise<ModelingArtifact> => (await api.get(`/modeling/projects/${projectId}/artifacts/${artifactId}`)).data,
+  listApprovals: async (projectId: string): Promise<{ approvals: ApprovalRequest[]; total: number }> => (await api.get(`/modeling/projects/${projectId}/approvals`)).data,
+  decideApproval: async (
+    projectId: string,
+    approvalId: string,
+    decision: { decision: 'approved' | 'changes_requested' | 'rejected'; payload_hash: string; comment: string },
+  ) => (await api.post(`/modeling/projects/${projectId}/approvals/${approvalId}/decide`, decision)).data,
 }
 
 export default api

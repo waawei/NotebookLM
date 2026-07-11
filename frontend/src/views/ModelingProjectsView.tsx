@@ -1,7 +1,9 @@
 import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import { AlertCircle, ChevronLeft, ChevronRight, Loader2, RefreshCw } from 'lucide-react'
-import { modelingApi, type ModelingProject } from '../services/api'
+import { modelingApi, type ApprovalRequest, type ModelingArtifact, type ModelingProject, type ModelPlan } from '../services/api'
 import { useStore } from '../store/useStore'
+import ModelingInputPanel from '../components/ModelingInputPanel'
+import ModelPlanApprovalCard from '../components/ModelPlanApprovalCard'
 
 const MODELING_WORKFLOW_STATES = new Set([
   'project_initialized',
@@ -52,6 +54,10 @@ export default function ModelingProjectsView() {
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [transitioning, setTransitioning] = useState(false)
+  const [stageBusy, setStageBusy] = useState(false)
+  const [artifacts, setArtifacts] = useState<ModelingArtifact[]>([])
+  const [approvals, setApprovals] = useState<ApprovalRequest[]>([])
+  const [modelPlan, setModelPlan] = useState<ModelPlan | null>(null)
   const [error, setError] = useState('')
 
   const selectedProject = useMemo(
@@ -86,6 +92,35 @@ export default function ModelingProjectsView() {
   useEffect(() => {
     void loadProjects()
   }, [])
+
+  const loadEvidence = async (projectId: string) => {
+    try {
+      const [artifactData, approvalData] = await Promise.all([
+        modelingApi.listArtifacts(projectId),
+        modelingApi.listApprovals(projectId),
+      ])
+      setArtifacts(artifactData.artifacts)
+      setApprovals(approvalData.approvals)
+      const pending = approvalData.approvals.find((item) => item.gate === 'model_approval' && item.status === 'pending')
+      if (pending) {
+        const planArtifact = await modelingApi.getArtifact(projectId, pending.payload.artifact_id)
+        setModelPlan(planArtifact.content as ModelPlan)
+      } else {
+        setModelPlan(null)
+      }
+    } catch {
+      setError('Unable to load modeling evidence. Please try again.')
+    }
+  }
+
+  useEffect(() => {
+    if (selectedProject) void loadEvidence(selectedProject.project_id)
+    else {
+      setArtifacts([])
+      setApprovals([])
+      setModelPlan(null)
+    }
+  }, [selectedProject?.project_id, selectedProject?.state])
 
   const createProject = async (event: FormEvent) => {
     event.preventDefault()
@@ -122,6 +157,32 @@ export default function ModelingProjectsView() {
       setTransitioning(false)
     }
   }
+
+  const runStageAction = async () => {
+    if (!selectedProject) return
+    setStageBusy(true)
+    setError('')
+    try {
+      if (selectedProject.state === 'problem_parsing') {
+        await modelingApi.parseProblem(selectedProject.project_id)
+      } else if (selectedProject.state === 'data_profiling') {
+        const dataInput = [...artifacts].reverse().find((item) => item.artifact_type === 'data_input')
+        if (!dataInput) throw new Error('Data input missing')
+        await modelingApi.profileData(selectedProject.project_id, dataInput.artifact_id)
+      } else if (selectedProject.state === 'model_planning') {
+        await modelingApi.createModelPlan(selectedProject.project_id)
+      }
+      await loadEvidence(selectedProject.project_id)
+    } catch {
+      setError('Unable to run the current modeling stage. Please check its inputs.')
+    } finally {
+      setStageBusy(false)
+    }
+  }
+
+  const pendingModelApproval = approvals.find(
+    (item) => item.gate === 'model_approval' && item.status === 'pending',
+  )
 
   return (
     <div className="grid h-full grid-cols-[minmax(260px,340px)_1fr] bg-gray-100 dark:bg-gray-950">
@@ -162,6 +223,14 @@ export default function ModelingProjectsView() {
           <article className="mx-auto max-w-4xl rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
             <div className="border-b border-gray-100 pb-4 dark:border-gray-800"><h1 className="text-xl font-semibold text-gray-950 dark:text-gray-100">{selectedProject.name}</h1><p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Current state: <span className="font-medium">{selectedProject.state}</span></p>{selectedProject.deadline && <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Deadline: {selectedProject.deadline}</p>}</div>
             <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-medium text-gray-500">Project slug</dt><dd className="mt-1 text-gray-900 dark:text-gray-100">{selectedProject.slug}</dd></div><div><dt className="text-xs font-medium text-gray-500">Workspace</dt><dd className="mt-1 break-all text-gray-900 dark:text-gray-100">{selectedProject.workspace_path}</dd></div></dl>
+            <div className="mt-5 space-y-4">
+              <ModelingInputPanel projectId={selectedProject.project_id} onChanged={() => loadEvidence(selectedProject.project_id)} />
+              {selectedProject.state === 'problem_parsing' && <button type="button" disabled={stageBusy} onClick={() => void runStageAction()} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Parse problem</button>}
+              {selectedProject.state === 'data_profiling' && <button type="button" disabled={stageBusy || !artifacts.some((item) => item.artifact_type === 'data_input')} onClick={() => void runStageAction()} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Profile data</button>}
+              {selectedProject.state === 'model_planning' && <button type="button" disabled={stageBusy} onClick={() => void runStageAction()} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Create model plan</button>}
+              {pendingModelApproval && modelPlan && <ModelPlanApprovalCard projectId={selectedProject.project_id} approval={pendingModelApproval} plan={modelPlan} onDecided={() => loadEvidence(selectedProject.project_id)} />}
+              {artifacts.length > 0 && <section aria-label="Modeling artifacts" className="rounded border border-gray-200 p-3 dark:border-gray-800"><h2 className="text-sm font-semibold">Artifacts</h2><ul className="mt-2 space-y-1 text-xs text-gray-600 dark:text-gray-300">{artifacts.map((artifact) => <li key={artifact.artifact_id}>{artifact.artifact_type}: {artifact.relative_path}</li>)}</ul></section>}
+            </div>
             <div className="mt-6 flex flex-wrap items-end gap-3 border-t border-gray-100 pt-5 dark:border-gray-800">
               <button onClick={() => void transitionProject('advance')} disabled={transitioning || !canAdvance} className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300 dark:disabled:bg-gray-700"><ChevronRight className="h-4 w-4" />Advance project</button>
               <label className="min-w-[200px] flex-1"><span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">Rollback reason</span><input aria-label="Rollback reason" value={rollbackReason} onChange={(event) => setRollbackReason(event.target.value)} className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100" /></label>

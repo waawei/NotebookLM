@@ -7,6 +7,14 @@ const modelingApiMock = vi.hoisted(() => ({
   get: vi.fn(),
   advance: vi.fn(),
   rollback: vi.fn(),
+  listArtifacts: vi.fn(),
+  getArtifact: vi.fn(),
+  listApprovals: vi.fn(),
+  parseProblem: vi.fn(),
+  profileData: vi.fn(),
+  createModelPlan: vi.fn(),
+  uploadInput: vi.fn(),
+  decideApproval: vi.fn(),
 }))
 
 vi.mock('../services/api', () => ({ modelingApi: modelingApiMock }))
@@ -51,6 +59,12 @@ describe('ModelingProjectsView', () => {
     modelingApiMock.create.mockResolvedValue({ ...forecast, project_id: 'project-2', name: 'Churn', slug: 'churn' })
     modelingApiMock.advance.mockResolvedValue({ ...forecast, state: 'problem_parsing' })
     modelingApiMock.rollback.mockResolvedValue(forecast)
+    modelingApiMock.listArtifacts.mockResolvedValue({ artifacts: [], total: 0 })
+    modelingApiMock.listApprovals.mockResolvedValue({ approvals: [], total: 0 })
+    modelingApiMock.parseProblem.mockResolvedValue({})
+    modelingApiMock.profileData.mockResolvedValue({})
+    modelingApiMock.createModelPlan.mockResolvedValue({})
+    modelingApiMock.getArtifact.mockResolvedValue({})
   })
 
   it('loads projects, selects one, and creates a project', async () => {
@@ -130,5 +144,56 @@ describe('ModelingProjectsView', () => {
     render(<ModelingProjectsView />)
 
     expect(await screen.findByText('Unable to load modeling projects. Please try again.')).toBeInTheDocument()
+  })
+
+  it.each([
+    ['problem_parsing', 'Parse problem', 'parseProblem', undefined],
+    ['data_profiling', 'Profile data', 'profileData', 'data-1'],
+    ['model_planning', 'Create model plan', 'createModelPlan', undefined],
+  ] as const)('runs the legal Phase 2 action for %s', async (state, label, method, artifactId) => {
+    modelingApiMock.list.mockResolvedValue({ projects: [{ ...forecast, state }], total: 1 })
+    modelingApiMock.listArtifacts.mockResolvedValue({
+      artifacts: artifactId ? [{ artifact_id: artifactId, artifact_type: 'data_input' }] : [],
+      total: artifactId ? 1 : 0,
+    })
+    render(<ModelingProjectsView />)
+
+    await screen.findByRole('heading', { name: 'Forecast' })
+    fireEvent.click(await screen.findByRole('button', { name: label }))
+    await waitFor(() => {
+      if (artifactId) expect(modelingApiMock[method]).toHaveBeenCalledWith('project-1', artifactId)
+      else expect(modelingApiMock[method]).toHaveBeenCalledWith('project-1')
+    })
+  })
+
+  it('loads the pending plan and renders its approval card', async () => {
+    modelingApiMock.list.mockResolvedValue({ projects: [{ ...forecast, state: 'model_approval_pending' }], total: 1 })
+    modelingApiMock.listArtifacts.mockResolvedValue({
+      artifacts: [{ artifact_id: 'plan-1', artifact_type: 'model_plan' }],
+      total: 1,
+    })
+    modelingApiMock.listApprovals.mockResolvedValue({
+      approvals: [{
+        approval_id: 'approval-1',
+        project_id: 'project-1',
+        gate: 'model_approval',
+        payload_hash: 'hash-1',
+        payload: { artifact_id: 'plan-1', artifact_sha256: 'sha-1', version: 1 },
+        status: 'pending',
+      }],
+      total: 1,
+    })
+    modelingApiMock.getArtifact.mockResolvedValue({
+      artifact_id: 'plan-1',
+      content: {
+        problem_summary: 'Forecast sales',
+        candidates: [{ name: 'Linear baseline', assumptions: [], features: [], algorithm: 'linear', metrics: ['rmse'], risks: ['drift'] }],
+      },
+    })
+
+    render(<ModelingProjectsView />)
+
+    expect(await screen.findByText('Model plan approval')).toBeInTheDocument()
+    expect(screen.getByText('Linear baseline')).toBeInTheDocument()
   })
 })
