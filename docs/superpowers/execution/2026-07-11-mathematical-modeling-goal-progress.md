@@ -7,14 +7,14 @@
 ```yaml
 workflow: mathematical-modeling
 current_phase: 3
-phase_status: in_progress
-current_task: "Task 3: Execution Policy and Approval Ticket"
-task_status: in_progress
+phase_status: completed
+current_task: "Task 6: Reproducibility Checkpoint"
+task_status: verified
 baseline_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase3"
-last_verified_commit: 6f534ebb805457ed79110785e4a605c0131117bd
-last_verification: "Gate 2 reverified: Phase 2 checkpoint 1 passed; backend 170 passed/1 skipped/13 subtests; frontend 120 passed; production build passed"
-next_action: "Complete Phase 3 Task 3 execution-policy tests and implementation"
+last_verified_commit: c72749f
+last_verification: "Gate 3 passed: approved baseline/candidate deterministic checkpoint passed; backend 192 passed/1 skipped/13 subtests; frontend 25 files/122 tests; production build passed; final review found no P1/P2 blockers"
+next_action: "Stop after Phase 3 and wait for user review; do not start Phase 4"
 ```
 
 ## 启动前风险
@@ -30,8 +30,8 @@ next_action: "Complete Phase 3 Task 3 execution-policy tests and implementation"
 | --- | --- | --- | --- | --- |
 | 1 | completed | `2026-07-10-mathematical-modeling-phase1-foundation.md` | passed | Task 6 ledger commit |
 | 2 | completed | `2026-07-10-mathematical-modeling-phase2-intake-planning.md` | passed | `09000b4` + completion ledger commit |
-| 3 | in_progress | `2026-07-10-mathematical-modeling-phase3-experiments.md` | pending | — |
-| 4 | blocked_by_phase_3 | `2026-07-10-mathematical-modeling-phase4-paper.md` | pending | — |
+| 3 | completed | `2026-07-10-mathematical-modeling-phase3-experiments.md` | passed | `0a6e542` + `c72749f` + completion ledger commit |
+| 4 | not_started | `2026-07-10-mathematical-modeling-phase4-paper.md` | pending | — |
 | 5 | blocked_by_phase_4 | `2026-07-10-mathematical-modeling-phase5-delivery-git.md` | pending | — |
 | 6 | blocked_by_phase_5 | `2026-07-10-mathematical-modeling-phase6-hardening.md` | pending | — |
 
@@ -63,15 +63,51 @@ next_action: "Complete Phase 3 Task 3 execution-policy tests and implementation"
 
 ### Phase 3 / Task 3: Execution Policy and Approval Ticket
 
-- 状态：in_progress
+- 状态：verified
 - 预计文件：`backend/services/execution_policy.py`, `backend/services/project_environment_service.py`, `backend/tests/test_execution_policy.py`, `backend/tests/test_project_environment_service.py`
-- 实际文件：无
+- 实际文件：`backend/services/execution_policy.py`, `backend/services/project_environment_service.py`, `backend/tests/test_execution_policy.py`, `backend/tests/test_project_environment_service.py`
 - 失败测试：`DEBUG=false; PYTHONPATH=backend; python -m pytest backend/tests/test_execution_policy.py backend/tests/test_project_environment_service.py -q`，退出码 2；按预期因缺少策略和环境服务收集失败
 - 聚焦验证：同一命令退出码 0，4 passed
 - 相关回归：含审批、实验契约、存储与代码 Agent 的命令退出码 0，15 passed
-- 提交：pending
+- 提交：实现 `8613d87`；审查修复 `40dbbd8`；账本 `a9fe6f2`
 - 保留的用户改动：无
-- 备注：依赖安装批次必须显式标记 `network_allowed: true` 且经过批准；本 Task 不执行安装或联网。
+- 备注：依赖安装批次必须显式标记 `network_allowed: true` 且经过批准；本 Task 不执行安装或联网。独立审查新增相对路径穿越和非规范 pip 调用回归；策略解析所有路径到工作区内，且只允许规范依赖安装命令。
+
+### Phase 3 / Task 4: Restricted Runner and Immutable Experiment Output
+
+- 状态：verified
+- 预计文件：`backend/services/restricted_runner.py`, `backend/services/environment_capture.py`, `backend/services/experiment_service.py`, `backend/tests/test_restricted_runner.py`, `backend/tests/test_experiment_service.py`
+- 实际文件：`backend/services/restricted_runner.py`, `backend/services/environment_capture.py`, `backend/services/experiment_service.py`, `backend/services/modeling_store.py`, `backend/tests/test_restricted_runner.py`, `backend/tests/test_experiment_service.py`
+- 失败测试：`DEBUG=false; PYTHONPATH=backend; python -m pytest backend/tests/test_restricted_runner.py backend/tests/test_experiment_service.py -q`，退出码 2；按预期因缺少运行器与执行服务收集失败
+- 聚焦验证：同一命令退出码 0，3 passed
+- 相关回归：受限执行、策略、环境、实验契约、存储、成果和审批的组合命令退出码 0，20 passed
+- 提交：实现 `ffc7cc6`；审查修复 `3f182bd`
+- 保留的用户改动：无
+- 备注：运行器必须清除密钥、默认断网、限制输出和超时并终止进程树；执行服务只写入新实验目录并登记有效指标、日志、环境和声明成果。审查修复将当前代码、配置和输入哈希绑定到票据并执行前复核；原子领取 prepared 实验；保留多命令日志和退出码；成果登记失败回滚索引；默认断网拒绝解释器绕过并禁用 Python 进程创建入口。应用层隔离不声称提供系统级网络沙箱。
+
+### Phase 3 / Task 5: Experiment Gates, API, and UI
+
+- 状态：verified
+- 预计文件：`backend/services/modeling_gate_service.py`, `backend/api/modeling.py`, `backend/tests/test_experiment_api.py`, `frontend/src/services/api.ts`, `frontend/src/services/api.test.ts`, `frontend/src/components/ExperimentApprovalCard.tsx`, `frontend/src/components/ExperimentApprovalCard.test.tsx`, `frontend/src/components/ExperimentRunPanel.tsx`, `frontend/src/components/ExperimentRunPanel.test.tsx`, `frontend/src/views/ModelingProjectsView.tsx`
+- 实际文件：`backend/services/modeling_gate_service.py`, `backend/api/modeling.py`, `backend/services/modeling_code_agent_service.py`, `backend/tests/test_experiment_api.py`, `frontend/src/services/api.ts`, `frontend/src/components/ExperimentApprovalCard.tsx`, `frontend/src/components/ExperimentApprovalCard.test.tsx`, `frontend/src/components/ExperimentRunPanel.tsx`, `frontend/src/components/ExperimentRunPanel.test.tsx`, `frontend/src/views/ModelingProjectsView.tsx`
+- 失败测试：后端 `test_experiment_api.py` 初始退出码 1，缺少结果 Gate 和 execute 端点；审查回归退出码 1，发现 Python 路径票据不一致与两个 baseline Gate 绕过
+- 聚焦验证：后端初始 4 passed；审查修复后后端 9 passed；前端 `api` 与两个组件 11 passed，生产构建通过
+- 相关回归：Task 5 后端组合命令退出码 0，17 passed；保留 Pydantic/PyPDF2 deprecation warnings；前端构建保留既有 Vite chunk-size warning
+- 提交：实现 `6d0ad6b`；审查修复 `7e2183c`、`8346057`
+- 保留的用户改动：无
+- 备注：结果 Gate 需要已完成基线和候选模型、有效验证指标与登记图表或表格；API 将陈旧审批映射为 HTTP 409。审查修复将生成命令规范到项目 `.venv` Python、要求非 baseline 候选且 Pydantic 验证指标，并使审批卡显示输入哈希/依赖差异、运行面板 1500ms 轮询及图表成果 ID。前端验证使用已有本地依赖的临时目录连接，未下载包。
+
+### Phase 3 / Task 6: Reproducibility Checkpoint
+
+- 状态：verified
+- 预计文件：无源文件变更；如验证暴露缺陷则按 TDD 修复
+- 实际文件：`backend/services/modeling_code_agent_service.py`, `backend/tests/test_phase3_reproducibility_checkpoint.py`
+- 失败测试：首次检查点退出码 1，因 `config.json` 票据哈希使用紧凑 JSON 而落盘为缩进 JSON；执行前内容复核正确拒绝
+- 聚焦验证：修复后 `DEBUG=false; PYTHONPATH=backend; python -m pytest backend/tests/test_phase3_reproducibility_checkpoint.py -q`，退出码 0，1 passed
+- 相关回归：完整后端 `192 passed, 1 skipped, 13 subtests`；完整前端 `25 files, 122 tests`；生产构建成功，保留既有 Vite chunk-size warning
+- 提交：检查点与配置哈希修复 `0a6e542`
+- 保留的用户改动：未跟踪 `data/` 为 API 测试生成的运行时目录，绝不暂存或提交
+- 备注：创建并批准了基线、候选和同配置固定种子重跑；验证指标差异不超过 `1e-9`、原实验目录字节不变、图表已登记，篡改命令/票据后执行因审批不匹配被拒绝。未开始 Phase 4。
 
 ### Phase 2 / Task 6: Phase 2 Real-Data Checkpoint
 
