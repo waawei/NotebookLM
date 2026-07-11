@@ -43,14 +43,17 @@ class ModelingRoleService:
         source = self._validated_file(
             project, artifact, {".pdf", ".md", ".txt"}, "Problem input"
         )
-        task, run = self.run_service.start(
-            project_id,
-            "problem_parsing",
-            "modeling",
-            "modeling_problem_parser",
-            {"artifact_id": artifact_id},
-            ["problem/problem_spec.json"],
-        )
+        try:
+            task, run = self.run_service.start(
+                project_id,
+                "problem_parsing",
+                "modeling",
+                "modeling_problem_parser",
+                {"artifact_id": artifact_id},
+                ["problem/problem_spec.json"],
+            )
+        except Exception as error:
+            raise ValueError(self._safe_error(error)) from error
         output = Path(project["workspace_path"]) / "problem" / "problem_spec.json"
         previous_output = output.read_bytes() if output.exists() else None
         registered = None
@@ -122,14 +125,17 @@ class ModelingRoleService:
         profile_payload = json.loads(profile_path.read_text(encoding="utf-8"))
         if not isinstance(profile_payload, dict):
             raise ValueError("Data profile must be a JSON object")
-        task, run = self.run_service.start(
-            project_id,
-            "model_planning",
-            "modeling",
-            "modeling_planner",
-            {"profile_artifact_id": profile_artifact_id},
-            ["analysis/model_plan.json", "analysis/model_plan.md"],
-        )
+        try:
+            task, run = self.run_service.start(
+                project_id,
+                "model_planning",
+                "modeling",
+                "modeling_planner",
+                {"profile_artifact_id": profile_artifact_id},
+                ["analysis/model_plan.json", "analysis/model_plan.md"],
+            )
+        except Exception as error:
+            raise ValueError(self._safe_error(error)) from error
         root = Path(project["workspace_path"])
         json_path = root / "analysis" / "model_plan.json"
         markdown_path = root / "analysis" / "model_plan.md"

@@ -96,5 +96,11 @@ class ModelingAgentRunService:
             self.agent_store.update_agent_run_status(
                 run_id, "failed", error=safe_error
             )
-        finally:
-            self.modeling_store.update_task(task["task_id"], task["status"], retries)
+        except Exception:
+            try:
+                self.agent_store.update_agent_run_status(
+                    run_id, "failed", error=safe_error
+                )
+            except Exception:
+                pass
+        self.modeling_store.update_task(task["task_id"], task["status"], retries)

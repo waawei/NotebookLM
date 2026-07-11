@@ -259,6 +259,25 @@ def test_provider_failure_is_sanitized_in_exception_and_run_history(tmp_path):
     assert "RuntimeError" in str(raised.value)
 
 
+def test_run_start_failure_is_sanitized_at_role_boundary(tmp_path):
+    service, project, problem, _, _, _, _ = role_context(tmp_path, [])
+
+    class FailingRunService:
+        def start(self, *args, **kwargs):
+            raise RuntimeError(
+                "database C:\\private\\agents.db rejected sk-start-secret-123456"
+            )
+
+    service.run_service = FailingRunService()
+    with pytest.raises(ValueError) as raised:
+        asyncio.run(service.parse_problem(project["project_id"], problem["artifact_id"]))
+
+    message = str(raised.value)
+    assert message == "Modeling role failed (RuntimeError)"
+    assert "private" not in message
+    assert "sk-start" not in message
+
+
 def test_plan_approval_failure_rolls_back_outputs_and_artifacts(tmp_path):
     response = json.dumps(
         {

@@ -105,3 +105,43 @@ def test_failure_step_error_still_updates_run_and_task(tmp_path):
 
     assert store.get_task(task["task_id"])["status"] == "failed"
     assert delegate.get_agent_run(run["run_id"])["status"] == "failed"
+
+
+def test_failure_status_update_retries_without_leaking_store_error(tmp_path):
+    store = ModelingStore(str(tmp_path / "modeling.db"))
+    project = store.create_project("Forecast", "forecast", str(tmp_path / "workspace"), None)
+    delegate = DocumentMetadataStore(str(tmp_path / "agents.db"))
+
+    class FlakyStatusAgentStore:
+        def __init__(self):
+            self.status_calls = 0
+
+        def create_agent_run(self, *args, **kwargs):
+            return delegate.create_agent_run(*args, **kwargs)
+
+        def append_agent_step(self, *args, **kwargs):
+            return delegate.append_agent_step(*args, **kwargs)
+
+        def update_agent_run_status(self, *args, **kwargs):
+            self.status_calls += 1
+            if self.status_calls == 1:
+                raise RuntimeError("C:\\private\\agents.db unavailable")
+            return delegate.update_agent_run_status(*args, **kwargs)
+
+    agent_store = FlakyStatusAgentStore()
+    lifecycle = ModelingAgentRunService(store, agent_store)
+    task, run = lifecycle.start(
+        project["project_id"],
+        "problem_parsing",
+        "modeling",
+        "modeling_problem_parser",
+        {},
+        ["problem/problem_spec.json"],
+    )
+
+    lifecycle.fail(task, run["run_id"], "safe failure")
+
+    assert agent_store.status_calls == 2
+    assert store.get_task(task["task_id"])["status"] == "failed"
+    assert delegate.get_agent_run(run["run_id"])["status"] == "failed"
+    assert delegate.get_agent_run(run["run_id"])["error"] == "safe failure"
