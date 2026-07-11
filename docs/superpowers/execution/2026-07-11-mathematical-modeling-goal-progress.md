@@ -8,13 +8,13 @@
 workflow: mathematical-modeling
 current_phase: 4
 phase_status: in_progress
-current_task: "Task 1: Paper Contracts, Claims, and Placeholder Resolution"
+current_task: "Task 2: Paper Writer Agent and Versioned Drafts"
 task_status: verified
 baseline_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase4"
-last_verified_commit: ee6ed66
-last_verification: "Phase 4 Task 1: review-fix regression 12 passed"
-next_action: "Start Phase 4 Task 2"
+last_verified_commit: 313e66c
+last_verification: "Phase 4 Task 2: focused 5 passed; Task 1-2 regression 10 passed"
+next_action: "Review Task 2, then start Task 3"
 ```
 
 ## 启动前风险
@@ -31,7 +31,7 @@ next_action: "Start Phase 4 Task 2"
 | 1 | completed | `2026-07-10-mathematical-modeling-phase1-foundation.md` | passed | Task 6 ledger commit |
 | 2 | completed | `2026-07-10-mathematical-modeling-phase2-intake-planning.md` | passed | `09000b4` + completion ledger commit |
 | 3 | completed | `2026-07-10-mathematical-modeling-phase3-experiments.md` | passed | `0a6e542` + `c72749f` + completion ledger commit |
-| 4 | in_progress | `2026-07-10-mathematical-modeling-phase4-paper.md` | pending | Task 1 `34fea97` + `ee6ed66` |
+| 4 | in_progress | `2026-07-10-mathematical-modeling-phase4-paper.md` | pending | Task 1 `34fea97` + `ee6ed66`; Task 2 `313e66c` |
 | 5 | blocked_by_phase_4 | `2026-07-10-mathematical-modeling-phase5-delivery-git.md` | pending | — |
 | 6 | blocked_by_phase_5 | `2026-07-10-mathematical-modeling-phase6-hardening.md` | pending | — |
 
@@ -48,6 +48,18 @@ next_action: "Start Phase 4 Task 2"
 - 提交：实现 `34fea97`；独立审查修复 `ee6ed66`
 - 保留的用户改动：无；Phase 4 工作树从 `aecdd1b` 创建时干净
 - 备注：指标、图和表占位符均要求同项目已完成实验及已登记 artifact；解析前复核 metrics 文件 SHA-256，且 claim 集合在一个 SQLite 事务中替换。独立审查无遗留 P1/P2。
+
+### Phase 4 / Task 2: Paper Writer Agent and Versioned Drafts
+
+- 状态：verified
+- 预计文件：`backend/services/paper_agent_service.py`, `backend/skills/modeling_paper_writer/skill.json`, `backend/tests/test_paper_agent_service.py`
+- 实际文件：预计文件及 `backend/tests/test_skill_service.py`
+- 失败测试：`DEBUG=false; python -m pytest tests/test_paper_agent_service.py -q`，退出码 2；按预期缺少 writer service
+- 聚焦验证：`DEBUG=false; python -m pytest tests/test_paper_agent_service.py tests/test_skill_service.py -q`，退出码 0，5 passed
+- 相关回归：`DEBUG=false; python -m pytest tests/test_paper_agent_service.py tests/test_paper_placeholder_service.py tests/test_paper_claim_service.py tests/test_skill_service.py -q`，退出码 0，10 passed
+- 提交：`313e66c`
+- 保留的用户改动：无
+- 备注：编辑态 Markdown/LaTeX 保留 placeholder；带结果名的字面指标数值会被拒绝。
 
 ### Phase 3 / Task 1: Experiment Contracts and Records
 
