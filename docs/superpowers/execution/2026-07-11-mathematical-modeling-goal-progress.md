@@ -8,13 +8,13 @@
 workflow: mathematical-modeling
 current_phase: 5
 phase_status: in_progress
-current_task: "Task 3: Git Policy Scan and Reviewable Diff"
+current_task: "Task 4: Approval-Gated Explicit Git Commit"
 task_status: verified
 baseline_commit: 1a6a55a7c95cfd26a6568dbfda66d19f3a688c49
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase5"
-last_verified_commit: d7099da882222587d30143cca658a0e98e13500d
-last_verification: "Phase 4 Gate regression 9 passed; Phase 5 Task 1 3 passed; Task 2 2 passed; Task 3 2 passed/1 skipped"
-next_action: "Start Phase 5 Task 4; do not start Phase 6"
+last_verified_commit: b3906df0e34bd726cf3719c3e95be20807b28c70
+last_verification: "Phase 4 Gate regression 9 passed; Phase 5 Task 1 3 passed; Task 2 review regression 7 passed/1 skipped; Task 3 2 passed/1 skipped; Task 4 5 passed"
+next_action: "Start Phase 5 Task 5; do not start Phase 6"
 ```
 
 ## 启动前风险
@@ -32,7 +32,7 @@ next_action: "Start Phase 5 Task 4; do not start Phase 6"
 | 2 | completed | `2026-07-10-mathematical-modeling-phase2-intake-planning.md` | passed | `09000b4` + completion ledger commit |
 | 3 | completed | `2026-07-10-mathematical-modeling-phase3-experiments.md` | passed | `0a6e542` + `c72749f` + completion ledger commit |
 | 4 | completed | `2026-07-10-mathematical-modeling-phase4-paper.md` | passed | Task 1 `34fea97` + `ee6ed66`; Task 2 `313e66c` + `b0c167b`; Task 3 `9d2e4cd` + `fc0205e`; Task 4 `4648b01` + `f38bbd2`; Task 5 `a645dda`; Task 6 `54f3fc8` + `8363a3e` |
-| 5 | in_progress | `2026-07-10-mathematical-modeling-phase5-delivery-git.md` | pending | Task 1 `eab060d` |
+| 5 | in_progress | `2026-07-10-mathematical-modeling-phase5-delivery-git.md` | pending | Tasks 1–4 completed |
 | 6 | blocked_by_phase_5 | `2026-07-10-mathematical-modeling-phase6-hardening.md` | pending | — |
 
 ## 当前阶段 Task 记录
@@ -67,6 +67,24 @@ next_action: "Start Phase 5 Task 4; do not start Phase 6"
 - 提交：`d7099da882222587d30143cca658a0e98e13500d`
 - 保留的用户改动：无
 - 备注：只接受显式项目相对路径，拒绝 secret、`.env`、虚拟环境、缓存、build 临时目录、超过 20 MiB 文件和外部 symlink；untracked text 使用统一 diff，二进制仅显示名称与 SHA-256，总输出最多 2 MiB。
+
+### Phase 5 / Task 4: Approval-Gated Explicit Git Commit
+
+- 状态：verified
+- 实际文件：`backend/services/git_commit_service.py`, `backend/services/modeling_store.py`, `backend/services/modeling_gate_service.py`, `backend/tests/test_git_commit_service.py`, `backend/tests/test_commit_gate.py`
+- 失败测试：commit service 初始聚焦测试退出码 2；Gate tests 初始 2 failed，因 packaging/committing 未执行交付与提交检查
+- 聚焦验证：`DEBUG=false; PYTHONPATH=backend; python -m pytest backend/tests/test_git_commit_service.py backend/tests/test_commit_gate.py -q`，退出码 0，5 passed
+- 提交：`b3906df0e34bd726cf3719c3e95be20807b28c70`
+- 保留的用户改动：无
+- 备注：审批 payload 绑定排序路径、每文件 hash、diff hash、manifest hash 和 subject；提交仅以参数数组调用 `git add --`、`git commit -m` 与 `git rev-parse HEAD`，从不调用 remote。提交前重建 payload，因此修改路径、内容或信息会失效。
+
+### Phase 5 / Task 2 Review Fixes
+
+- 状态：verified
+- 独立审查发现：真实 `data_manifest.json` 的 `{files: [...]}` envelope 未解析、manifest 缺少 data manifest/实验四类证据、归档跟随外部 symlink 或敏感路径、重复构建使历史 delivery artifact hash 误报。
+- 红灯：`test_delivery_service.py` 2 failed，重现缺失 raw-data entry 与审计证据。
+- 绿灯：`test_delivery_service.py test_modeling_output_link.py test_reproducibility_service.py` 退出码 0，7 passed、1 skipped（symlink host 限制）。
+- 提交：`6e311ce7ff67dcd216567e5b0720dfd49993e2cc`
 
 ### Phase 4 / Task 1: Paper Contracts, Claims, and Placeholder Resolution
 
