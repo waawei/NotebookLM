@@ -8,13 +8,13 @@
 workflow: mathematical-modeling
 current_phase: 3
 phase_status: in_progress
-current_task: "Task 1: Experiment Contracts and Records"
+current_task: "Task 3: Execution Policy and Approval Ticket"
 task_status: in_progress
 baseline_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase3"
 last_verified_commit: 6f534ebb805457ed79110785e4a605c0131117bd
 last_verification: "Gate 2 reverified: Phase 2 checkpoint 1 passed; backend 170 passed/1 skipped/13 subtests; frontend 120 passed; production build passed"
-next_action: "Complete Phase 3 Task 1 with contract and immutable experiment-record tests"
+next_action: "Complete Phase 3 Task 3 execution-policy tests and implementation"
 ```
 
 ## 启动前风险
@@ -48,6 +48,30 @@ next_action: "Complete Phase 3 Task 1 with contract and immutable experiment-rec
 - 提交：实现 `5b5d6db`；审查修复 `5f69d1c`
 - 保留的用户改动：无；Phase 3 工作树从 `6f534eb` 创建时干净
 - 备注：Gate 2 以 Phase 2 完成工作树的新鲜检查点、后端、前端和构建证据复核；未开始 Phase 4。独立审查发现状态更新会清除未提供的运行字段，且存储层能绕过实验契约；新增先红后绿回归，状态更新仅修改明确字段，存储层验证实验 ID、配置与执行票据哈希。
+
+### Phase 3 / Task 2: Code Generation Contract and Project Template
+
+- 状态：verified
+- 预计文件：`backend/requirements.txt`, `backend/services/modeling_code_agent_service.py`, `backend/skills/modeling_programmer/skill.json`, `backend/tests/test_modeling_code_agent_service.py`, `backend/tests/test_skill_service.py`
+- 实际文件：`backend/requirements.txt`, `backend/services/modeling_code_agent_service.py`, `backend/skills/modeling_programmer/skill.json`, `backend/tests/test_modeling_code_agent_service.py`, `backend/tests/test_skill_service.py`
+- 失败测试：`DEBUG=false; PYTHONPATH=backend; python -m pytest backend/tests/test_modeling_code_agent_service.py -q`，退出码 2；按预期因缺少 `services.modeling_code_agent_service` 收集失败
+- 聚焦验证：`DEBUG=false; PYTHONPATH=backend; python -m pytest backend/tests/test_modeling_code_agent_service.py backend/tests/test_skill_service.py -q`，退出码 0，5 passed
+- 相关回归：含建模角色、生命周期、成果、审批与实验契约的命令退出码 0，30 passed
+- 提交：实现 `027f289`；审查修复 `7bc5289`
+- 保留的用户改动：无
+- 备注：依赖均以精确版本写入 `requirements.txt`；根据权限规则，未运行 `pip install` 或联网下载。代码 Agent 只接收模型审批当前哈希、限定源路径和相对参数数组，生成确定性配置、复现文件、源哈希和未批准执行票据。独立审查新增输入内容复核、配置纳入源哈希和完整 pipeline 输出要求；相应红绿回归已通过。
+
+### Phase 3 / Task 3: Execution Policy and Approval Ticket
+
+- 状态：in_progress
+- 预计文件：`backend/services/execution_policy.py`, `backend/services/project_environment_service.py`, `backend/tests/test_execution_policy.py`, `backend/tests/test_project_environment_service.py`
+- 实际文件：无
+- 失败测试：`DEBUG=false; PYTHONPATH=backend; python -m pytest backend/tests/test_execution_policy.py backend/tests/test_project_environment_service.py -q`，退出码 2；按预期因缺少策略和环境服务收集失败
+- 聚焦验证：同一命令退出码 0，4 passed
+- 相关回归：含审批、实验契约、存储与代码 Agent 的命令退出码 0，15 passed
+- 提交：pending
+- 保留的用户改动：无
+- 备注：依赖安装批次必须显式标记 `network_allowed: true` 且经过批准；本 Task 不执行安装或联网。
 
 ### Phase 2 / Task 6: Phase 2 Real-Data Checkpoint
 
