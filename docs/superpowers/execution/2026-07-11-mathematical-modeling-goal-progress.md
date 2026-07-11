@@ -6,15 +6,15 @@
 
 ```yaml
 workflow: mathematical-modeling
-current_phase: 3
-phase_status: completed
-current_task: "Task 6: Reproducibility Checkpoint"
+current_phase: 4
+phase_status: in_progress
+current_task: "Task 1: Paper Contracts, Claims, and Placeholder Resolution"
 task_status: verified
 baseline_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
-worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase3"
-last_verified_commit: c72749f
-last_verification: "Gate 3 passed: approved baseline/candidate deterministic checkpoint passed; backend 192 passed/1 skipped/13 subtests; frontend 25 files/122 tests; production build passed; final review found no P1/P2 blockers"
-next_action: "Stop after Phase 3 and wait for user review; do not start Phase 4"
+worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase4"
+last_verified_commit: 34fea97
+last_verification: "Phase 4 Task 1: focused 3 passed; related regression 10 passed"
+next_action: "Review Task 1, then start Task 2"
 ```
 
 ## 启动前风险
@@ -31,11 +31,23 @@ next_action: "Stop after Phase 3 and wait for user review; do not start Phase 4"
 | 1 | completed | `2026-07-10-mathematical-modeling-phase1-foundation.md` | passed | Task 6 ledger commit |
 | 2 | completed | `2026-07-10-mathematical-modeling-phase2-intake-planning.md` | passed | `09000b4` + completion ledger commit |
 | 3 | completed | `2026-07-10-mathematical-modeling-phase3-experiments.md` | passed | `0a6e542` + `c72749f` + completion ledger commit |
-| 4 | not_started | `2026-07-10-mathematical-modeling-phase4-paper.md` | pending | — |
+| 4 | in_progress | `2026-07-10-mathematical-modeling-phase4-paper.md` | pending | Task 1 `34fea97` |
 | 5 | blocked_by_phase_4 | `2026-07-10-mathematical-modeling-phase5-delivery-git.md` | pending | — |
 | 6 | blocked_by_phase_5 | `2026-07-10-mathematical-modeling-phase6-hardening.md` | pending | — |
 
 ## 当前阶段 Task 记录
+
+### Phase 4 / Task 1: Paper Contracts, Claims, and Placeholder Resolution
+
+- 状态：verified
+- 预计文件：`backend/services/paper_contracts.py`, `backend/services/paper_claim_service.py`, `backend/services/paper_placeholder_service.py`, `backend/services/modeling_store.py`, `backend/tests/test_paper_placeholder_service.py`, `backend/tests/test_paper_claim_service.py`
+- 实际文件：与预计文件一致
+- 失败测试：`DEBUG=false; python -m pytest tests/test_paper_placeholder_service.py tests/test_paper_claim_service.py -q`，退出码 2；按预期缺少 paper services
+- 聚焦验证：同一命令退出码 0，3 passed
+- 相关回归：`DEBUG=false; python -m pytest tests/test_paper_placeholder_service.py tests/test_paper_claim_service.py tests/test_modeling_store.py tests/test_artifact_service.py tests/test_experiment_store.py -q`，退出码 0，10 passed
+- 提交：`34fea97`
+- 保留的用户改动：无；Phase 4 工作树从 `aecdd1b` 创建时干净
+- 备注：指标、图和表占位符均要求同项目已完成实验及已登记 artifact；claim 集合在一个 SQLite 事务中替换。
 
 ### Phase 3 / Task 1: Experiment Contracts and Records
 
