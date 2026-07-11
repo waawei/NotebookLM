@@ -30,7 +30,7 @@ class ReviewAgentService:
             latex_text = ""
         else:
             issues = self._deterministic(project, markdown, markdown_text, latex_text)
-        prompt = "Return only JSON with issues.\n" + json.dumps({"markdown": markdown_text, "latex": latex_text})
+        prompt = "STAGE:reviewer\nReturn only JSON with issues.\n" + json.dumps({"markdown": markdown_text, "latex": latex_text})
         try:
             raw = json.loads(await self.llm.generate(prompt))
             issues.extend(ReviewIssue.model_validate(item).model_dump() for item in raw.get("issues", []))

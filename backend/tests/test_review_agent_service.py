@@ -6,6 +6,7 @@ from services.artifact_service import ArtifactService
 from services.modeling_store import ModelingStore
 from services.paper_claim_service import PaperClaimService
 from services.review_agent_service import ReviewAgentService
+from fakes.fake_modeling_llm import FakeModelingLLM
 
 
 def test_review_blocks_unresolved_placeholders(tmp_path):
@@ -106,3 +107,20 @@ def test_review_reports_blocking_issue_when_paper_artifact_changes(tmp_path):
 
     assert result["status"] == "failed"
     assert "paper_artifact_hash_mismatch" in {item["code"] for item in result["issues"]}
+
+
+def test_review_uses_stage_keyed_fixture_fake(tmp_path):
+    workspace = tmp_path / "workspace"
+    paper = workspace / "paper"
+    paper.mkdir(parents=True)
+    (paper / "draft.md").write_text("# Subproblem 1\nFixture paper", encoding="utf-8")
+    (paper / "main.tex").write_text("\\begin{document}Fixture paper\\end{document}", encoding="utf-8")
+    store = ModelingStore(str(tmp_path / "modeling.db"))
+    project = store.create_project("Forecast", "forecast", str(workspace), None)
+    artifacts = ArtifactService(store)
+    artifacts.register(project["project_id"], "paper_markdown", "paper/draft.md")
+    artifacts.register(project["project_id"], "paper_latex", "paper/main.tex")
+
+    result = asyncio.run(ReviewAgentService(store, artifacts, FakeModelingLLM()).review(project["project_id"]))
+
+    assert result["status"] == "passed"

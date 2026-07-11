@@ -19,6 +19,19 @@ def test_competition_fixture_has_exact_contract_and_24_rows():
     contract = json.loads((ROOT / "expected_contracts.json").read_text(encoding="utf-8"))
 
     assert len(rows) == 24
+    assert rows == [
+        {"price": price, "promotion": promotion, "weekday": weekday, "sales": sales}
+        for price, promotion, weekday, sales in [
+            ("10", "0", "1", "105"), ("11", "0", "2", "101"), ("12", "0", "3", "98"),
+            ("13", "0", "4", "94"), ("14", "0", "5", "91"), ("15", "0", "6", "88"),
+            ("16", "0", "7", "86"), ("10", "1", "1", "124"), ("11", "1", "2", "121"),
+            ("12", "1", "3", "118"), ("13", "1", "4", "115"), ("14", "1", "5", "112"),
+            ("15", "1", "6", "109"), ("16", "1", "7", "106"), ("9", "0", "1", "108"),
+            ("9", "1", "2", "129"), ("17", "0", "3", "82"), ("17", "1", "4", "102"),
+            ("12", "0", "5", "96"), ("12", "1", "6", "116"), ("14", "0", "7", "89"),
+            ("14", "1", "1", "114"), ("11", "0", "4", "100"), ("15", "1", "5", "110"),
+        ]
+    ]
     assert contract == {
         "target": "sales", "features": ["price", "promotion", "weekday"],
         "seed": 42, "candidates": ["mean_baseline", "linear_regression"],
