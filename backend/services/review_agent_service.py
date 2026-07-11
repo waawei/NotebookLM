@@ -83,7 +83,11 @@ class ReviewAgentService:
         latex = self._latest(artifacts, "paper_latex")
         root = Path(project["workspace_path"]).resolve()
         digest = hashlib.sha256()
-        for artifact in (markdown, latex):
+        bibliography = [item for item in artifacts if item["artifact_type"] == "paper_bibliography"]
+        sources = [markdown, latex]
+        if bibliography:
+            sources.append(max(bibliography, key=lambda item: (item["created_at"], item["artifact_id"])))
+        for artifact in sources:
             path = (root / artifact["relative_path"]).resolve()
             if path == root or root not in path.parents or not path.is_file():
                 raise ValueError("Paper artifact is unavailable")

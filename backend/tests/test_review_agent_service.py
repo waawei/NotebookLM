@@ -63,3 +63,24 @@ def test_review_accepts_resolved_claims_and_invalidates_changed_paper(tmp_path):
 
     assert passed["status"] == "passed"
     assert reviewer.current_paper_hash(project["project_id"]) != passed["paper_hash"]
+
+
+def test_review_hash_changes_when_registered_bibliography_changes(tmp_path):
+    workspace = tmp_path / "workspace"
+    paper = workspace / "paper"
+    paper.mkdir(parents=True)
+    (paper / "draft.md").write_text("# Subproblem 1", encoding="utf-8")
+    (paper / "main.tex").write_text("\\begin{document}OK\\end{document}", encoding="utf-8")
+    bibliography = paper / "references.bib"
+    bibliography.write_text("@article{one, title={One}}", encoding="utf-8")
+    store = ModelingStore(str(tmp_path / "modeling.db"))
+    project = store.create_project("Forecast", "forecast", str(workspace), None)
+    artifacts = ArtifactService(store)
+    artifacts.register(project["project_id"], "paper_markdown", "paper/draft.md")
+    artifacts.register(project["project_id"], "paper_latex", "paper/main.tex")
+    artifacts.register(project["project_id"], "paper_bibliography", "paper/references.bib")
+    reviewer = ReviewAgentService(store, artifacts, type("LLM", (), {})())
+    initial = reviewer.current_paper_hash(project["project_id"])
+    bibliography.write_text("@article{two, title={Two}}", encoding="utf-8")
+
+    assert reviewer.current_paper_hash(project["project_id"]) != initial
