@@ -21,7 +21,13 @@ class GitPolicyService:
         root = self._root(project)
         normalized, issues = self.validate_paths(root, paths)
         if issues:
-            return {"ok": False, "paths": normalized, "issues": issues, "diff": ""}
+            return {
+                "ok": False,
+                "paths": normalized,
+                "issues": issues,
+                "diff": "",
+                "diff_hash": hashlib.sha256(b"").hexdigest(),
+            }
         diff_parts = []
         for relative in normalized:
             path = resolve_git_path(root, relative)
@@ -32,7 +38,13 @@ class GitPolicyService:
         diff = "".join(diff_parts)
         if len(diff.encode("utf-8")) > MAX_REVIEW_BYTES:
             diff = diff.encode("utf-8")[:MAX_REVIEW_BYTES].decode("utf-8", errors="ignore") + "\n[diff truncated]\n"
-        return {"ok": True, "paths": normalized, "issues": [], "diff": diff}
+        return {
+            "ok": True,
+            "paths": normalized,
+            "issues": [],
+            "diff": diff,
+            "diff_hash": hashlib.sha256(diff.encode("utf-8")).hexdigest(),
+        }
 
     def validate_paths(self, root: Path, paths: list[str]) -> tuple[list[str], list[dict]]:
         normalized = sorted({PurePosixPath(path.replace("\\", "/")).as_posix() for path in paths})

@@ -83,6 +83,7 @@ export default function ModelingProjectsView() {
     && selectedProject.state !== 'completed',
   )
   const canRollback = Boolean(selectedProject && MODELING_ROLLBACK_STATES.has(selectedProject.state))
+  const workspaceReady = Boolean(runtimeStatus?.workspace.configured && runtimeStatus?.workspace.writable)
 
   const loadProjects = async () => {
     setLoading(true)
@@ -140,7 +141,7 @@ export default function ModelingProjectsView() {
       setArtifacts(artifactData.artifacts.map((item) => contentById.has(item.artifact_id) ? { ...item, content: contentById.get(item.artifact_id) } : item))
       setApprovals(approvalData.approvals)
       setExperiments(experimentData.experiments)
-      if (selectedProject?.state === 'commit_approval_pending' && typeof modelingApi.reviewGit === 'function') {
+      if (selectedProject?.state === 'commit_approval_pending' && runtimeStatus?.git.available && typeof modelingApi.reviewGit === 'function') {
         const status = await modelingApi.gitStatus(projectId)
         const candidates = status.paths
         if (candidates.length) setGitReview(await modelingApi.reviewGit(projectId, candidates))
@@ -170,6 +171,13 @@ export default function ModelingProjectsView() {
     }
   }
 
+  const refreshProject = async (projectId: string) => {
+    const project = await modelingApi.get(projectId)
+    setProjects((current) => replaceProject(current, project))
+    setSelectedModelingProjectId(project.project_id)
+    await loadEvidence(projectId)
+  }
+
   useEffect(() => {
     if (selectedProject) void loadEvidence(selectedProject.project_id)
     else {
@@ -179,7 +187,7 @@ export default function ModelingProjectsView() {
       setExperiments([])
       setEvidenceProjectId(null)
     }
-  }, [selectedProject?.project_id, selectedProject?.state])
+  }, [selectedProject?.project_id, selectedProject?.state, runtimeStatus?.git.available])
 
   const createProject = async (event: FormEvent) => {
     event.preventDefault()
@@ -260,7 +268,7 @@ export default function ModelingProjectsView() {
     setError('')
     try {
       await modelingApi.prepareExperiment(selectedProject.project_id, experiments.length)
-      await loadEvidence(selectedProject.project_id)
+      await refreshProject(selectedProject.project_id)
     } catch { setError('Unable to prepare the approved experiment.') } finally { setStageBusy(false) }
   }
 
@@ -270,7 +278,7 @@ export default function ModelingProjectsView() {
     setError('')
     try {
       await modelingApi.requestExecution(selectedProject.project_id, experimentId)
-      await loadEvidence(selectedProject.project_id)
+      await refreshProject(selectedProject.project_id)
     } catch { setError('Unable to request experiment execution approval.') } finally { setStageBusy(false) }
   }
 
@@ -280,7 +288,7 @@ export default function ModelingProjectsView() {
     setError('')
     try {
       await modelingApi.executeExperiment(selectedProject.project_id, experimentId)
-      await loadEvidence(selectedProject.project_id)
+      await refreshProject(selectedProject.project_id)
     } catch { setError('Unable to execute the approved experiment.') } finally { setStageBusy(false) }
   }
 
@@ -300,7 +308,7 @@ export default function ModelingProjectsView() {
           <form onSubmit={createProject} className="flex gap-2">
             <label className="sr-only" htmlFor="project-name">Project name</label>
             <input id="project-name" aria-label="Project name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Project name" className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100" />
-            <button disabled={!name.trim() || submitting} className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300 dark:disabled:bg-gray-700">
+            <button disabled={!name.trim() || submitting || runtimeStatus !== null && !workspaceReady} className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300 dark:disabled:bg-gray-700">
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create project'}
             </button>
           </form>
@@ -319,26 +327,26 @@ export default function ModelingProjectsView() {
       </aside>
       <main className="min-w-0 overflow-y-auto p-6">
         {error && <div role="alert" className="mx-auto mb-4 flex max-w-4xl items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200"><AlertCircle className="h-4 w-4 shrink-0" />{error}</div>}
+        {runtimeStatus && <div className="mx-auto mb-4 max-w-4xl"><ModelingRuntimeStatusPanel status={runtimeStatus} /></div>}
         {selectedProject ? (
           <article className="mx-auto max-w-4xl rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
             <div className="border-b border-gray-100 pb-4 dark:border-gray-800"><h1 className="text-xl font-semibold text-gray-950 dark:text-gray-100">{selectedProject.name}</h1><p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Current state: <span className="font-medium">{selectedProject.state}</span></p>{selectedProject.deadline && <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Deadline: {selectedProject.deadline}</p>}</div>
             <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-medium text-gray-500">Project slug</dt><dd className="mt-1 text-gray-900 dark:text-gray-100">{selectedProject.slug}</dd></div><div><dt className="text-xs font-medium text-gray-500">Workspace</dt><dd className="mt-1 break-all text-gray-900 dark:text-gray-100">{selectedProject.workspace_path}</dd></div></dl>
             <div className="mt-5 space-y-4">
-              {runtimeStatus && <ModelingRuntimeStatusPanel status={runtimeStatus} />}
               {recoveries.filter((recovery) => recovery.project_id === selectedProject.project_id).map((recovery) => <ModelingRecoveryBanner key={recovery.recovery_id} recovery={recovery} onDismissed={(recoveryId) => setRecoveries((current) => current.filter((item) => item.recovery_id !== recoveryId))} />)}
-              {selectedProject.state === 'project_initialized' && <ModelingInputPanel projectId={selectedProject.project_id} onChanged={() => loadEvidence(selectedProject.project_id)} />}
-              {selectedProject.state === 'problem_parsing' && <button type="button" disabled={stageBusy} onClick={() => void runStageAction()} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Parse problem</button>}
-              {selectedProject.state === 'data_profiling' && <button type="button" disabled={stageBusy || !artifacts.some((item) => item.artifact_type === 'data_input')} onClick={() => void runStageAction()} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Profile data</button>}
-              {selectedProject.state === 'model_planning' && <button type="button" disabled={stageBusy} onClick={() => void runStageAction()} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Create model plan</button>}
-              {selectedProject.state === 'model_approval_pending' && pendingModelApproval && modelPlan && <ModelPlanApprovalCard key={pendingModelApproval.approval_id} projectId={selectedProject.project_id} approval={pendingModelApproval} plan={modelPlan} onDecided={() => loadEvidence(selectedProject.project_id)} />}
-              {selectedProject.state === 'experiment_implementation' && <button type="button" disabled={stageBusy || !runtimeStatus?.workspace.writable || !runtimeStatus?.python.available} onClick={() => void prepareExperiment()} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Prepare experiment</button>}
+              {selectedProject.state === 'project_initialized' && <ModelingInputPanel projectId={selectedProject.project_id} disabled={!workspaceReady} onChanged={() => loadEvidence(selectedProject.project_id)} />}
+              {selectedProject.state === 'problem_parsing' && <button type="button" disabled={stageBusy || !workspaceReady} onClick={() => void runStageAction()} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Parse problem</button>}
+              {selectedProject.state === 'data_profiling' && <button type="button" disabled={stageBusy || !workspaceReady || !artifacts.some((item) => item.artifact_type === 'data_input')} onClick={() => void runStageAction()} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Profile data</button>}
+              {selectedProject.state === 'model_planning' && <button type="button" disabled={stageBusy || !workspaceReady} onClick={() => void runStageAction()} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Create model plan</button>}
+              {selectedProject.state === 'model_approval_pending' && pendingModelApproval && modelPlan && <ModelPlanApprovalCard key={pendingModelApproval.approval_id} projectId={selectedProject.project_id} approval={pendingModelApproval} plan={modelPlan} onDecided={() => refreshProject(selectedProject.project_id)} />}
+              {selectedProject.state === 'experiment_implementation' && <button type="button" disabled={stageBusy || !workspaceReady || !runtimeStatus?.python.available} onClick={() => void prepareExperiment()} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Prepare experiment</button>}
               {selectedProject.state === 'execution_approval_pending' && experiments.filter((item) => item.status === 'prepared').map((item) => <button key={item.experiment_id} type="button" disabled={stageBusy} onClick={() => void requestExecution(item.experiment_id)} className="mr-2 rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Request execution approval: {item.experiment_id}</button>)}
-              {selectedProject.state === 'execution_approval_pending' && pendingExecutionApproval && approvalExperiment?.execution_batch && <ExperimentApprovalCard projectId={selectedProject.project_id} approval={pendingExecutionApproval} batch={approvalExperiment.execution_batch as ExecutionBatch} onDecided={() => loadEvidence(selectedProject.project_id)} />}
-              {experiments.length > 0 && <ExperimentRunPanel projectId={selectedProject.project_id} experiments={experiments} canExecute={Boolean(runtimeStatus?.workspace.writable && runtimeStatus?.python.available)} onChanged={() => void loadEvidence(selectedProject.project_id)} onExecute={(experimentId) => void executeExperiment(experimentId)} />}
-              {['paper_drafting', 'consistency_review', 'final_approval_pending'].includes(selectedProject.state) && (!paperMarkdown || !paperLatex) && <button type="button" disabled={stageBusy} onClick={async () => { setStageBusy(true); try { await modelingApi.createPaperDraft(selectedProject.project_id); await loadEvidence(selectedProject.project_id) } catch { setError('Unable to generate the paper draft.') } finally { setStageBusy(false) } }} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Generate paper draft</button>}
-              {paperMarkdown && paperLatex && <PaperWorkspace projectId={selectedProject.project_id} markdown={String(paperMarkdown.content || '')} latex={String(paperLatex.content || '')} approval={selectedProject.state === 'final_approval_pending' ? pendingFinalApproval : undefined} canCompile={runtimeStatus?.xelatex.available ?? false} onChanged={() => loadEvidence(selectedProject.project_id)} />}
-              {selectedProject.state === 'packaging' && <DeliveryChecklist projectId={selectedProject.project_id} onChanged={() => loadEvidence(selectedProject.project_id)} />}
-              {selectedProject.state === 'commit_approval_pending' && gitReview && <GitCommitApprovalCard projectId={selectedProject.project_id} review={gitReview} approval={latestCommitApproval} canCommit={runtimeStatus?.git.available ?? false} onChanged={() => loadEvidence(selectedProject.project_id)} />}
+              {selectedProject.state === 'execution_approval_pending' && pendingExecutionApproval && approvalExperiment?.execution_batch && <ExperimentApprovalCard projectId={selectedProject.project_id} approval={pendingExecutionApproval} batch={approvalExperiment.execution_batch as ExecutionBatch} onDecided={() => refreshProject(selectedProject.project_id)} />}
+              {experiments.length > 0 && <ExperimentRunPanel projectId={selectedProject.project_id} experiments={experiments} canExecute={Boolean(runtimeStatus?.workspace.writable && runtimeStatus?.python.available)} onChanged={() => void refreshProject(selectedProject.project_id)} onExecute={(experimentId) => void executeExperiment(experimentId)} />}
+              {['paper_drafting', 'consistency_review', 'final_approval_pending'].includes(selectedProject.state) && (!paperMarkdown || !paperLatex) && <button type="button" disabled={stageBusy || !workspaceReady} onClick={async () => { setStageBusy(true); try { await modelingApi.createPaperDraft(selectedProject.project_id); await refreshProject(selectedProject.project_id) } catch { setError('Unable to generate the paper draft.') } finally { setStageBusy(false) } }} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Generate paper draft</button>}
+              {paperMarkdown && paperLatex && <PaperWorkspace projectId={selectedProject.project_id} markdown={String(paperMarkdown.content || '')} latex={String(paperLatex.content || '')} approval={selectedProject.state === 'final_approval_pending' ? pendingFinalApproval : undefined} canWrite={workspaceReady} canCompile={workspaceReady && (runtimeStatus?.xelatex.available ?? false)} onChanged={() => refreshProject(selectedProject.project_id)} />}
+              {selectedProject.state === 'packaging' && <DeliveryChecklist projectId={selectedProject.project_id} canBuild={workspaceReady} onChanged={() => refreshProject(selectedProject.project_id)} />}
+              {selectedProject.state === 'commit_approval_pending' && gitReview && <GitCommitApprovalCard projectId={selectedProject.project_id} review={gitReview} approval={latestCommitApproval} canCommit={runtimeStatus?.git.available ?? false} onChanged={() => refreshProject(selectedProject.project_id)} />}
               {artifacts.length > 0 && <section aria-label="Modeling artifacts" className="rounded border border-gray-200 p-3 dark:border-gray-800"><h2 className="text-sm font-semibold">Artifacts</h2><ul className="mt-2 space-y-1 text-xs text-gray-600 dark:text-gray-300">{artifacts.map((artifact) => <li key={artifact.artifact_id}>{artifact.artifact_type}: {artifact.relative_path}</li>)}</ul></section>}
             </div>
             <div className="mt-6 flex flex-wrap items-end gap-3 border-t border-gray-100 pt-5 dark:border-gray-800">

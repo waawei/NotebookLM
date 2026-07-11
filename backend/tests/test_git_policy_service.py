@@ -1,3 +1,4 @@
+import hashlib
 from pathlib import Path
 
 import pytest
@@ -41,6 +42,7 @@ def test_policy_returns_reviewable_diff_for_untracked_text(tmp_path):
     assert review["ok"] is True
     assert review["paths"] == ["README.md"]
     assert "+# Solution" in review["diff"]
+    assert review["diff_hash"] == hashlib.sha256(review["diff"].encode("utf-8")).hexdigest()
 
 
 def _git_project(tmp_path: Path) -> Path:

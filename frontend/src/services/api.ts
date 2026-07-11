@@ -287,6 +287,7 @@ export interface ApprovalRequest {
     version?: number
     paths?: string[]
     diff_hash?: string
+    file_hashes?: Record<string, string>
     manifest_hash?: string
     commit_message?: string
   }
@@ -360,7 +361,7 @@ export interface PaperReview {
   issues: PaperReviewIssue[]
 }
 
-export interface GitReview { ok: boolean; paths: string[]; diff: string; issues: Array<{ path?: string; code: string; message: string }> }
+export interface GitReview { ok: boolean; paths: string[]; diff: string; diff_hash: string; file_hashes?: Record<string, string>; manifest_hash?: string; issues: Array<{ path?: string; code: string; message: string }> }
 
 export interface ModelingRuntimeStatus {
   workspace: { configured: boolean; writable: boolean }
