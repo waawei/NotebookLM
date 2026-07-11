@@ -506,9 +506,9 @@ async def list_deliverables(project_id: str):
 
 @router.post("/projects/{project_id}/git/review")
 async def review_git(project_id: str, request: GitReviewRequest):
-    project = _require_project(project_id)
+    _require_project(project_id)
     try:
-        return git_policy_service.review(project, request.paths)
+        return git_commit_service.review(project_id, request.paths)
     except ValueError as error:
         status = 400 if "path" in str(error).lower() or "repository" in str(error).lower() else 409
         raise HTTPException(status_code=status, detail=str(error)) from error

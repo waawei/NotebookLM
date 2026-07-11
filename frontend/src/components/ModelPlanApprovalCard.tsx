@@ -6,10 +6,11 @@ interface ModelPlanApprovalCardProps {
   projectId: string
   approval: ApprovalRequest
   plan: ModelPlan
+  canDecide?: boolean
   onDecided: () => void | Promise<void>
 }
 
-export default function ModelPlanApprovalCard({ projectId, approval, plan, onDecided }: ModelPlanApprovalCardProps) {
+export default function ModelPlanApprovalCard({ projectId, approval, plan, canDecide = true, onDecided }: ModelPlanApprovalCardProps) {
   const [comment, setComment] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -57,8 +58,8 @@ export default function ModelPlanApprovalCard({ projectId, approval, plan, onDec
         <textarea aria-label="Approval comment" value={comment} onChange={(event) => setComment(event.target.value)} className="mt-1 block w-full rounded border border-gray-300 p-2 text-sm dark:border-gray-700 dark:bg-gray-950" />
       </label>
       <div className="mt-3 flex gap-2">
-        <button type="button" disabled={busy} onClick={() => void decide('approved')} className="rounded bg-green-700 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">{busy && <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />}Approve plan</button>
-        <button type="button" disabled={busy} onClick={() => void decide('changes_requested')} className="rounded border border-amber-500 px-3 py-2 text-sm font-medium text-amber-900 dark:text-amber-100">Request changes</button>
+        <button type="button" disabled={busy || !canDecide} onClick={() => void decide('approved')} className="rounded bg-green-700 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">{busy && <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />}Approve plan</button>
+        <button type="button" disabled={busy || !canDecide} onClick={() => void decide('changes_requested')} className="rounded border border-amber-500 px-3 py-2 text-sm font-medium text-amber-900 dark:text-amber-100">Request changes</button>
       </div>
     </section>
   )

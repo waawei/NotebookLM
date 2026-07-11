@@ -18,6 +18,18 @@ class GitCommitService:
         payload = self.current_payload(project_id, paths, message)
         return self.approval_service.request(project_id, "commit_approval", payload)
 
+    def review(self, project_id: str, paths: list[str]) -> dict:
+        project = self._project(project_id)
+        review = self.policy.review(project, paths)
+        if not review["ok"]:
+            return review
+        manifest = self._manifest(project_id)
+        return {
+            **review,
+            "file_hashes": self._future_staged_hashes(project["workspace_path"], review["paths"]),
+            "manifest_hash": manifest["sha256"],
+        }
+
     def commit(self, project_id: str, paths: list[str], message: str) -> dict:
         project = self._project(project_id)
         payload = self.current_payload(project_id, paths, message)
@@ -46,12 +58,10 @@ class GitCommitService:
             raise ValueError("Commit message must be a non-empty subject of at most 72 characters")
         if self.reproducibility and not self.reproducibility.check(project_id)["ok"]:
             raise ValueError("Reproducibility check failed")
-        review = self.policy.review(project, paths)
+        review = self.review(project_id, paths)
         if not review["ok"]:
             raise ValueError("Git policy review failed")
-        manifest = self._manifest(project_id)
-        self.policy.file_hashes(project, review["paths"])
-        return {"paths": review["paths"], "file_hashes": self._future_staged_hashes(project["workspace_path"], review["paths"]), "diff_hash": hashlib.sha256(review["diff"].encode("utf-8")).hexdigest(), "manifest_hash": manifest["sha256"], "commit_message": clean_message}
+        return {"paths": review["paths"], "file_hashes": review["file_hashes"], "diff_hash": review["diff_hash"], "manifest_hash": review["manifest_hash"], "commit_message": clean_message}
 
     def _manifest(self, project_id: str) -> dict:
         manifests = [item for item in self.store.list_artifacts(project_id) if item["artifact_type"] == "delivery_manifest"]

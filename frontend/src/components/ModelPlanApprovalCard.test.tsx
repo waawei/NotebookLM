@@ -64,4 +64,11 @@ describe('ModelPlanApprovalCard', () => {
       { decision: 'changes_requested', payload_hash: 'hash-1', comment: 'Revise assumptions' },
     ))
   })
+
+  it('disables approval decisions when the workspace is unavailable', () => {
+    render(<ModelPlanApprovalCard projectId="project-1" approval={approval} plan={plan} canDecide={false} onDecided={() => undefined} />)
+
+    expect(screen.getByRole('button', { name: 'Approve plan' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Request changes' })).toBeDisabled()
+  })
 })

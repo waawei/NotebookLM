@@ -18,4 +18,10 @@ describe('FinalPaperApprovalCard', () => {
 
     await waitFor(() => expect(modelingApi.requestFinalApproval).toHaveBeenCalledWith('p-1'))
   })
+
+  it('disables final approval decisions when the workspace is unavailable', () => {
+    render(<FinalPaperApprovalCard projectId="p-1" canDecide={false} review={{ status: 'passed', issues: [] }} onChanged={() => undefined} />)
+
+    expect(screen.getByRole('button', { name: 'Request final approval' })).toBeDisabled()
+  })
 })

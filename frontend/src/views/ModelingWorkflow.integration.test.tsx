@@ -49,7 +49,7 @@ describe('ModelingProjectsView workflow integration', () => {
       approvals: state === 'model_approval_pending' ? [planApproval]
         : state === 'execution_approval_pending' && executionApprovalRequested ? [{ approval_id: `execution-${experimentCount}`, project_id: 'project-1', gate: 'execution_approval', payload_hash: `execution-hash-${experimentCount}`, payload: {}, status: 'pending' }]
           : state === 'final_approval_pending' && finalRequested ? [{ approval_id: 'final-approval', project_id: 'project-1', gate: 'final_approval', payload_hash: 'final-hash', payload: {}, status: 'pending' }]
-            : state === 'commit_approval_pending' && commitRequested ? [{ approval_id: 'commit-approval', project_id: 'project-1', gate: 'commit_approval', payload_hash: 'commit-hash', payload: { paths: ['deliverables/paper.pdf'], diff_hash: 'diff-hash', commit_message: 'feat: add fixture modeling solution' }, status: commitApproved ? 'approved' : 'pending' }]
+            : state === 'commit_approval_pending' && commitRequested ? [{ approval_id: 'commit-approval', project_id: 'project-1', gate: 'commit_approval', payload_hash: 'commit-hash', payload: { paths: ['deliverables/paper.pdf'], diff_hash: 'diff-hash', file_hashes: { 'deliverables/paper.pdf': 'paper-hash' }, manifest_hash: 'manifest-hash', commit_message: 'feat: add fixture modeling solution' }, status: commitApproved ? 'approved' : 'pending' }]
               : [], total: 1,
     }))
     modelingApiMock.listExperiments.mockImplementation(async () => ({ experiments: ['execution_approval_pending', 'experiment_running'].includes(state) ? [{ ...experiment(experimentCount), status: executionApproved ? 'prepared' : 'prepared' }] : [], total: experimentCount }))
@@ -70,7 +70,7 @@ describe('ModelingProjectsView workflow integration', () => {
     modelingApiMock.listDeliverables.mockResolvedValue({ artifacts: [], total: 0 })
     modelingApiMock.buildDeliverables.mockResolvedValue({})
     modelingApiMock.gitStatus.mockResolvedValue({ paths: ['deliverables/paper.pdf'] })
-    modelingApiMock.reviewGit.mockResolvedValue({ ok: true, paths: ['deliverables/paper.pdf'], diff: 'diff', diff_hash: 'diff-hash', issues: [] })
+    modelingApiMock.reviewGit.mockResolvedValue({ ok: true, paths: ['deliverables/paper.pdf'], diff: 'diff', diff_hash: 'diff-hash', file_hashes: { 'deliverables/paper.pdf': 'paper-hash' }, manifest_hash: 'manifest-hash', issues: [] })
     modelingApiMock.requestCommit.mockImplementation(async () => { commitRequested = true; return {} })
     modelingApiMock.commit.mockImplementation(async () => { state = 'completed'; return {} })
     modelingApiMock.paperPdfUrl.mockReturnValue('/paper.pdf')
@@ -135,16 +135,50 @@ describe('ModelingProjectsView workflow integration', () => {
     modelingApiMock.list.mockResolvedValue({ projects: [commitProject], total: 1 })
     modelingApiMock.get.mockResolvedValue(commitProject)
     modelingApiMock.listArtifacts.mockResolvedValue({ artifacts: [], total: 0 })
-    modelingApiMock.listApprovals.mockResolvedValue({ approvals: [{ approval_id: 'commit-approval', project_id: 'project-1', gate: 'commit_approval', payload_hash: 'commit-hash', payload: { paths: ['deliverables/paper.pdf'], diff_hash: 'approved-diff', commit_message: 'feat: add fixture modeling solution' }, status: 'approved' }], total: 1 })
+    modelingApiMock.listApprovals.mockResolvedValue({ approvals: [{ approval_id: 'commit-approval', project_id: 'project-1', gate: 'commit_approval', payload_hash: 'commit-hash', payload: { paths: ['deliverables/paper.pdf'], diff_hash: 'approved-diff', file_hashes: { 'deliverables/paper.pdf': 'paper-hash' }, manifest_hash: 'manifest-hash', commit_message: 'feat: add fixture modeling solution' }, status: 'approved' }], total: 1 })
     modelingApiMock.listExperiments.mockResolvedValue({ experiments: [], total: 0 })
     modelingApiMock.runtime.mockResolvedValue({ workspace: { configured: true, writable: true }, python: { available: true, version: '3.12.0' }, git: { available: true, version: 'git version' }, xelatex: { available: true, version: 'XeLaTeX' } })
     modelingApiMock.recoveries.mockResolvedValue({ recoveries: [], total: 0 })
     modelingApiMock.gitStatus.mockResolvedValue({ paths: ['deliverables/paper.pdf'] })
-    modelingApiMock.reviewGit.mockResolvedValue({ ok: true, paths: ['deliverables/paper.pdf'], diff: 'changed diff', diff_hash: 'changed-diff', issues: [] })
+    modelingApiMock.reviewGit.mockResolvedValue({ ok: true, paths: ['deliverables/paper.pdf'], diff: 'changed diff', diff_hash: 'changed-diff', file_hashes: { 'deliverables/paper.pdf': 'paper-hash' }, manifest_hash: 'manifest-hash', issues: [] })
 
     render(<ModelingProjectsView />)
 
     expect(await screen.findByText('Approval does not match the current review payload.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Commit approved files' })).not.toBeInTheDocument()
+  })
+
+  it('disables state-bound write actions when the workspace is unavailable', async () => {
+    modelingApiMock.list.mockResolvedValue({ projects: [project], total: 1 })
+    modelingApiMock.get.mockResolvedValue(project)
+    modelingApiMock.listArtifacts.mockResolvedValue({ artifacts: [{ artifact_id: 'plan-1', artifact_type: 'model_plan', version: 1 }], total: 1 })
+    modelingApiMock.getArtifact.mockResolvedValue({ artifact_id: 'plan-1', content: { problem_summary: 'Forecast sales', candidates: [] } })
+    modelingApiMock.listApprovals.mockResolvedValue({ approvals: [planApproval], total: 1 })
+    modelingApiMock.listExperiments.mockResolvedValue({ experiments: [], total: 0 })
+    modelingApiMock.runtime.mockResolvedValue({ workspace: { configured: true, writable: false }, python: { available: true, version: '3.12.0' }, git: { available: true, version: 'git version' }, xelatex: { available: true, version: 'XeLaTeX' } })
+    modelingApiMock.recoveries.mockResolvedValue({ recoveries: [], total: 0 })
+
+    render(<ModelingProjectsView />)
+
+    expect(await screen.findByText('Model plan approval')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Approve plan' })).toBeDisabled())
+    expect(screen.getByRole('button', { name: 'Request changes' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Advance project' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Rollback project' })).toBeDisabled()
+  })
+
+  it('disables experiment execution when the workspace is not configured', async () => {
+    const executionProject = { ...project, state: 'execution_approval_pending' }
+    modelingApiMock.list.mockResolvedValue({ projects: [executionProject], total: 1 })
+    modelingApiMock.get.mockResolvedValue(executionProject)
+    modelingApiMock.listArtifacts.mockResolvedValue({ artifacts: [], total: 0 })
+    modelingApiMock.listApprovals.mockResolvedValue({ approvals: [], total: 0 })
+    modelingApiMock.listExperiments.mockResolvedValue({ experiments: [{ experiment_id: 'exp-0001', status: 'prepared', config: { model: { kind: 'linear_regression' }, seed: 42, metrics: [] }, execution_batch: executionBatch }], total: 1 })
+    modelingApiMock.runtime.mockResolvedValue({ workspace: { configured: false, writable: true }, python: { available: true, version: '3.12.0' }, git: { available: true, version: 'git version' }, xelatex: { available: true, version: 'XeLaTeX' } })
+    modelingApiMock.recoveries.mockResolvedValue({ recoveries: [], total: 0 })
+
+    render(<ModelingProjectsView />)
+
+    expect(await screen.findByRole('button', { name: 'Run' })).toBeDisabled()
   })
 })

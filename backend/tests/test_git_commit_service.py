@@ -1,4 +1,5 @@
 import subprocess
+import hashlib
 
 import pytest
 
@@ -8,7 +9,7 @@ from services.git_commit_service import GitCommitService
 
 class FakePolicy:
     def review(self, project, paths):
-        return {"ok": True, "paths": sorted(paths), "issues": [], "diff": "diff"}
+        return {"ok": True, "paths": sorted(paths), "issues": [], "diff": "diff", "diff_hash": hashlib.sha256(b"diff").hexdigest()}
 
     def file_hashes(self, project, paths):
         return {path: __import__("hashlib").sha256(path.encode("utf-8")).hexdigest() for path in sorted(paths)}
@@ -69,6 +70,17 @@ def test_request_commit_requires_passing_reproducibility_check(tmp_path):
 
     with pytest.raises(ValueError, match="Reproducibility"):
         service.request_commit(project["project_id"], ["README.md"], "feat: add modeling solution")
+
+
+def test_review_returns_the_full_current_approval_snapshot(tmp_path):
+    project, _, service, _ = _service(tmp_path)
+
+    review = service.review(project["project_id"], ["README.md"])
+
+    assert review["paths"] == ["README.md"]
+    assert review["diff_hash"]
+    assert review["file_hashes"] == service.policy.file_hashes(project, ["README.md"])
+    assert review["manifest_hash"] == "b" * 64
 
 
 def test_commit_rejects_pre_staged_unapproved_paths(tmp_path):

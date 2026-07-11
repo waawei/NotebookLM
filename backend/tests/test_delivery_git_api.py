@@ -27,3 +27,16 @@ def test_request_commit_maps_stale_approval_to_409(monkeypatch):
         assert error.status_code == 409
     else:
         raise AssertionError("Expected stale approval conflict")
+
+
+def test_git_review_returns_commit_service_snapshot(monkeypatch):
+    monkeypatch.setattr(modeling, "project_service", Mock(get_project=Mock(return_value={"project_id": "p-1"})))
+    service = Mock()
+    service.review.return_value = {"ok": True, "paths": ["README.md"], "diff": "diff", "diff_hash": "diff-hash", "file_hashes": {"README.md": "file-hash"}, "manifest_hash": "manifest-hash", "issues": []}
+    monkeypatch.setattr(modeling, "git_commit_service", service)
+
+    result = asyncio.run(modeling.review_git("p-1", modeling.GitReviewRequest(paths=["README.md"])))
+
+    assert result["file_hashes"] == {"README.md": "file-hash"}
+    assert result["manifest_hash"] == "manifest-hash"
+    service.review.assert_called_once_with("p-1", ["README.md"])

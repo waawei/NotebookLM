@@ -77,13 +77,14 @@ export default function ModelingProjectsView() {
     () => projects.find((project) => project.project_id === selectedModelingProjectId) || projects[0] || null,
     [projects, selectedModelingProjectId],
   )
+  const workspaceReady = Boolean(runtimeStatus?.workspace.configured && runtimeStatus?.workspace.writable)
   const canAdvance = Boolean(
     selectedProject
+    && workspaceReady
     && MODELING_WORKFLOW_STATES.has(selectedProject.state)
     && selectedProject.state !== 'completed',
   )
-  const canRollback = Boolean(selectedProject && MODELING_ROLLBACK_STATES.has(selectedProject.state))
-  const workspaceReady = Boolean(runtimeStatus?.workspace.configured && runtimeStatus?.workspace.writable)
+  const canRollback = Boolean(selectedProject && workspaceReady && MODELING_ROLLBACK_STATES.has(selectedProject.state))
 
   const loadProjects = async () => {
     setLoading(true)
@@ -187,12 +188,18 @@ export default function ModelingProjectsView() {
       setExperiments([])
       setEvidenceProjectId(null)
     }
+  }, [selectedProject?.project_id, selectedProject?.state])
+
+  useEffect(() => {
+    if (selectedProject?.state === 'commit_approval_pending' && runtimeStatus?.git.available) {
+      void loadEvidence(selectedProject.project_id)
+    }
   }, [selectedProject?.project_id, selectedProject?.state, runtimeStatus?.git.available])
 
   const createProject = async (event: FormEvent) => {
     event.preventDefault()
     const cleanName = name.trim()
-    if (!cleanName) return
+    if (!cleanName || !workspaceReady) return
     setSubmitting(true)
     setError('')
     try {
@@ -208,7 +215,7 @@ export default function ModelingProjectsView() {
   }
 
   const transitionProject = async (direction: 'advance' | 'rollback') => {
-    if (!selectedProject) return
+    if (!selectedProject || !workspaceReady) return
     setTransitioning(true)
     setError('')
     try {
@@ -226,7 +233,7 @@ export default function ModelingProjectsView() {
   }
 
   const runStageAction = async () => {
-    if (!selectedProject) return
+    if (!selectedProject || !workspaceReady) return
     setStageBusy(true)
     setError('')
     try {
@@ -263,7 +270,7 @@ export default function ModelingProjectsView() {
   const latestCommitApproval = evidenceProjectId === selectedProject?.project_id ? approvals.filter((item) => item.gate === 'commit_approval').sort((left, right) => (right.created_at || '').localeCompare(left.created_at || ''))[0] : undefined
 
   const prepareExperiment = async () => {
-    if (!selectedProject) return
+    if (!selectedProject || !workspaceReady || !runtimeStatus?.python.available) return
     setStageBusy(true)
     setError('')
     try {
@@ -273,7 +280,7 @@ export default function ModelingProjectsView() {
   }
 
   const requestExecution = async (experimentId: string) => {
-    if (!selectedProject) return
+    if (!selectedProject || !workspaceReady) return
     setStageBusy(true)
     setError('')
     try {
@@ -283,7 +290,7 @@ export default function ModelingProjectsView() {
   }
 
   const executeExperiment = async (experimentId: string) => {
-    if (!selectedProject) return
+    if (!selectedProject || !workspaceReady || !runtimeStatus?.python.available) return
     setStageBusy(true)
     setError('')
     try {
@@ -308,7 +315,7 @@ export default function ModelingProjectsView() {
           <form onSubmit={createProject} className="flex gap-2">
             <label className="sr-only" htmlFor="project-name">Project name</label>
             <input id="project-name" aria-label="Project name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Project name" className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100" />
-            <button disabled={!name.trim() || submitting || runtimeStatus !== null && !workspaceReady} className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300 dark:disabled:bg-gray-700">
+            <button disabled={!name.trim() || submitting || !workspaceReady} className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300 dark:disabled:bg-gray-700">
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create project'}
             </button>
           </form>
@@ -338,15 +345,15 @@ export default function ModelingProjectsView() {
               {selectedProject.state === 'problem_parsing' && <button type="button" disabled={stageBusy || !workspaceReady} onClick={() => void runStageAction()} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Parse problem</button>}
               {selectedProject.state === 'data_profiling' && <button type="button" disabled={stageBusy || !workspaceReady || !artifacts.some((item) => item.artifact_type === 'data_input')} onClick={() => void runStageAction()} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Profile data</button>}
               {selectedProject.state === 'model_planning' && <button type="button" disabled={stageBusy || !workspaceReady} onClick={() => void runStageAction()} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Create model plan</button>}
-              {selectedProject.state === 'model_approval_pending' && pendingModelApproval && modelPlan && <ModelPlanApprovalCard key={pendingModelApproval.approval_id} projectId={selectedProject.project_id} approval={pendingModelApproval} plan={modelPlan} onDecided={() => refreshProject(selectedProject.project_id)} />}
+              {selectedProject.state === 'model_approval_pending' && pendingModelApproval && modelPlan && <ModelPlanApprovalCard key={pendingModelApproval.approval_id} projectId={selectedProject.project_id} approval={pendingModelApproval} plan={modelPlan} canDecide={workspaceReady} onDecided={() => refreshProject(selectedProject.project_id)} />}
               {selectedProject.state === 'experiment_implementation' && <button type="button" disabled={stageBusy || !workspaceReady || !runtimeStatus?.python.available} onClick={() => void prepareExperiment()} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Prepare experiment</button>}
-              {selectedProject.state === 'execution_approval_pending' && experiments.filter((item) => item.status === 'prepared').map((item) => <button key={item.experiment_id} type="button" disabled={stageBusy} onClick={() => void requestExecution(item.experiment_id)} className="mr-2 rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Request execution approval: {item.experiment_id}</button>)}
-              {selectedProject.state === 'execution_approval_pending' && pendingExecutionApproval && approvalExperiment?.execution_batch && <ExperimentApprovalCard projectId={selectedProject.project_id} approval={pendingExecutionApproval} batch={approvalExperiment.execution_batch as ExecutionBatch} onDecided={() => refreshProject(selectedProject.project_id)} />}
-              {experiments.length > 0 && <ExperimentRunPanel projectId={selectedProject.project_id} experiments={experiments} canExecute={Boolean(runtimeStatus?.workspace.writable && runtimeStatus?.python.available)} onChanged={() => void refreshProject(selectedProject.project_id)} onExecute={(experimentId) => void executeExperiment(experimentId)} />}
-              {['paper_drafting', 'consistency_review', 'final_approval_pending'].includes(selectedProject.state) && (!paperMarkdown || !paperLatex) && <button type="button" disabled={stageBusy || !workspaceReady} onClick={async () => { setStageBusy(true); try { await modelingApi.createPaperDraft(selectedProject.project_id); await refreshProject(selectedProject.project_id) } catch { setError('Unable to generate the paper draft.') } finally { setStageBusy(false) } }} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Generate paper draft</button>}
-              {paperMarkdown && paperLatex && <PaperWorkspace projectId={selectedProject.project_id} markdown={String(paperMarkdown.content || '')} latex={String(paperLatex.content || '')} approval={selectedProject.state === 'final_approval_pending' ? pendingFinalApproval : undefined} canWrite={workspaceReady} canCompile={workspaceReady && (runtimeStatus?.xelatex.available ?? false)} onChanged={() => refreshProject(selectedProject.project_id)} />}
+              {selectedProject.state === 'execution_approval_pending' && experiments.filter((item) => item.status === 'prepared').map((item) => <button key={item.experiment_id} type="button" disabled={stageBusy || !workspaceReady} onClick={() => void requestExecution(item.experiment_id)} className="mr-2 rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Request execution approval: {item.experiment_id}</button>)}
+              {selectedProject.state === 'execution_approval_pending' && pendingExecutionApproval && approvalExperiment?.execution_batch && <ExperimentApprovalCard projectId={selectedProject.project_id} approval={pendingExecutionApproval} batch={approvalExperiment.execution_batch as ExecutionBatch} canDecide={workspaceReady} onDecided={() => refreshProject(selectedProject.project_id)} />}
+              {experiments.length > 0 && <ExperimentRunPanel projectId={selectedProject.project_id} experiments={experiments} canExecute={Boolean(workspaceReady && runtimeStatus?.python.available)} onChanged={() => void refreshProject(selectedProject.project_id)} onExecute={(experimentId) => void executeExperiment(experimentId)} />}
+              {['paper_drafting', 'consistency_review', 'final_approval_pending'].includes(selectedProject.state) && (!paperMarkdown || !paperLatex) && <button type="button" disabled={stageBusy || !workspaceReady} onClick={async () => { if (!workspaceReady) return; setStageBusy(true); try { await modelingApi.createPaperDraft(selectedProject.project_id); await refreshProject(selectedProject.project_id) } catch { setError('Unable to generate the paper draft.') } finally { setStageBusy(false) } }} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Generate paper draft</button>}
+              {paperMarkdown && paperLatex && <PaperWorkspace projectId={selectedProject.project_id} markdown={String(paperMarkdown.content || '')} latex={String(paperLatex.content || '')} approval={selectedProject.state === 'final_approval_pending' ? pendingFinalApproval : undefined} canWrite={workspaceReady} canReview={workspaceReady} canCompile={workspaceReady && (runtimeStatus?.xelatex.available ?? false)} onChanged={() => refreshProject(selectedProject.project_id)} />}
               {selectedProject.state === 'packaging' && <DeliveryChecklist projectId={selectedProject.project_id} canBuild={workspaceReady} onChanged={() => refreshProject(selectedProject.project_id)} />}
-              {selectedProject.state === 'commit_approval_pending' && gitReview && <GitCommitApprovalCard projectId={selectedProject.project_id} review={gitReview} approval={latestCommitApproval} canCommit={runtimeStatus?.git.available ?? false} onChanged={() => refreshProject(selectedProject.project_id)} />}
+              {selectedProject.state === 'commit_approval_pending' && gitReview && <GitCommitApprovalCard projectId={selectedProject.project_id} review={gitReview} approval={latestCommitApproval} canCommit={workspaceReady && (runtimeStatus?.git.available ?? false)} onChanged={() => refreshProject(selectedProject.project_id)} />}
               {artifacts.length > 0 && <section aria-label="Modeling artifacts" className="rounded border border-gray-200 p-3 dark:border-gray-800"><h2 className="text-sm font-semibold">Artifacts</h2><ul className="mt-2 space-y-1 text-xs text-gray-600 dark:text-gray-300">{artifacts.map((artifact) => <li key={artifact.artifact_id}>{artifact.artifact_type}: {artifact.relative_path}</li>)}</ul></section>}
             </div>
             <div className="mt-6 flex flex-wrap items-end gap-3 border-t border-gray-100 pt-5 dark:border-gray-800">

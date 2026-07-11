@@ -144,6 +144,22 @@ describe('ModelingProjectsView', () => {
     await waitFor(() => expect(modelingApiMock.rollback).toHaveBeenCalledWith('project-1', ''))
   })
 
+  it('disables project transitions when the workspace is unavailable', async () => {
+    modelingApiMock.runtime.mockResolvedValue({
+      workspace: { configured: true, writable: false },
+      python: { available: true, version: '3.12.0' },
+      git: { available: true, version: 'git version 2.45.0' },
+      xelatex: { available: true, version: 'XeLaTeX' },
+    })
+    modelingApiMock.list.mockResolvedValue({ projects: [{ ...forecast, state: 'problem_parsing' }], total: 1 })
+    render(<ModelingProjectsView />)
+
+    await screen.findByRole('heading', { name: 'Forecast' })
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Advance project' })).toBeDisabled())
+    expect(screen.getByRole('button', { name: 'Rollback project' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Parse problem' })).toBeDisabled()
+  })
+
   it.each(workflowActionAvailability)(
     'matches backend action availability for %s',
     async (state, advanceEnabled, rollbackEnabled) => {
