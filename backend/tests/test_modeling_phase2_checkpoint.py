@@ -141,6 +141,10 @@ def test_real_utf8_csv_checkpoint_and_stale_plan_conflict(tmp_path, monkeypatch)
     )
     assert profile["duplicate_rows"] == 1
     assert profile["columns"]["target"]["missing"] == 1
+    assert profile["columns"]["target"]["dtype"].startswith("float")
+    assert "numeric" in profile["columns"]["target"]
+    assert profile["columns"]["category"]["dtype"] == "object"
+    assert "numeric" not in profile["columns"]["category"]
     assert asyncio.run(modeling.advance_project(project["project_id"]))["state"] == "model_planning"
     plan_result = asyncio.run(modeling.create_model_plan(project["project_id"]))
     assert len(plan_result["model_plan"]["candidates"]) == 2
@@ -170,19 +174,22 @@ def test_real_utf8_csv_checkpoint_and_stale_plan_conflict(tmp_path, monkeypatch)
     advanced = asyncio.run(modeling.advance_project(project["project_id"]))
     assert advanced["state"] == "experiment_implementation"
     assert problem_artifact["artifact_type"] == "problem_input"
-    kinds = {item["artifact_type"] for item in store.list_artifacts(project["project_id"])}
-    assert {
-        "problem_spec",
-        "data_profile",
-        "data_report",
-        "model_plan",
-        "model_plan_report",
-    } <= kinds
-    for relative_path in (
-        "problem/problem_spec.json",
-        "analysis/data_profile.json",
-        "analysis/data_report.md",
-        "analysis/model_plan.json",
-        "analysis/model_plan.md",
-    ):
-        assert (workspace / relative_path).is_file()
+    expected_artifacts = {
+        "problem_spec": "problem/problem_spec.json",
+        "data_profile": "analysis/data_profile.json",
+        "data_report": "analysis/data_report.md",
+        "model_plan": "analysis/model_plan.json",
+        "model_plan_report": "analysis/model_plan.md",
+    }
+    registered = store.list_artifacts(project["project_id"])
+    for artifact_type, relative_path in expected_artifacts.items():
+        matches = [
+            item
+            for item in registered
+            if item["artifact_type"] == artifact_type
+            and item["relative_path"] == relative_path
+        ]
+        assert len(matches) == 1
+        target = workspace / relative_path
+        assert target.is_file()
+        assert matches[0]["sha256"] == hashlib.sha256(target.read_bytes()).hexdigest()
