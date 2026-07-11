@@ -8,13 +8,13 @@
 workflow: mathematical-modeling
 current_phase: 2
 phase_status: in_progress
-current_task: "Task 2: Immutable Input Import and Manifests"
+current_task: "Task 3: Deterministic CSV Profiling"
 task_status: in_progress
 baseline_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase2"
 last_verified_commit: e698df6
 last_verification: "Post-Gate review fixes passed: missing task/run resources return 404 and the workbench exposes only legal workflow actions for all declared states"
-next_action: "Write and verify failing Task 2 immutable input tests"
+next_action: "Write and verify failing Task 3 CSV profile tests"
 ```
 
 ## 启动前风险
@@ -36,6 +36,18 @@ next_action: "Write and verify failing Task 2 immutable input tests"
 | 6 | blocked_by_phase_5 | `2026-07-10-mathematical-modeling-phase6-hardening.md` | pending | — |
 
 ## 当前阶段 Task 记录
+
+### Phase 2 / Task 3: Deterministic CSV Profiling
+
+- 状态：verified
+- 预计文件：`backend/requirements.txt`, `backend/services/data_profile_service.py`, `backend/tests/test_data_profile_service.py`
+- 实际文件：`backend/requirements.txt`, `backend/services/data_profile_service.py`, `backend/tests/test_data_profile_service.py`
+- 失败测试：`DEBUG=false; PYTHONPATH=backend; python -m pytest backend/tests/test_data_profile_service.py -q`，退出码 1；按预期因 `services.data_profile_service` 不存在而出现 1 个收集错误
+- 聚焦验证：同一命令初始退出码 0，3 passed；审查修复后退出码 0，8 passed、1 个符号链接测试因 Windows 权限 skip
+- 相关回归：聚焦测试加 `backend/tests/test_modeling_input_service.py backend/tests/test_artifact_service.py backend/tests/test_modeling_store.py`，实现提交前退出码 0，19 passed；审查修复后退出码 0，24 passed、1 skipped
+- 提交：实现 `cff1080c16151ee759470ace277518984701c60a`；审查修复 `c9c78d42f9da7ced5352456ca67211c4cbbef668`
+- 保留的用户改动：无；Task 3 开始时工作树仅有本账本更新
+- 备注：本机 pandas 为 2.3.2，pip 缓存无计划固定的 2.2.2；先以兼容 API 完成 TDD 并在 requirements 固定 2.2.2，不未经授权联网安装。独立审查发现非有限统计、源成果篡改/逃逸和双输出/登记半成品风险；新增极值、缺失/错后缀/哈希、符号链接、写入与两次登记失败回归，实施当前源 SHA/边界复核、非有限值归一为 null、原子输出与成果记录补偿回滚。复审无剩余 Critical/Important，结论 Ready；同路径哈希复核与 pandas 再打开之间仍有极窄 TOCTOU，被评为 Minor。
 
 ### Phase 2 / Task 2: Immutable Input Import and Manifests
 
