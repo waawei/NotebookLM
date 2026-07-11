@@ -1,12 +1,19 @@
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
 
 from services.git_policy_service import GitPolicyService, resolve_git_path
 from services.restricted_runner import RestrictedRunner
+from services.modeling_input_service import ModelingInputService
+from services.modeling_store import ModelingStore
+from services.artifact_service import ArtifactService
+from services.approval_service import ApprovalService
+from services.git_commit_service import GitCommitService
+from test_git_commit_service import FakeGit, FakePolicy, PassingReproducibility, _service
 
 
 @pytest.mark.parametrize(
@@ -50,11 +57,22 @@ def test_runner_enforces_output_and_timeout_limits(tmp_path):
     assert timeout.timed_out is True
 
 
+def test_runner_kills_child_processes_after_timeout(tmp_path):
+    result = RestrictedRunner().run(
+        [sys.executable, "-c", "import subprocess,sys,time; subprocess.Popen([sys.executable,'-c','import time; time.sleep(30)']); time.sleep(30)"],
+        tmp_path, 1, 4096, True,
+    )
+    assert result.timed_out is True
+    time.sleep(0.2)
+    assert all(process.info["cmdline"] is None or "time.sleep(30)" not in " ".join(process.info["cmdline"]) for process in __import__("psutil").process_iter(["cmdline"]))
+
+
 def test_git_policy_blocks_symlinks_forbidden_paths_secrets_and_large_files(tmp_path):
     project = tmp_path / "project"
     project.mkdir()
     (project / ".git").mkdir()
     (project / ".env").write_text("API_KEY=secret", encoding="utf-8")
+    (project / "settings.py").write_text("API_KEY=secret", encoding="utf-8")
     (project / "large.bin").write_bytes(b"x" * (20 * 1024 * 1024 + 1))
     external = tmp_path / "outside.txt"
     external.write_text("outside", encoding="utf-8")
@@ -65,11 +83,11 @@ def test_git_policy_blocks_symlinks_forbidden_paths_secrets_and_large_files(tmp_
         pytest.skip("symlink creation is unavailable on this Windows host")
 
     review = GitPolicyService().review(
-        {"workspace_path": str(project)}, [".env", "large.bin", "linked.txt"]
+        {"workspace_path": str(project)}, [".env", "settings.py", "large.bin", "linked.txt"]
     )
     assert review["ok"] is False
     assert {item["code"] for item in review["issues"]} == {
-        "forbidden_path", "file_too_large", "external_symlink"
+        "forbidden_path", "secret_detected", "file_too_large", "external_symlink"
     }
 
 
@@ -93,3 +111,24 @@ def test_git_policy_invokes_only_allowed_git_subcommands(monkeypatch, tmp_path):
 
     forbidden = {"push", "reset", "clean", "rebase", "remote", "checkout"}
     assert all(not forbidden.intersection(command) for command in commands)
+
+
+def test_commit_rejects_empty_staging_and_stale_approval(tmp_path):
+    project, store, service, fake_git = _service(tmp_path)
+    request = service.request_commit(project["project_id"], ["README.md"], "feat: add modeling solution")
+    ApprovalService(store).decide(request["approval_id"], "approved", request["payload_hash"])
+    class EmptyGit(FakeGit):
+        def __call__(self, command, **kwargs):
+            self.commands.append(command)
+            if command[1:4] == ["diff", "--cached", "--name-only"]:
+                return subprocess.CompletedProcess(command, 0, "", "")
+            if command[1:4] == ["diff", "--cached", "--quiet"]:
+                return subprocess.CompletedProcess(command, 0, "", "")
+            return super().__call__(command, **kwargs)
+
+    service.git_run = EmptyGit()
+
+    with pytest.raises(ValueError, match="Staged"):
+        service.commit(project["project_id"], ["README.md"], "feat: add modeling solution")
+    with pytest.raises(ValueError, match="approval"):
+        service.commit(project["project_id"], ["README.md"], "different message")

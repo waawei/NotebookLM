@@ -12,9 +12,9 @@ current_task: "Task 3: Adversarial Security and Resource Regression Suite"
 task_status: verified
 baseline_commit: fd74c07a9b0b8e34c3b4c71bf8fef3f1a63420ae
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase6"
-last_verified_commit: 2b09292e38c655ff553bd95354a024a8dbf79780
-last_verification: "Task 3 adversarial regression plus Runner/Git regression: 16 passed/2 skipped; Task 2 runtime regression: 11 passed; Task 1 recovery regression: 22 passed/5 subtests"
-next_action: "Complete Task 3 review and continue Phase 6 Task 4"
+last_verified_commit: df597aebde538811d6103a509aaf66f28fb784cc
+last_verification: "Task 3 adversarial plus Runner/Git/input regression: 33 passed/2 skipped (Windows symlink permissions); Task 2 runtime regression: 11 passed; Task 1 recovery regression: 22 passed/5 subtests"
+next_action: "Complete Task 3 re-review and continue Phase 6 Task 4"
 ```
 
 ## 启动前风险
