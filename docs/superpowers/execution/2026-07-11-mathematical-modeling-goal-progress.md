@@ -7,14 +7,14 @@
 ```yaml
 workflow: mathematical-modeling
 current_phase: 2
-phase_status: in_progress
+phase_status: completed
 current_task: "Task 6: Phase 2 Real-Data Checkpoint"
-task_status: in_progress
+task_status: verified
 baseline_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase2"
-last_verified_commit: e698df6
-last_verification: "Post-Gate review fixes passed: missing task/run resources return 404 and the workbench exposes only legal workflow actions for all declared states"
-next_action: "Run and record the real UTF-8 prompt/CSV Phase 2 vertical checkpoint"
+last_verified_commit: 09000b4
+last_verification: "Gate 2 passed: backend 170 passed/1 skipped/13 subtests, frontend 120 passed, production build passed, real UTF-8/CSV checkpoint passed, and final review found no Critical or Important issues"
+next_action: "Stop after Phase 2 and wait for user review; do not start Phase 3"
 ```
 
 ## 启动前风险
@@ -29,8 +29,8 @@ next_action: "Run and record the real UTF-8 prompt/CSV Phase 2 vertical checkpoi
 | 阶段 | 状态 | 计划 | Gate | 完成提交 |
 | --- | --- | --- | --- | --- |
 | 1 | completed | `2026-07-10-mathematical-modeling-phase1-foundation.md` | passed | Task 6 ledger commit |
-| 2 | in_progress | `2026-07-10-mathematical-modeling-phase2-intake-planning.md` | pending | — |
-| 3 | blocked_by_phase_2 | `2026-07-10-mathematical-modeling-phase3-experiments.md` | pending | — |
+| 2 | completed | `2026-07-10-mathematical-modeling-phase2-intake-planning.md` | passed | `09000b4` + completion ledger commit |
+| 3 | not_started | `2026-07-10-mathematical-modeling-phase3-experiments.md` | pending | — |
 | 4 | blocked_by_phase_3 | `2026-07-10-mathematical-modeling-phase4-paper.md` | pending | — |
 | 5 | blocked_by_phase_4 | `2026-07-10-mathematical-modeling-phase5-delivery-git.md` | pending | — |
 | 6 | blocked_by_phase_5 | `2026-07-10-mathematical-modeling-phase6-hardening.md` | pending | — |
@@ -44,7 +44,7 @@ next_action: "Run and record the real UTF-8 prompt/CSV Phase 2 vertical checkpoi
 - 实际文件：`backend/tests/test_modeling_phase2_checkpoint.py`
 - 失败测试：不适用；Task 6 为真实纵向验证，无生产实现预期
 - 聚焦验证：临时运行目录下 `DEBUG=false; PYTHONPATH=backend; python -m pytest backend/tests/test_modeling_phase2_checkpoint.py -q`，退出码 0，1 passed；保留既有 Pydantic/PyPDF2 deprecation warning
-- 相关回归：Task 5 审查修复后 Phase 2 聚焦后端 40 passed、1 skipped，前端 41 passed，构建通过；阶段最终完整回归待 Gate 2 收尾记录
+- 相关回归：最终完整 Gate 2 回归在隔离临时运行目录通过：后端 170 passed、1 skipped、13 subtests passed；前端 23 files、120 passed；生产构建和 `git diff --check` 通过；工作树在收尾文档修改前干净。本机 pandas 2.3.2 与 requirements 固定的 2.2.2 API 兼容；未联网安装依赖。
 - 提交：检查点 `79d7d35d8e184efdcf5dde6debbeaf44edc6fb0c`；审查强化 `7fd4fa881c04d8285044546b4f3884949bf48771`
 - 保留的用户改动：无；Task 6 开始时工作树干净
 - 备注：使用真实 UTF-8 题目和 CSV 字节、实际 SQLite/外部 Git 工作区及确定性 Fake LLM；验证题目/CSV 原始字节与只读位、双 manifest SHA-256、缺失值/重复行、数值 target/分类 category、2 个候选、五个命名成果逐一对应 registry relative_path 与当前 SHA、hash-bound approval、篡改后 API 409 和恢复后 Gate 2。初审要求强化 schema 和 registry 关联，已补充；应用仓库 clean checkpoint 在账本提交后以外部 `git status --short` 新鲜验证。最终状态仅推进至 Phase 2 出口 `experiment_implementation`，未实现或运行 Phase 3。
@@ -203,6 +203,7 @@ next_action: "Run and record the real UTF-8 prompt/CSV Phase 2 vertical checkpoi
 | 时间 | 阶段/Task | 命令 | 结果 | 提交 |
 | --- | --- | --- | --- | --- |
 | 2026-07-11 | 规划基线 | `git show --stat bd167bf` | 六阶段计划提交存在 | `bd167bf` |
+| 2026-07-11 | Phase 2 / Gate 2 | `python -m pytest backend/tests -q`; `npm test -- --run`; `npm run build`; `git diff --check` | 后端 170 passed、1 skipped、13 subtests；前端 120 passed；构建与 diff 检查通过；最终只读审查无 Critical/Important | `09000b4` |
 
 ## 阻塞项
 
@@ -213,6 +214,7 @@ next_action: "Run and record the real UTF-8 prompt/CSV Phase 2 vertical checkpoi
 | Goal | 会话 | 开始 | 结束 | 结果 |
 | --- | --- | --- | --- | --- |
 | Phase 1 | 尚未创建 | — | — | pending |
+| Phase 2 | 当前会话 | 2026-07-11 | 2026-07-11 | completed; Gate 2 passed; Phase 3 not started |
 
 ## 更新规则
 

@@ -84,8 +84,8 @@ TypeScript consumes snake_case JSON without a second normalization layer for the
 
 ## Phase Gates
 
-- [ ] **Gate 1:** Run all Phase 1 backend tests, frontend tests, and `npm run build`; commit only after project persistence and navigation work together.
-- [ ] **Gate 2:** Complete one real CSV intake and approve a content-hashed model plan; verify raw files remain unchanged.
+- [x] **Gate 1:** Run all Phase 1 backend tests, frontend tests, and `npm run build`; commit only after project persistence and navigation work together.
+- [x] **Gate 2:** Complete one real CSV intake and approve a content-hashed model plan; verify raw files remain unchanged.
 - [ ] **Gate 3:** Re-run a recorded experiment and compare metrics within the declared tolerance; verify a changed command invalidates approval.
 - [ ] **Gate 4:** Compile `paper/main.tex` and prove every metric/figure placeholder resolves to a registered artifact.
 - [ ] **Gate 5:** Scan the exact staged file list and create a commit only after matching approval; verify no remote operation occurs.
