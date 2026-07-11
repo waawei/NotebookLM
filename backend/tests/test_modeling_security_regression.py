@@ -24,6 +24,19 @@ def test_git_paths_reject_escapes(relative, tmp_path):
         resolve_git_path(tmp_path, relative)
 
 
+@pytest.mark.parametrize("filename", ["../escape.csv", "C:/Windows/win.ini", "/etc/passwd", "data/raw/../../secret.csv"])
+def test_input_service_rejects_escape_names(filename, tmp_path):
+    workspace = tmp_path / "workspace"
+    (workspace / "data" / "raw").mkdir(parents=True)
+    (workspace / "problem" / "original").mkdir(parents=True)
+    store = ModelingStore(str(tmp_path / "modeling.db"))
+    project = store.create_project("Forecast", "forecast", str(workspace), None)
+    service = ModelingInputService(store, ArtifactService(store), 1024)
+
+    with pytest.raises(ValueError, match="Invalid input filename"):
+        service.import_input(project["project_id"], filename, b"x\n1\n", "data")
+
+
 @pytest.mark.parametrize("name", ["LLM_API_KEY", "AUTHORIZATION", "ACCESS_TOKEN", "DB_PASSWORD"])
 def test_runner_never_forwards_sensitive_environment(name, monkeypatch, tmp_path):
     monkeypatch.setenv(name, "sensitive-value")
@@ -74,6 +87,19 @@ def test_git_policy_blocks_symlinks_forbidden_paths_secrets_and_large_files(tmp_
     (project / ".env").write_text("API_KEY=secret", encoding="utf-8")
     (project / "settings.py").write_text("API_KEY=secret", encoding="utf-8")
     (project / "large.bin").write_bytes(b"x" * (20 * 1024 * 1024 + 1))
+    review = GitPolicyService().review(
+        {"workspace_path": str(project)}, [".env", "settings.py", "large.bin"]
+    )
+    assert review["ok"] is False
+    assert {item["code"] for item in review["issues"]} == {
+        "forbidden_path", "secret_detected", "file_too_large"
+    }
+
+
+def test_git_policy_blocks_external_symlink(tmp_path):
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / ".git").mkdir()
     external = tmp_path / "outside.txt"
     external.write_text("outside", encoding="utf-8")
     link = project / "linked.txt"
@@ -82,13 +108,9 @@ def test_git_policy_blocks_symlinks_forbidden_paths_secrets_and_large_files(tmp_
     except OSError:
         pytest.skip("symlink creation is unavailable on this Windows host")
 
-    review = GitPolicyService().review(
-        {"workspace_path": str(project)}, [".env", "settings.py", "large.bin", "linked.txt"]
-    )
+    review = GitPolicyService().review({"workspace_path": str(project)}, ["linked.txt"])
     assert review["ok"] is False
-    assert {item["code"] for item in review["issues"]} == {
-        "forbidden_path", "secret_detected", "file_too_large", "external_symlink"
-    }
+    assert review["issues"][0]["code"] == "external_symlink"
 
 
 def test_git_policy_invokes_only_allowed_git_subcommands(monkeypatch, tmp_path):
@@ -118,17 +140,34 @@ def test_commit_rejects_empty_staging_and_stale_approval(tmp_path):
     request = service.request_commit(project["project_id"], ["README.md"], "feat: add modeling solution")
     ApprovalService(store).decide(request["approval_id"], "approved", request["payload_hash"])
     class EmptyGit(FakeGit):
+        def __init__(self):
+            super().__init__()
+            self.added = False
+
         def __call__(self, command, **kwargs):
             self.commands.append(command)
-            if command[1:4] == ["diff", "--cached", "--name-only"]:
+            if command[1:3] == ["add", "--"]:
+                self.added = True
                 return subprocess.CompletedProcess(command, 0, "", "")
+            if command[1:4] == ["diff", "--cached", "--name-only"]:
+                return subprocess.CompletedProcess(command, 0, "README.md\n" if self.added else "", "")
             if command[1:4] == ["diff", "--cached", "--quiet"]:
                 return subprocess.CompletedProcess(command, 0, "", "")
             return super().__call__(command, **kwargs)
 
     service.git_run = EmptyGit()
 
-    with pytest.raises(ValueError, match="Staged"):
+    with pytest.raises(ValueError, match="No approved changes"):
         service.commit(project["project_id"], ["README.md"], "feat: add modeling solution")
     with pytest.raises(ValueError, match="approval"):
         service.commit(project["project_id"], ["README.md"], "different message")
+
+
+def test_git_commit_flow_never_invokes_forbidden_commands(tmp_path):
+    project, store, service, fake_git = _service(tmp_path)
+    request = service.request_commit(project["project_id"], ["README.md"], "feat: add modeling solution")
+    ApprovalService(store).decide(request["approval_id"], "approved", request["payload_hash"])
+    service.commit(project["project_id"], ["README.md"], "feat: add modeling solution")
+
+    forbidden = {"push", "reset", "clean", "rebase", "remote", "checkout"}
+    assert all(not forbidden.intersection(command) for command in fake_git.commands)
