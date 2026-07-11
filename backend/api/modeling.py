@@ -162,16 +162,21 @@ async def upload_input(
     file: UploadFile = File(...),
     kind: str = "problem",
 ):
-    _require_project(project_id)
+    _require_state(project_id, "project_initialized")
     clean_kind = await validate_input_kind(InputUploadKind(kind=kind))
     if not file.filename:
         raise HTTPException(status_code=400, detail="Input filename is required")
     try:
+        content = await file.read(settings.MAX_FILE_SIZE + 1)
+        if len(content) > settings.MAX_FILE_SIZE:
+            raise HTTPException(status_code=400, detail="Input file exceeds size limit")
         return input_service.import_input(
-            project_id, file.filename, await file.read(), clean_kind
+            project_id, file.filename, content, clean_kind
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+    finally:
+        await file.close()
 
 
 @router.post("/projects/{project_id}/problem/parse")
@@ -248,7 +253,8 @@ async def decide_approval(
             status_code=400, detail="A comment is required when requesting changes"
         )
     try:
-        return approval_service.decide(
+        return approval_service.decide_for_project(
+            project_id,
             approval_id,
             request.decision,
             request.payload_hash,

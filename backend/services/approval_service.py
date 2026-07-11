@@ -39,6 +39,19 @@ class ApprovalService:
             approval_id, decision, payload_hash, comment
         )
 
+    def decide_for_project(
+        self,
+        project_id: str,
+        approval_id: str,
+        decision: str,
+        payload_hash: str,
+        comment: str = "",
+    ) -> dict:
+        request = self.store.get_approval_request(approval_id)
+        if not request or request["project_id"] != project_id:
+            raise ValueError("Approval request not found")
+        return self.decide(approval_id, decision, payload_hash, comment)
+
     def require_approved(
         self, project_id: str, gate: str, payload_hash: str
     ) -> dict:

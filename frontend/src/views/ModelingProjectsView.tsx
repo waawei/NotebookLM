@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useMemo, useState } from 'react'
+import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertCircle, ChevronLeft, ChevronRight, Loader2, RefreshCw } from 'lucide-react'
 import { modelingApi, type ApprovalRequest, type ModelingArtifact, type ModelingProject, type ModelPlan } from '../services/api'
 import { useStore } from '../store/useStore'
@@ -59,6 +59,7 @@ export default function ModelingProjectsView() {
   const [approvals, setApprovals] = useState<ApprovalRequest[]>([])
   const [modelPlan, setModelPlan] = useState<ModelPlan | null>(null)
   const [error, setError] = useState('')
+  const evidenceGeneration = useRef(0)
 
   const selectedProject = useMemo(
     () => projects.find((project) => project.project_id === selectedModelingProjectId) || projects[0] || null,
@@ -94,22 +95,34 @@ export default function ModelingProjectsView() {
   }, [])
 
   const loadEvidence = async (projectId: string) => {
+    const generation = ++evidenceGeneration.current
     try {
       const [artifactData, approvalData] = await Promise.all([
         modelingApi.listArtifacts(projectId),
         modelingApi.listApprovals(projectId),
       ])
+      if (generation !== evidenceGeneration.current) return
       setArtifacts(artifactData.artifacts)
       setApprovals(approvalData.approvals)
-      const pending = approvalData.approvals.find((item) => item.gate === 'model_approval' && item.status === 'pending')
+      const pending = approvalData.approvals
+        .filter((item) => item.gate === 'model_approval' && item.status === 'pending')
+        .sort((left, right) => {
+          const created = (right.created_at || '').localeCompare(left.created_at || '')
+          if (created !== 0) return created
+          const version = (right.payload?.version || 0) - (left.payload?.version || 0)
+          return version || right.approval_id.localeCompare(left.approval_id)
+        })[0]
       if (pending) {
         const planArtifact = await modelingApi.getArtifact(projectId, pending.payload.artifact_id)
+        if (generation !== evidenceGeneration.current) return
         setModelPlan(planArtifact.content as ModelPlan)
       } else {
         setModelPlan(null)
       }
     } catch {
-      setError('Unable to load modeling evidence. Please try again.')
+      if (generation === evidenceGeneration.current) {
+        setError('Unable to load modeling evidence. Please try again.')
+      }
     }
   }
 
@@ -180,9 +193,13 @@ export default function ModelingProjectsView() {
     }
   }
 
-  const pendingModelApproval = approvals.find(
-    (item) => item.gate === 'model_approval' && item.status === 'pending',
-  )
+  const pendingModelApproval = approvals
+    .filter((item) => item.gate === 'model_approval' && item.status === 'pending')
+    .sort((left, right) => {
+      const created = (right.created_at || '').localeCompare(left.created_at || '')
+      if (created !== 0) return created
+      return (right.payload?.version || 0) - (left.payload?.version || 0)
+    })[0]
 
   return (
     <div className="grid h-full grid-cols-[minmax(260px,340px)_1fr] bg-gray-100 dark:bg-gray-950">
@@ -224,7 +241,7 @@ export default function ModelingProjectsView() {
             <div className="border-b border-gray-100 pb-4 dark:border-gray-800"><h1 className="text-xl font-semibold text-gray-950 dark:text-gray-100">{selectedProject.name}</h1><p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Current state: <span className="font-medium">{selectedProject.state}</span></p>{selectedProject.deadline && <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Deadline: {selectedProject.deadline}</p>}</div>
             <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-xs font-medium text-gray-500">Project slug</dt><dd className="mt-1 text-gray-900 dark:text-gray-100">{selectedProject.slug}</dd></div><div><dt className="text-xs font-medium text-gray-500">Workspace</dt><dd className="mt-1 break-all text-gray-900 dark:text-gray-100">{selectedProject.workspace_path}</dd></div></dl>
             <div className="mt-5 space-y-4">
-              <ModelingInputPanel projectId={selectedProject.project_id} onChanged={() => loadEvidence(selectedProject.project_id)} />
+              {selectedProject.state === 'project_initialized' && <ModelingInputPanel projectId={selectedProject.project_id} onChanged={() => loadEvidence(selectedProject.project_id)} />}
               {selectedProject.state === 'problem_parsing' && <button type="button" disabled={stageBusy} onClick={() => void runStageAction()} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Parse problem</button>}
               {selectedProject.state === 'data_profiling' && <button type="button" disabled={stageBusy || !artifacts.some((item) => item.artifact_type === 'data_input')} onClick={() => void runStageAction()} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Profile data</button>}
               {selectedProject.state === 'model_planning' && <button type="button" disabled={stageBusy} onClick={() => void runStageAction()} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Create model plan</button>}

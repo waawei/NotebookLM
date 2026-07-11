@@ -38,6 +38,7 @@ describe('ModelPlanApprovalCard', () => {
 
     expect(screen.getByText('Linear baseline')).toBeInTheDocument()
     expect(screen.getByText(/drift/)).toBeInTheDocument()
+    expect(screen.getByText(/sha-1/)).toBeInTheDocument()
     expect(screen.getByText(/hash-1/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Approve plan' }))
 

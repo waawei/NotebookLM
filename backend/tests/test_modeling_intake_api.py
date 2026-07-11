@@ -36,6 +36,13 @@ class FakeApprovalService:
         self.calls.append((approval_id, decision, payload_hash, comment))
         return {"approval_id": approval_id, "decision": decision}
 
+    def decide_for_project(
+        self, project_id, approval_id, decision, payload_hash, comment=""
+    ):
+        if project_id != "p-1":
+            raise ValueError("Approval request not found")
+        return self.decide(approval_id, decision, payload_hash, comment)
+
     def list_for_project(self, project_id):
         return [{"approval_id": "a-1", "project_id": project_id}]
 
@@ -118,3 +125,61 @@ def test_phase2_routes_are_registered():
     assert "/projects/{project_id}/model-plan" in paths
     assert "/projects/{project_id}/artifacts" in paths
     assert "/projects/{project_id}/approvals/{approval_id}/decide" in paths
+
+
+def test_upload_rejects_oversized_body_before_input_service(fake_services, monkeypatch):
+    _, inputs, _ = fake_services
+    monkeypatch.setattr(modeling.settings, "MAX_FILE_SIZE", 4)
+    upload = UploadFile(filename="large.csv", file=BytesIO(b"12345"))
+
+    with pytest.raises(HTTPException) as raised:
+        asyncio.run(modeling.upload_input("p-1", upload, "data"))
+
+    assert raised.value.status_code == 400
+    assert inputs.calls == []
+    assert upload.file.closed
+
+
+def test_upload_is_rejected_after_project_initialization(fake_services):
+    projects, inputs, _ = fake_services
+    projects.project["state"] = "problem_parsing"
+    upload = UploadFile(filename="train.csv", file=BytesIO(b"x\n1\n"))
+
+    with pytest.raises(HTTPException) as raised:
+        asyncio.run(modeling.upload_input("p-1", upload, "data"))
+
+    assert raised.value.status_code == 409
+    assert inputs.calls == []
+
+
+def test_approval_decision_rejects_cross_project_request(monkeypatch, tmp_path):
+    from services.approval_service import ApprovalService
+    from services.modeling_store import ModelingStore
+
+    store = ModelingStore(str(tmp_path / "modeling.db"))
+    project_a = store.create_project("A", "a", str(tmp_path / "a"), None)
+    project_b = store.create_project("B", "b", str(tmp_path / "b"), None)
+    approvals = ApprovalService(store)
+    request = approvals.request(project_b["project_id"], "model_approval", {"version": 1})
+
+    class Projects:
+        def get_project(self, project_id):
+            return store.get_project(project_id)
+
+    monkeypatch.setattr(modeling, "project_service", Projects())
+    monkeypatch.setattr(modeling, "approval_service", approvals)
+    with pytest.raises(HTTPException) as raised:
+        asyncio.run(
+            modeling.decide_approval(
+                project_a["project_id"],
+                request["approval_id"],
+                modeling.ApprovalDecision(
+                    decision="approved",
+                    payload_hash=request["payload_hash"],
+                    comment="",
+                ),
+            )
+        )
+
+    assert raised.value.status_code == 409
+    assert store.get_approval_request(request["approval_id"])["status"] == "pending"

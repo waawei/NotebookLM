@@ -111,6 +111,7 @@ describe('ModelingProjectsView', () => {
     await screen.findByRole('heading', { name: 'Forecast' })
     expect(screen.getByRole('button', { name: 'Advance project' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Rollback project' })).toBeDisabled()
+    expect(screen.queryByText('Competition inputs')).not.toBeInTheDocument()
   })
 
   it('keeps both legal actions usable in problem parsing', async () => {
@@ -195,5 +196,48 @@ describe('ModelingProjectsView', () => {
 
     expect(await screen.findByText('Model plan approval')).toBeInTheDocument()
     expect(screen.getByText('Linear baseline')).toBeInTheDocument()
+  })
+
+  it('selects the newest pending model approval', async () => {
+    modelingApiMock.list.mockResolvedValue({ projects: [{ ...forecast, state: 'model_approval_pending' }], total: 1 })
+    modelingApiMock.listArtifacts.mockResolvedValue({ artifacts: [], total: 0 })
+    modelingApiMock.listApprovals.mockResolvedValue({
+      approvals: [
+        { approval_id: 'old', project_id: 'project-1', gate: 'model_approval', payload_hash: 'old-hash', payload: { artifact_id: 'old-plan', artifact_sha256: 'old-sha', version: 1 }, status: 'pending', created_at: '2026-07-11T01:00:00' },
+        { approval_id: 'new', project_id: 'project-1', gate: 'model_approval', payload_hash: 'new-hash', payload: { artifact_id: 'new-plan', artifact_sha256: 'new-sha', version: 2 }, status: 'pending', created_at: '2026-07-11T02:00:00' },
+      ],
+      total: 2,
+    })
+    modelingApiMock.getArtifact.mockResolvedValue({
+      artifact_id: 'new-plan',
+      content: { problem_summary: 'Newest', candidates: [] },
+    })
+
+    render(<ModelingProjectsView />)
+
+    await screen.findByText('Model plan approval')
+    expect(modelingApiMock.getArtifact).toHaveBeenCalledWith('project-1', 'new-plan')
+    expect(screen.getByText(/new-sha/)).toBeInTheDocument()
+  })
+
+  it('ignores an out-of-order evidence response from the previous project', async () => {
+    let resolveFirst: (value: unknown) => void = () => undefined
+    const firstArtifacts = new Promise((resolve) => { resolveFirst = resolve })
+    const second = { ...forecast, project_id: 'project-2', name: 'Second', slug: 'second' }
+    modelingApiMock.list.mockResolvedValue({ projects: [forecast, second], total: 2 })
+    modelingApiMock.listArtifacts
+      .mockReturnValueOnce(firstArtifacts)
+      .mockResolvedValueOnce({ artifacts: [{ artifact_id: 'second-artifact', artifact_type: 'data_input', relative_path: 'data/raw/second.csv' }], total: 1 })
+    modelingApiMock.listApprovals.mockResolvedValue({ approvals: [], total: 0 })
+    render(<ModelingProjectsView />)
+
+    await screen.findByRole('heading', { name: 'Forecast' })
+    fireEvent.click(screen.getByRole('button', { name: /Second/ }))
+    expect(await screen.findByRole('heading', { name: 'Second' })).toBeInTheDocument()
+    expect(await screen.findByText(/second.csv/)).toBeInTheDocument()
+    resolveFirst({ artifacts: [{ artifact_id: 'old-artifact', artifact_type: 'data_input', relative_path: 'data/raw/old.csv' }], total: 1 })
+
+    await waitFor(() => expect(screen.queryByText(/old.csv/)).not.toBeInTheDocument())
+    expect(screen.getByText(/second.csv/)).toBeInTheDocument()
   })
 })

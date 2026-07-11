@@ -39,7 +39,8 @@ export default function ModelPlanApprovalCard({ projectId, approval, plan, onDec
   return (
     <section className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950">
       <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Model plan approval</h2>
-      <p className="mt-1 break-all text-xs text-gray-600 dark:text-gray-300">Approval hash: {approval.payload_hash}</p>
+      <p className="mt-1 break-all text-xs text-gray-600 dark:text-gray-300">Plan artifact SHA-256: {approval.payload.artifact_sha256}</p>
+      <p className="mt-1 break-all text-xs text-gray-600 dark:text-gray-300">Approval payload hash: {approval.payload_hash}</p>
       <p className="mt-3 text-sm text-gray-700 dark:text-gray-200">{plan.problem_summary}</p>
       <div className="mt-3 space-y-3">
         {plan.candidates.map((candidate) => (
