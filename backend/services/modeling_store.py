@@ -133,6 +133,34 @@ class ModelingStore:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS paper_claims (
+                    claim_id TEXT PRIMARY KEY,
+                    project_id TEXT NOT NULL,
+                    paper_artifact_id TEXT NOT NULL,
+                    placeholder TEXT NOT NULL,
+                    claim_type TEXT NOT NULL,
+                    artifact_id TEXT NOT NULL,
+                    experiment_id TEXT NOT NULL,
+                    metric_name TEXT,
+                    rendered_value TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS review_runs (
+                    review_id TEXT PRIMARY KEY,
+                    project_id TEXT NOT NULL,
+                    paper_hash TEXT NOT NULL,
+                    issues_json TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
             columns = {
                 row[1] for row in conn.execute("PRAGMA table_info(experiment_runs)")
             }
@@ -421,6 +449,44 @@ class ModelingStore:
                 "DELETE FROM project_artifacts WHERE artifact_id = ?",
                 (artifact_id,),
             )
+
+    def replace_paper_claims(
+        self, project_id: str, paper_artifact_id: str, claims: list[dict]
+    ) -> None:
+        now = datetime.now().isoformat()
+        with self._connect() as conn:
+            conn.execute(
+                "DELETE FROM paper_claims WHERE project_id = ? AND paper_artifact_id = ?",
+                (project_id, paper_artifact_id),
+            )
+            for claim in claims:
+                conn.execute(
+                    """
+                    INSERT INTO paper_claims (
+                        claim_id, project_id, paper_artifact_id, placeholder, claim_type,
+                        artifact_id, experiment_id, metric_name, rendered_value, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        str(uuid.uuid4()), project_id, paper_artifact_id,
+                        claim["placeholder"], claim["claim_type"], claim["artifact_id"],
+                        claim["experiment_id"], claim.get("metric_name"),
+                        claim["rendered_value"], now,
+                    ),
+                )
+
+    def list_paper_claims(
+        self, project_id: str, paper_artifact_id: str | None = None
+    ) -> list[dict]:
+        query = "SELECT * FROM paper_claims WHERE project_id = ?"
+        params = [project_id]
+        if paper_artifact_id is not None:
+            query += " AND paper_artifact_id = ?"
+            params.append(paper_artifact_id)
+        query += " ORDER BY created_at, claim_id"
+        with self._connect() as conn:
+            rows = conn.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
 
     @staticmethod
     def _approval_from_row(row) -> dict | None:
