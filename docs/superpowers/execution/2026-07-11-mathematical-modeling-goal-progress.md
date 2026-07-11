@@ -7,14 +7,14 @@
 ```yaml
 workflow: mathematical-modeling
 current_phase: 6
-phase_status: in_progress
-current_task: "Task 7: Documentation and Phase 6 Gate"
-task_status: in_progress
+phase_status: completed
+current_task: "Gate 6 complete"
+task_status: verified
 baseline_commit: fd74c07a9b0b8e34c3b4c71bf8fef3f1a63420ae
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase6"
-last_verified_commit: 748f7b0
+last_verified_commit: 1a02173
 last_verification: "Gate 6: backend 281 passed, 4 skipped, 13 subtests; frontend 33 files/148 tests; production build passed; isolated startup recovery audit passed"
-next_action: "Commit Task 7 documentation, then record the Gate 6 completion SHA"
+next_action: "Phase 6 complete; stop Goal and report all six phases"
 ```
 
 ## 启动前风险
@@ -33,7 +33,7 @@ next_action: "Commit Task 7 documentation, then record the Gate 6 completion SHA
 | 3 | completed | `2026-07-10-mathematical-modeling-phase3-experiments.md` | passed | `0a6e542` + `c72749f` + completion ledger commit |
 | 4 | completed | `2026-07-10-mathematical-modeling-phase4-paper.md` | passed | Task 1 `34fea97` + `ee6ed66`; Task 2 `313e66c` + `b0c167b`; Task 3 `9d2e4cd` + `fc0205e`; Task 4 `4648b01` + `f38bbd2`; Task 5 `a645dda`; Task 6 `54f3fc8` + `8363a3e` |
 | 5 | completed | `2026-07-10-mathematical-modeling-phase5-delivery-git.md` | passed | Task 1 `eab060d`; Task 2 `155d8e5` + `6e311ce`; Task 3 `d7099da`; Task 4 `b3906df`; Task 5 `cd59950`; Task 6 `64cb92d`; review fixes `9de6eb8` |
-| 6 | in_progress | `2026-07-10-mathematical-modeling-phase6-hardening.md` | pending | Task 1 `9d9745d` through `56e6d28`; Task 2 `5bb2c53` + `2b09292`; Task 3 `df597ae` through `f701b0b`; Task 4 `30da3f9` through `890fe5b`; Task 5 `650960f` through `4661b83`; Task 6 `b38d000` through `820ca98`; Task 7 pending commit |
+| 6 | completed | `2026-07-10-mathematical-modeling-phase6-hardening.md` | passed | Task 1 `9d9745d` through `56e6d28`; Task 2 `5bb2c53` + `2b09292`; Task 3 `df597ae` through `f701b0b`; Task 4 `30da3f9` through `890fe5b`; Task 5 `650960f` through `4661b83`; Task 6 `b38d000` through `820ca98`; Task 7 `1a02173` |
 
 ## 当前阶段 Task 记录
 
@@ -79,13 +79,13 @@ next_action: "Commit Task 7 documentation, then record the Gate 6 completion SHA
 
 ### Phase 6 / Task 7: Documentation and Release Verification
 
-- 状态：in_progress；提交：pending task commit。
+- 状态：verified；提交：`1a02173`。
 - 文档：`README.md` 说明运行时前置条件、六阶段用户流、四个审批、原始数据与恢复策略、能力降级和固定 24 行赛题；`TESTING_GUIDE.md` 记录完整命令、人工恢复/Git 审计和能力预期。
 - Gate 修复：完整后端运行暴露 Phase 3 checkpoint 使用 `{}` 旧 profile 夹具，无法满足已验证的数据 profile target 契约；夹具改为声明 `price` 和 `sales`，不放宽生产校验。
 - 完整验证：`DEBUG=false; PYTHONPATH=backend; python -m pytest backend/tests -q`，退出码 0，281 passed、4 skipped、13 subtests passed；`npm test -- --run`，退出码 0，33 files、148 tests passed；`npm run build`，退出码 0（仅 Vite chunk-size warning）。
 - 启动审计：隔离临时数据库/工作区中注入 `experiment_running` 后启动真实 FastAPI；启动钩子将项目恢复到 `experiment_implementation`，实验为 `failed/interrupted`，持久化 recovery record，审计服务随后停止。
 - Git 审计：Phase 5 checkpoint 验证项目独立仓库 `git remote` 为空；本仓库的既有 `origin` 未修改；`git diff --check` 通过；未跟踪 `data/` 保持不暂存。
-- Gate 6：pending Task 7 independent commit.
+- Gate 6：passed。
 
 ### Phase 5 / Task 1: Reproducibility and Delivery Contracts
 
