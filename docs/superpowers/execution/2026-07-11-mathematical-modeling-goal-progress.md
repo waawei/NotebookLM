@@ -7,14 +7,14 @@
 ```yaml
 workflow: mathematical-modeling
 current_phase: 5
-phase_status: in_progress
+phase_status: completed
 current_task: "Task 6: Phase 5 Independent-Repository Checkpoint"
 task_status: verified
 baseline_commit: 1a6a55a7c95cfd26a6568dbfda66d19f3a688c49
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase5"
 last_verified_commit: 9de6eb81b634b1701413f42af010787690500c3d
-last_verification: "Phase 4 Gate regression 9 passed; Phase 5 Task 1 3 passed; Task 2 review regression 7 passed/1 skipped; Task 3 2 passed/1 skipped; Task 4 5 passed; Task 5 backend 10 passed/2 skipped and frontend 3 files/11 tests/build; Task 6 checkpoint 4 passed; review fixes backend 18 passed/2 skipped, frontend 30 files/127 tests, production build passed"
-next_action: "Resolve repeatable full-backend pytest runner hang before Phase 5 completion; do not start Phase 6"
+last_verification: "Gate 5 passed: backend 238 passed/3 skipped/13 subtests; frontend 30 files/127 tests; production build passed; independent repository checkpoint passed"
+next_action: "Stop after Phase 5 and wait for user review; do not start Phase 6"
 ```
 
 ## 启动前风险
@@ -32,8 +32,8 @@ next_action: "Resolve repeatable full-backend pytest runner hang before Phase 5 
 | 2 | completed | `2026-07-10-mathematical-modeling-phase2-intake-planning.md` | passed | `09000b4` + completion ledger commit |
 | 3 | completed | `2026-07-10-mathematical-modeling-phase3-experiments.md` | passed | `0a6e542` + `c72749f` + completion ledger commit |
 | 4 | completed | `2026-07-10-mathematical-modeling-phase4-paper.md` | passed | Task 1 `34fea97` + `ee6ed66`; Task 2 `313e66c` + `b0c167b`; Task 3 `9d2e4cd` + `fc0205e`; Task 4 `4648b01` + `f38bbd2`; Task 5 `a645dda`; Task 6 `54f3fc8` + `8363a3e` |
-| 5 | in_progress | `2026-07-10-mathematical-modeling-phase5-delivery-git.md` | pending | Tasks 1–6 completed; final Gate pending |
-| 6 | blocked_by_phase_5 | `2026-07-10-mathematical-modeling-phase6-hardening.md` | pending | — |
+| 5 | completed | `2026-07-10-mathematical-modeling-phase5-delivery-git.md` | passed | Task 1 `eab060d`; Task 2 `155d8e5` + `6e311ce`; Task 3 `d7099da`; Task 4 `b3906df`; Task 5 `cd59950`; Task 6 `64cb92d`; review fixes `9de6eb8` |
+| 6 | not_started | `2026-07-10-mathematical-modeling-phase6-hardening.md` | pending | — |
 
 ## 当前阶段 Task 记录
 
@@ -122,6 +122,16 @@ next_action: "Resolve repeatable full-backend pytest runner hang before Phase 5 
 - 现象：`DEBUG=false; python -m pytest tests -q` 从 `backend/` 执行时，runner 在约 25 秒后失去会话输出并留下 pytest 子进程；排除 `test_phase3_reproducibility_checkpoint.py` 后仍复现。
 - 已排除：单独 `test_phase3_reproducibility_checkpoint.py` 退出码 0，1 passed；阶段 5 全部聚焦 backend 回归退出码 0，18 passed、2 skipped；阶段 4 Gate 聚焦回归 9 passed。
 - 处理：已在每次诊断后终止仅由本次 pytest 启动的遗留 Python 子进程；未改动或删除仓库文件。必须在后续 Goal 回合继续诊断，当前不得将 Gate 5 或 Phase 5 标记为完成。
+
+### Phase 5 Gate 5 Completion
+
+- 状态：verified
+- 完整后端：使用隐藏受控进程完成 `DEBUG=false; python -m pytest tests -q`，退出码 0，238 passed、3 skipped、13 subtests passed，耗时 123.88s；先前交互通道只是在长时间 venv/ensurepip fixture 执行时丢失输出，并非测试失败。
+- 完整前端：`npm test -- --run` 退出码 0，30 files、127 tests passed；保留既有 `act(...)` 警告。
+- 生产构建：`npm run build` 退出码 0；保留既有 Vite chunk-size warning。
+- Git 审计：`git diff --check 1a6a55a..HEAD` 通过；无 tracked symlink；未执行 push 或 remote 修改。工作树仅保留测试生成、未跟踪且未暂存的 `data/`。
+- 独立审查：P1 index/manifest/hash binding 与 P2 delivery/approval UI findings 均以 `9de6eb8` 修复并由 backend 18 passed、2 skipped及完整 Gate 复核。
+- Gate 5：passed。Phase 6 维持 `not_started`。
 
 ### Phase 5 / Task 2 Review Fixes
 
