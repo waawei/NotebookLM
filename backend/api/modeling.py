@@ -33,6 +33,7 @@ from services.git_policy_service import GitPolicyService
 from services.git_commit_service import GitCommitService
 from services.output_service import OutputService
 from services.modeling_recovery_service import ModelingRecoveryService
+from services.modeling_runtime_status import ModelingRuntimeStatus
 
 
 router = APIRouter()
@@ -71,6 +72,7 @@ delivery_service = DeliveryService(modeling_store, artifact_service, OutputServi
 git_policy_service = GitPolicyService()
 git_commit_service = GitCommitService(modeling_store, approval_service, git_policy_service, delivery_service.reproducibility)
 recovery_service = ModelingRecoveryService(modeling_store, project_service.agent_store)
+runtime_status_service = ModelingRuntimeStatus(settings.MODELING_WORKSPACE_ROOT)
 
 
 class ProjectCreate(BaseModel):
@@ -108,6 +110,11 @@ class GitCommitRequest(GitReviewRequest):
 async def list_recoveries():
     recoveries = modeling_store.list_recoveries()
     return {"recoveries": recoveries, "total": len(recoveries)}
+
+
+@router.get("/runtime")
+async def runtime_status():
+    return runtime_status_service.status()
 
 
 @router.post("/recoveries/{recovery_id}/dismiss")
