@@ -15,6 +15,12 @@ const modelingApiMock = vi.hoisted(() => ({
   createModelPlan: vi.fn(),
   uploadInput: vi.fn(),
   decideApproval: vi.fn(),
+  checkDeliverables: vi.fn(),
+  buildDeliverables: vi.fn(),
+  gitStatus: vi.fn(),
+  reviewGit: vi.fn(),
+  requestCommit: vi.fn(),
+  commit: vi.fn(),
 }))
 
 vi.mock('../services/api', () => ({ modelingApi: modelingApiMock }))
@@ -65,6 +71,8 @@ describe('ModelingProjectsView', () => {
     modelingApiMock.profileData.mockResolvedValue({})
     modelingApiMock.createModelPlan.mockResolvedValue({})
     modelingApiMock.getArtifact.mockResolvedValue({})
+    modelingApiMock.checkDeliverables.mockResolvedValue({ ok: false, issues: [] })
+    modelingApiMock.gitStatus.mockResolvedValue({ paths: [] })
   })
 
   it('loads projects, selects one, and creates a project', async () => {
