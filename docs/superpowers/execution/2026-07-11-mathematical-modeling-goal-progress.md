@@ -6,15 +6,15 @@
 
 ```yaml
 workflow: mathematical-modeling
-current_phase: 2
-phase_status: completed
-current_task: "Task 6: Phase 2 Real-Data Checkpoint"
-task_status: verified
+current_phase: 3
+phase_status: in_progress
+current_task: "Task 1: Experiment Contracts and Records"
+task_status: in_progress
 baseline_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
-worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase2"
-last_verified_commit: 09000b4
-last_verification: "Gate 2 passed: backend 170 passed/1 skipped/13 subtests, frontend 120 passed, production build passed, real UTF-8/CSV checkpoint passed, and final review found no Critical or Important issues"
-next_action: "Stop after Phase 2 and wait for user review; do not start Phase 3"
+worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase3"
+last_verified_commit: 6f534ebb805457ed79110785e4a605c0131117bd
+last_verification: "Gate 2 reverified: Phase 2 checkpoint 1 passed; backend 170 passed/1 skipped/13 subtests; frontend 120 passed; production build passed"
+next_action: "Complete Phase 3 Task 1 with contract and immutable experiment-record tests"
 ```
 
 ## 启动前风险
@@ -30,12 +30,24 @@ next_action: "Stop after Phase 2 and wait for user review; do not start Phase 3"
 | --- | --- | --- | --- | --- |
 | 1 | completed | `2026-07-10-mathematical-modeling-phase1-foundation.md` | passed | Task 6 ledger commit |
 | 2 | completed | `2026-07-10-mathematical-modeling-phase2-intake-planning.md` | passed | `09000b4` + completion ledger commit |
-| 3 | not_started | `2026-07-10-mathematical-modeling-phase3-experiments.md` | pending | — |
+| 3 | in_progress | `2026-07-10-mathematical-modeling-phase3-experiments.md` | pending | — |
 | 4 | blocked_by_phase_3 | `2026-07-10-mathematical-modeling-phase4-paper.md` | pending | — |
 | 5 | blocked_by_phase_4 | `2026-07-10-mathematical-modeling-phase5-delivery-git.md` | pending | — |
 | 6 | blocked_by_phase_5 | `2026-07-10-mathematical-modeling-phase6-hardening.md` | pending | — |
 
 ## 当前阶段 Task 记录
+
+### Phase 3 / Task 1: Experiment Contracts and Records
+
+- 状态：verified
+- 预计文件：`backend/services/experiment_contracts.py`, `backend/services/modeling_store.py`, `backend/tests/test_experiment_contracts.py`, `backend/tests/test_experiment_store.py`
+- 实际文件：`backend/services/experiment_contracts.py`, `backend/services/modeling_store.py`, `backend/tests/test_experiment_contracts.py`, `backend/tests/test_experiment_store.py`
+- 失败测试：`DEBUG=false; PYTHONPATH=backend; python -m pytest backend/tests/test_experiment_contracts.py backend/tests/test_experiment_store.py -q`，退出码 2；按预期因缺少 `services.experiment_contracts` 收集失败
+- 聚焦验证：同一命令退出码 0，3 passed
+- 相关回归：`DEBUG=false; PYTHONPATH=backend; python -m pytest backend/tests/test_experiment_contracts.py backend/tests/test_experiment_store.py backend/tests/test_modeling_store.py backend/tests/test_artifact_service.py backend/tests/test_approval_service.py -q`，退出码 0，11 passed
+- 提交：实现 `5b5d6db`；审查修复 `5f69d1c`
+- 保留的用户改动：无；Phase 3 工作树从 `6f534eb` 创建时干净
+- 备注：Gate 2 以 Phase 2 完成工作树的新鲜检查点、后端、前端和构建证据复核；未开始 Phase 4。独立审查发现状态更新会清除未提供的运行字段，且存储层能绕过实验契约；新增先红后绿回归，状态更新仅修改明确字段，存储层验证实验 ID、配置与执行票据哈希。
 
 ### Phase 2 / Task 6: Phase 2 Real-Data Checkpoint
 
