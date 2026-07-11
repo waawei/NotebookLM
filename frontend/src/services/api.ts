@@ -326,6 +326,7 @@ export interface ExperimentRun {
   pid?: number | null
   exit_code?: number | null
   error_code?: string | null
+  artifacts?: ModelingArtifact[]
 }
 
 export const documentApi = {

@@ -70,7 +70,8 @@ def test_code_agent_creates_hashed_bounded_experiment_draft(tmp_path):
     result = asyncio.run(service.prepare_experiment(project["project_id"], 0))
 
     assert result["experiment"]["experiment_id"] == "exp-0001"
-    assert result["batch"]["commands"] == [["python", "src/train.py", "--config", "experiments/exp-0001/config.json"]]
+    assert result["batch"]["commands"][0][0].endswith(".venv\\Scripts\\python.exe")
+    assert result["batch"]["commands"][0][1:] == ["src/train.py", "--config", "experiments/exp-0001/config.json"]
     assert len(result["batch"]["code_hash"]) == 64
     assert (workspace / "src" / "train.py").is_file()
     assert (workspace / "experiments" / "exp-0001" / "config.json").is_file()

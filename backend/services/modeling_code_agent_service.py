@@ -9,6 +9,7 @@ from pydantic import Field, ValidationError, field_validator, model_validator
 from services.approval_service import canonical_hash
 from services.experiment_contracts import ExecutionBatch, ExperimentConfig
 from services.modeling_contracts import StrictModel
+from services.project_environment_service import ProjectEnvironmentService
 
 
 class GeneratedFile(StrictModel):
@@ -77,8 +78,8 @@ class ModelingCodeAgentService:
             generated = GeneratedExperiment.model_validate_json(await self.llm.generate(prompt))
         except (ValidationError, json.JSONDecodeError) as error:
             raise ValueError(self._validation_message(error)) from error
-        self._validate_commands(generated.commands)
         root = Path(project["workspace_path"]).resolve()
+        commands = self._normalize_commands(project, generated.commands)
         config = self._config(experiment_id, candidate, plan_payload)
         input_hashes = self._input_hashes(project)
         source_hashes = self._source_hashes(
@@ -89,7 +90,7 @@ class ModelingCodeAgentService:
         source_hash = self._combined_hash(source_hashes)
         batch = ExecutionBatch(
             experiment_id=experiment_id,
-            commands=generated.commands,
+            commands=commands,
             timeout_seconds=600,
             max_output_bytes=1_048_576,
             network_allowed=False,
@@ -200,7 +201,9 @@ class ModelingCodeAgentService:
         return f"exp-{number:04d}"
 
     @staticmethod
-    def _validate_commands(commands: list[list[str]]) -> None:
+    def _normalize_commands(project: dict, commands: list[list[str]]) -> list[list[str]]:
+        project_python = str(ProjectEnvironmentService().ensure_created(project))
+        normalized_commands = []
         for command in commands:
             if not command or any(not isinstance(item, str) or not item for item in command):
                 raise ValueError("Generated command must be a non-empty argument array")
@@ -208,6 +211,8 @@ class ModelingCodeAgentService:
                 raise ValueError("Generated commands must begin with python")
             if any(Path(argument).is_absolute() or ".." in PurePosixPath(argument).parts for argument in command[1:]):
                 raise ValueError("Generated command path escapes project workspace")
+            normalized_commands.append([project_python, *command[1:]])
+        return normalized_commands
 
     @staticmethod
     def _config(experiment_id: str, candidate: dict, plan: dict) -> dict:

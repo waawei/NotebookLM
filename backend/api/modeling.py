@@ -295,6 +295,13 @@ async def prepare_experiment(project_id: str, candidate_index: int = 0):
 async def list_experiments(project_id: str):
     _require_project(project_id)
     experiments = modeling_store.list_experiments(project_id)
+    artifacts = artifact_service.list_for_project(project_id)
+    for experiment in experiments:
+        experiment["artifacts"] = [
+            item
+            for item in artifacts
+            if item.get("source_experiment_id") == experiment["experiment_id"]
+        ]
     return {"experiments": experiments, "total": len(experiments)}
 
 
@@ -304,6 +311,11 @@ async def get_experiment(project_id: str, experiment_id: str):
     experiment = modeling_store.get_experiment(experiment_id)
     if not experiment or experiment["project_id"] != project_id:
         raise HTTPException(status_code=404, detail="Experiment not found")
+    experiment["artifacts"] = [
+        item
+        for item in artifact_service.list_for_project(project_id)
+        if item.get("source_experiment_id") == experiment_id
+    ]
     return experiment
 
 

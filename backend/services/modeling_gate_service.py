@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 from services.approval_service import canonical_hash
+from services.experiment_contracts import MetricRecord
 
 
 class ModelingGateService:
@@ -53,7 +54,7 @@ class ModelingGateService:
             if item["status"] == "completed"
         ]
         kinds = {item["config"]["model"]["kind"] for item in experiments}
-        if "baseline" not in kinds or len(experiments) < 2:
+        if "baseline" not in kinds or not any(kind != "baseline" for kind in kinds):
             raise ValueError("Result validation requires completed baseline and candidate experiments")
         root = Path(self.store.get_project(project_id)["workspace_path"]).resolve()
         for experiment in experiments:
@@ -62,7 +63,11 @@ class ModelingGateService:
                 metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError) as error:
                 raise ValueError("Result validation requires validation metrics") from error
-            if not isinstance(metrics, list) or not any(item.get("split") == "validation" for item in metrics if isinstance(item, dict)):
+            try:
+                validated = [MetricRecord.model_validate(item) for item in metrics]
+            except Exception as error:
+                raise ValueError("Result validation requires validation metrics") from error
+            if not validated or not any(item.split == "validation" for item in validated):
                 raise ValueError("Result validation requires validation metrics")
         artifacts = self.store.list_artifacts(project_id)
         if not any(item["artifact_type"] in {"experiment_figure", "experiment_table"} for item in artifacts):
