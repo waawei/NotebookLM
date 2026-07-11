@@ -281,7 +281,11 @@ export interface ApprovalRequest {
   project_id: string
   gate: string
   payload_hash: string
-  payload: { artifact_id: string; artifact_sha256: string; version: number }
+  payload: {
+    artifact_id?: string
+    artifact_sha256?: string
+    version?: number
+  }
   status: string
   created_at?: string
   updated_at?: string
@@ -299,6 +303,29 @@ export interface ModelCandidate {
 export interface ModelPlan {
   problem_summary: string
   candidates: ModelCandidate[]
+}
+
+export interface ExecutionBatch {
+  experiment_id: string
+  commands: string[][]
+  timeout_seconds: number
+  max_output_bytes: number
+  network_allowed: boolean
+  code_hash: string
+  input_hashes: Record<string, string>
+  source_hashes: Record<string, string>
+}
+
+export interface ExperimentRun {
+  experiment_id: string
+  project_id: string
+  config: { model: { kind: string }; seed: number; metrics: Array<{ name: string; direction: string }> }
+  execution_payload_hash?: string | null
+  execution_batch?: ExecutionBatch
+  status: string
+  pid?: number | null
+  exit_code?: number | null
+  error_code?: string | null
 }
 
 export const documentApi = {
@@ -600,6 +627,10 @@ export const modelingApi = {
     approvalId: string,
     decision: { decision: 'approved' | 'changes_requested' | 'rejected'; payload_hash: string; comment: string },
   ) => (await api.post(`/modeling/projects/${projectId}/approvals/${approvalId}/decide`, decision)).data,
+  prepareExperiment: async (projectId: string, candidateIndex: number) => (await api.post(`/modeling/projects/${projectId}/experiments/prepare`, null, { params: { candidate_index: candidateIndex } })).data,
+  listExperiments: async (projectId: string): Promise<{ experiments: ExperimentRun[]; total: number }> => (await api.get(`/modeling/projects/${projectId}/experiments`)).data,
+  requestExecution: async (projectId: string, experimentId: string): Promise<ApprovalRequest> => (await api.post(`/modeling/projects/${projectId}/experiments/${experimentId}/request-execution`)).data,
+  executeExperiment: async (projectId: string, experimentId: string): Promise<ExperimentRun> => (await api.post(`/modeling/projects/${projectId}/experiments/${experimentId}/execute`)).data,
 }
 
 export default api

@@ -119,6 +119,12 @@ class ModelingCodeAgentService:
                 path.parent.mkdir(parents=True, exist_ok=True)
                 self._atomic_write(path, content)
             experiment = self.store.create_experiment(experiment_id, project_id, config, None)
+            self.store.set_experiment_execution_batch(
+                experiment_id,
+                canonical_hash(batch.model_dump(mode="json")),
+                batch.model_dump(mode="json"),
+            )
+            experiment = self.store.get_experiment(experiment_id)
             self.run_service.complete(task["task_id"], run["run_id"], [])
             return {"experiment": experiment, "batch": batch.model_dump(mode="json")}
         except Exception as error:

@@ -18,6 +18,10 @@ from services.modeling_project_service import ModelingProjectService
 from services.modeling_role_service import ModelingRoleService
 from services.modeling_store import ModelingStore
 from services.modeling_workspace import ModelingWorkspaceService
+from services.modeling_code_agent_service import ModelingCodeAgentService
+from services.execution_policy import ExecutionPolicy
+from services.experiment_service import ExperimentService
+from services.experiment_contracts import ExecutionBatch
 
 
 router = APIRouter()
@@ -43,6 +47,11 @@ role_service = ModelingRoleService(
     run_service,
     LLMService(),
 )
+code_agent_service = ModelingCodeAgentService(
+    modeling_store, artifact_service, approval_service, run_service, LLMService()
+)
+execution_policy = ExecutionPolicy(approval_service)
+experiment_service = ExperimentService(modeling_store, artifact_service, execution_policy)
 
 
 class ProjectCreate(BaseModel):
@@ -270,4 +279,55 @@ async def decide_approval(
             status = 400
         else:
             status = 409
+        raise HTTPException(status_code=status, detail=detail) from error
+
+
+@router.post("/projects/{project_id}/experiments/prepare")
+async def prepare_experiment(project_id: str, candidate_index: int = 0):
+    _require_state(project_id, "experiment_implementation")
+    try:
+        return await code_agent_service.prepare_experiment(project_id, candidate_index)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.get("/projects/{project_id}/experiments")
+async def list_experiments(project_id: str):
+    _require_project(project_id)
+    experiments = modeling_store.list_experiments(project_id)
+    return {"experiments": experiments, "total": len(experiments)}
+
+
+@router.get("/projects/{project_id}/experiments/{experiment_id}")
+async def get_experiment(project_id: str, experiment_id: str):
+    _require_project(project_id)
+    experiment = modeling_store.get_experiment(experiment_id)
+    if not experiment or experiment["project_id"] != project_id:
+        raise HTTPException(status_code=404, detail="Experiment not found")
+    return experiment
+
+
+@router.post("/projects/{project_id}/experiments/{experiment_id}/request-execution")
+async def request_experiment_execution(project_id: str, experiment_id: str):
+    project = _require_state(project_id, "execution_approval_pending")
+    experiment = modeling_store.get_experiment(experiment_id)
+    if not experiment or experiment["project_id"] != project_id or "execution_batch" not in experiment:
+        raise HTTPException(status_code=404, detail="Prepared experiment not found")
+    try:
+        batch = ExecutionBatch.model_validate(experiment["execution_batch"])
+        request = execution_policy.request_execution(project, batch)
+        modeling_store.set_experiment_execution_batch(experiment_id, request["payload_hash"], batch.model_dump(mode="json"))
+        return request
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@router.post("/projects/{project_id}/experiments/{experiment_id}/execute")
+async def execute_experiment(project_id: str, experiment_id: str):
+    _require_state(project_id, "execution_approval_pending")
+    try:
+        return experiment_service.execute(project_id, experiment_id)
+    except ValueError as error:
+        detail = str(error)
+        status = 409 if "approval" in detail.lower() or "content" in detail.lower() else 400
         raise HTTPException(status_code=status, detail=detail) from error

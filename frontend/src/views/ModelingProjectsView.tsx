@@ -1,9 +1,11 @@
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertCircle, ChevronLeft, ChevronRight, Loader2, RefreshCw } from 'lucide-react'
-import { modelingApi, type ApprovalRequest, type ModelingArtifact, type ModelingProject, type ModelPlan } from '../services/api'
+import { modelingApi, type ApprovalRequest, type ExecutionBatch, type ExperimentRun, type ModelingArtifact, type ModelingProject, type ModelPlan } from '../services/api'
 import { useStore } from '../store/useStore'
 import ModelingInputPanel from '../components/ModelingInputPanel'
 import ModelPlanApprovalCard from '../components/ModelPlanApprovalCard'
+import ExperimentApprovalCard from '../components/ExperimentApprovalCard'
+import ExperimentRunPanel from '../components/ExperimentRunPanel'
 
 const MODELING_WORKFLOW_STATES = new Set([
   'project_initialized',
@@ -58,6 +60,7 @@ export default function ModelingProjectsView() {
   const [artifacts, setArtifacts] = useState<ModelingArtifact[]>([])
   const [approvals, setApprovals] = useState<ApprovalRequest[]>([])
   const [modelPlan, setModelPlan] = useState<ModelPlan | null>(null)
+  const [experiments, setExperiments] = useState<ExperimentRun[]>([])
   const [evidenceProjectId, setEvidenceProjectId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const evidenceGeneration = useRef(0)
@@ -102,13 +105,15 @@ export default function ModelingProjectsView() {
     setModelPlan(null)
     setEvidenceProjectId(null)
     try {
-      const [artifactData, approvalData] = await Promise.all([
+      const [artifactData, approvalData, experimentData] = await Promise.all([
         modelingApi.listArtifacts(projectId),
         modelingApi.listApprovals(projectId),
+        modelingApi.listExperiments(projectId),
       ])
       if (generation !== evidenceGeneration.current) return
       setArtifacts(artifactData.artifacts)
       setApprovals(approvalData.approvals)
+      setExperiments(experimentData.experiments)
       const pending = approvalData.approvals
         .filter((item) => item.gate === 'model_approval' && item.status === 'pending')
         .sort((left, right) => {
@@ -118,6 +123,7 @@ export default function ModelingProjectsView() {
           return version || right.approval_id.localeCompare(left.approval_id)
         })[0]
       if (pending) {
+        if (!pending.payload.artifact_id) throw new Error('Model approval payload is incomplete')
         const planArtifact = await modelingApi.getArtifact(projectId, pending.payload.artifact_id)
         if (generation !== evidenceGeneration.current) return
         setModelPlan(planArtifact.content as ModelPlan)
@@ -139,6 +145,7 @@ export default function ModelingProjectsView() {
       setArtifacts([])
       setApprovals([])
       setModelPlan(null)
+      setExperiments([])
       setEvidenceProjectId(null)
     }
   }, [selectedProject?.project_id, selectedProject?.state])
@@ -208,6 +215,39 @@ export default function ModelingProjectsView() {
       if (created !== 0) return created
       return (right.payload?.version || 0) - (left.payload?.version || 0)
     })[0] : undefined
+  const pendingExecutionApproval = evidenceProjectId === selectedProject?.project_id ? approvals
+    .filter((item) => item.gate === 'execution_approval' && item.status === 'pending')[0] : undefined
+  const approvalExperiment = pendingExecutionApproval ? experiments.find((item) => item.execution_payload_hash === pendingExecutionApproval.payload_hash) : undefined
+
+  const prepareExperiment = async () => {
+    if (!selectedProject) return
+    setStageBusy(true)
+    setError('')
+    try {
+      await modelingApi.prepareExperiment(selectedProject.project_id, experiments.length)
+      await loadEvidence(selectedProject.project_id)
+    } catch { setError('Unable to prepare the approved experiment.') } finally { setStageBusy(false) }
+  }
+
+  const requestExecution = async (experimentId: string) => {
+    if (!selectedProject) return
+    setStageBusy(true)
+    setError('')
+    try {
+      await modelingApi.requestExecution(selectedProject.project_id, experimentId)
+      await loadEvidence(selectedProject.project_id)
+    } catch { setError('Unable to request experiment execution approval.') } finally { setStageBusy(false) }
+  }
+
+  const executeExperiment = async (experimentId: string) => {
+    if (!selectedProject) return
+    setStageBusy(true)
+    setError('')
+    try {
+      await modelingApi.executeExperiment(selectedProject.project_id, experimentId)
+      await loadEvidence(selectedProject.project_id)
+    } catch { setError('Unable to execute the approved experiment.') } finally { setStageBusy(false) }
+  }
 
   return (
     <div className="grid h-full grid-cols-[minmax(260px,340px)_1fr] bg-gray-100 dark:bg-gray-950">
@@ -254,6 +294,10 @@ export default function ModelingProjectsView() {
               {selectedProject.state === 'data_profiling' && <button type="button" disabled={stageBusy || !artifacts.some((item) => item.artifact_type === 'data_input')} onClick={() => void runStageAction()} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Profile data</button>}
               {selectedProject.state === 'model_planning' && <button type="button" disabled={stageBusy} onClick={() => void runStageAction()} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Create model plan</button>}
               {pendingModelApproval && modelPlan && <ModelPlanApprovalCard key={pendingModelApproval.approval_id} projectId={selectedProject.project_id} approval={pendingModelApproval} plan={modelPlan} onDecided={() => loadEvidence(selectedProject.project_id)} />}
+              {selectedProject.state === 'experiment_implementation' && <button type="button" disabled={stageBusy} onClick={() => void prepareExperiment()} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Prepare experiment</button>}
+              {selectedProject.state === 'execution_approval_pending' && experiments.filter((item) => item.status === 'prepared').map((item) => <button key={item.experiment_id} type="button" disabled={stageBusy} onClick={() => void requestExecution(item.experiment_id)} className="mr-2 rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Request execution approval: {item.experiment_id}</button>)}
+              {pendingExecutionApproval && approvalExperiment?.execution_batch && <ExperimentApprovalCard projectId={selectedProject.project_id} approval={pendingExecutionApproval} batch={approvalExperiment.execution_batch as ExecutionBatch} onDecided={() => loadEvidence(selectedProject.project_id)} />}
+              {experiments.length > 0 && <ExperimentRunPanel experiments={experiments} onExecute={(experimentId) => void executeExperiment(experimentId)} />}
               {artifacts.length > 0 && <section aria-label="Modeling artifacts" className="rounded border border-gray-200 p-3 dark:border-gray-800"><h2 className="text-sm font-semibold">Artifacts</h2><ul className="mt-2 space-y-1 text-xs text-gray-600 dark:text-gray-300">{artifacts.map((artifact) => <li key={artifact.artifact_id}>{artifact.artifact_type}: {artifact.relative_path}</li>)}</ul></section>}
             </div>
             <div className="mt-6 flex flex-wrap items-end gap-3 border-t border-gray-100 pt-5 dark:border-gray-800">
