@@ -6,15 +6,15 @@
 
 ```yaml
 workflow: mathematical-modeling
-current_phase: 1
-phase_status: completed
-current_task: "Task 6: Phase 1 Vertical Verification"
-task_status: verified
+current_phase: 2
+phase_status: in_progress
+current_task: "Task 1: Artifact and Approval Persistence"
+task_status: in_progress
 baseline_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
-worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase1"
+worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase2"
 last_verified_commit: e698df6
 last_verification: "Post-Gate review fixes passed: missing task/run resources return 404 and the workbench exposes only legal workflow actions for all declared states"
-next_action: "Phase 1 complete; do not start Phase 2 in this Goal"
+next_action: "Write and verify failing Task 1 artifact and approval tests"
 ```
 
 ## 启动前风险
@@ -29,13 +29,25 @@ next_action: "Phase 1 complete; do not start Phase 2 in this Goal"
 | 阶段 | 状态 | 计划 | Gate | 完成提交 |
 | --- | --- | --- | --- | --- |
 | 1 | completed | `2026-07-10-mathematical-modeling-phase1-foundation.md` | passed | Task 6 ledger commit |
-| 2 | not_started | `2026-07-10-mathematical-modeling-phase2-intake-planning.md` | pending | — |
+| 2 | in_progress | `2026-07-10-mathematical-modeling-phase2-intake-planning.md` | pending | — |
 | 3 | blocked_by_phase_2 | `2026-07-10-mathematical-modeling-phase3-experiments.md` | pending | — |
 | 4 | blocked_by_phase_3 | `2026-07-10-mathematical-modeling-phase4-paper.md` | pending | — |
 | 5 | blocked_by_phase_4 | `2026-07-10-mathematical-modeling-phase5-delivery-git.md` | pending | — |
 | 6 | blocked_by_phase_5 | `2026-07-10-mathematical-modeling-phase6-hardening.md` | pending | — |
 
 ## 当前阶段 Task 记录
+
+### Phase 2 / Task 1: Artifact and Approval Persistence
+
+- 状态：verified
+- 预计文件：`backend/services/modeling_contracts.py`, `backend/services/modeling_store.py`, `backend/services/artifact_service.py`, `backend/services/approval_service.py`, `backend/tests/test_artifact_service.py`, `backend/tests/test_approval_service.py`
+- 实际文件：`backend/services/modeling_contracts.py`, `backend/services/modeling_store.py`, `backend/services/artifact_service.py`, `backend/services/approval_service.py`, `backend/tests/test_artifact_service.py`, `backend/tests/test_approval_service.py`
+- 失败测试：`DEBUG=false; PYTHONPATH=backend; python -m pytest backend/tests/test_artifact_service.py backend/tests/test_approval_service.py -q`，退出码 1；按预期因 `services.artifact_service` 与 `services.approval_service` 不存在而出现 2 个收集错误
+- 聚焦验证：同一命令初始退出码 0，4 passed；审查修复后审批聚焦套件 3 passed
+- 相关回归：聚焦测试加 `backend/tests/test_modeling_store.py backend/tests/test_modeling_project_service.py`，实现提交前退出码 0，11 passed；审查修复后退出码 0，12 passed；保留既有 Pydantic deprecation warning
+- 提交：实现 `480714e5162f719a2461310293a34e26a3c6dbc7`；审查修复 `84e2af0aef74ee4397442bf4174d8c3f4c2d3a53`
+- 保留的用户改动：无；Phase 2 隔离工作树基线为 `3b9b8f3`，创建时干净
+- 备注：Phase 1 提交历史已核对；新鲜复核后端建模纵向套件 23 passed、前端聚焦套件 45 passed、生产构建通过。Gate 复核生成的未跟踪 `data/` 已经用户授权后清理。Task 1 回归首次运行又因默认相对 `UPLOAD_DIR` 生成 `data/notebooklm.db`；根因已追踪到 `DocumentMetadataStore` 默认路径，后续测试通过临时环境目录隔离。独立审查发现历史 approved 决策会在后续 changes_requested 后仍被接受；新增先红后绿回归并要求请求当前状态为 approved。复审无剩余 Critical/Important，结论 Ready。并发注册同一路径时版本分配仍可能竞争，被审查评为 Minor 持久化加固项，不阻塞当前顺序计划。
 
 ### Task N: Task 名称
 
