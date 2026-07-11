@@ -84,3 +84,25 @@ def test_review_hash_changes_when_registered_bibliography_changes(tmp_path):
     bibliography.write_text("@article{two, title={Two}}", encoding="utf-8")
 
     assert reviewer.current_paper_hash(project["project_id"]) != initial
+
+
+def test_review_reports_blocking_issue_when_paper_artifact_changes(tmp_path):
+    workspace = tmp_path / "workspace"
+    paper = workspace / "paper"
+    paper.mkdir(parents=True)
+    markdown = paper / "draft.md"
+    markdown.write_text("# Subproblem 1", encoding="utf-8")
+    (paper / "main.tex").write_text("\\begin{document}OK\\end{document}", encoding="utf-8")
+    store = ModelingStore(str(tmp_path / "modeling.db"))
+    project = store.create_project("Forecast", "forecast", str(workspace), None)
+    artifacts = ArtifactService(store)
+    artifacts.register(project["project_id"], "paper_markdown", "paper/draft.md")
+    artifacts.register(project["project_id"], "paper_latex", "paper/main.tex")
+    markdown.write_text("# Subproblem 1\nChanged", encoding="utf-8")
+    reviewer = ReviewAgentService(store, artifacts, type("LLM", (), {})())
+    reviewer.llm.generate = AsyncMock(return_value=json.dumps({"issues": []}))
+
+    result = asyncio.run(reviewer.review(project["project_id"]))
+
+    assert result["status"] == "failed"
+    assert "paper_artifact_hash_mismatch" in {item["code"] for item in result["issues"]}

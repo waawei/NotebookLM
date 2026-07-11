@@ -21,8 +21,16 @@ class ReviewAgentService:
         artifacts = self.store.list_artifacts(project_id)
         markdown = self._latest(artifacts, "paper_markdown")
         latex = self._latest(artifacts, "paper_latex")
-        issues = self._deterministic(project, markdown, latex)
-        prompt = "Return only JSON with issues.\n" + json.dumps({"markdown": self._content(project, markdown), "latex": self._content(project, latex)})
+        try:
+            markdown_text = self._content(project, markdown)
+            latex_text = self._content(project, latex)
+        except ValueError:
+            issues = [self._issue("paper_artifact_hash_mismatch", "Paper artifact hash does not match registered content", "Paper")]
+            markdown_text = ""
+            latex_text = ""
+        else:
+            issues = self._deterministic(project, markdown, markdown_text, latex_text)
+        prompt = "Return only JSON with issues.\n" + json.dumps({"markdown": markdown_text, "latex": latex_text})
         try:
             raw = json.loads(await self.llm.generate(prompt))
             issues.extend(ReviewIssue.model_validate(item).model_dump() for item in raw.get("issues", []))
@@ -32,10 +40,8 @@ class ReviewAgentService:
         status = "failed" if any(item["severity"] == "blocking" for item in issues) else "passed"
         return self.store.create_review_run(project_id, paper_hash, issues, status)
 
-    def _deterministic(self, project, markdown, latex):
+    def _deterministic(self, project, markdown, markdown_text, latex_text):
         issues = []
-        markdown_text = self._content(project, markdown)
-        latex_text = self._content(project, latex)
         tokens = set(re.findall(r"\{\{(?:metric|figure|table):[^}]+\}\}", markdown_text + latex_text))
         claims = {
             item["placeholder"]: item

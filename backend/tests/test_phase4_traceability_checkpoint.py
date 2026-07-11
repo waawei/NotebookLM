@@ -63,3 +63,39 @@ def test_phase4_traceable_paper_compiles_and_stale_content_is_rejected(tmp_path)
     assert len(store.list_paper_claims(project["project_id"], markdown_artifact["artifact_id"])) == 2
     with pytest.raises(ValueError, match="review|approval"):
         latex_service.compile(project["project_id"])
+
+
+def test_phase4_review_blocks_deleted_referenced_figure(tmp_path):
+    workspace = tmp_path / "workspace"
+    figure = workspace / "experiments/exp-0001/figure.png"
+    paper = workspace / "paper"
+    figure.parent.mkdir(parents=True)
+    paper.mkdir()
+    figure.write_bytes(b"figure")
+    (paper / "draft.md").write_text("# Subproblem 1\n{{figure:FIGURE_ID}}", encoding="utf-8")
+    (paper / "main.tex").write_text("\\begin{document}OK\\end{document}", encoding="utf-8")
+    store = ModelingStore(str(tmp_path / "modeling.db"))
+    project = store.create_project("Forecast", "forecast", str(workspace), None)
+    artifacts = ArtifactService(store)
+    store.create_experiment("exp-0001", project["project_id"], {
+        "experiment_id": "exp-0001", "seed": 42, "target": "sales", "features": ["price"],
+        "model": {"kind": "baseline", "parameters": {}}, "metrics": [{"name": "rmse", "direction": "minimize"}],
+    }, "a" * 64)
+    store.update_experiment_status("exp-0001", "completed")
+    figure_artifact = artifacts.register(project["project_id"], "experiment_figure", "experiments/exp-0001/figure.png", source_experiment_id="exp-0001")
+    markdown = paper / "draft.md"
+    markdown.write_text(markdown.read_text(encoding="utf-8").replace("FIGURE_ID", figure_artifact["artifact_id"]), encoding="utf-8")
+    markdown_artifact = artifacts.register(project["project_id"], "paper_markdown", "paper/draft.md")
+    artifacts.register(project["project_id"], "paper_latex", "paper/main.tex")
+    PaperClaimService(store).replace_for_paper(project["project_id"], markdown_artifact["artifact_id"], [{
+        "placeholder": f"{{{{figure:{figure_artifact['artifact_id']}}}}}", "claim_type": "figure",
+        "artifact_id": figure_artifact["artifact_id"], "experiment_id": "exp-0001", "metric_name": None,
+        "rendered_value": "experiments/exp-0001/figure.png",
+    }])
+    figure.unlink()
+    reviewer = ReviewAgentService(store, artifacts, ReviewLLM())
+
+    result = asyncio.run(reviewer.review(project["project_id"]))
+
+    assert result["status"] == "failed"
+    assert "unresolved_placeholder" in {item["code"] for item in result["issues"]}
