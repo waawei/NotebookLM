@@ -6,6 +6,7 @@ from pathlib import Path
 
 from services.delivery_contracts import DeliveryFile, DeliveryManifest
 from services.reproducibility_service import ReproducibilityService
+from services.git_policy_service import FORBIDDEN_PARTS, SECRET_PATTERN
 
 
 class DeliveryService:
@@ -54,6 +55,7 @@ class DeliveryService:
         candidates.extend(root / name for name in self.ARCHIVE_FILES if (root / name).is_file())
         with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
             for path in sorted(candidates, key=lambda item: item.relative_to(root).as_posix()):
+                self._validate_archive_path(root, path)
                 archive.write(path, path.relative_to(root).as_posix())
 
     def _files(self, root: Path, archive: Path) -> list[DeliveryFile]:
@@ -62,16 +64,44 @@ class DeliveryService:
             files.append(self._delivery_file(root, root / relative, role, True))
         manifest_path = root / "data" / "data_manifest.json"
         if manifest_path.is_file():
+            files.append(self._delivery_file(root, manifest_path, "data_manifest", True))
             try:
-                entries = json.loads(manifest_path.read_text(encoding="utf-8"))
+                raw = json.loads(manifest_path.read_text(encoding="utf-8"))
             except json.JSONDecodeError:
-                entries = []
+                raw = []
+            entries = raw.get("files", []) if isinstance(raw, dict) else raw
             for entry in entries if isinstance(entries, list) else []:
                 relative = entry.get("relative_path") if isinstance(entry, dict) else None
                 if isinstance(relative, str):
                     path = root / relative
                     files.append(DeliveryFile(relative_path=relative, sha256=entry.get("sha256", ""), size=path.stat().st_size if path.is_file() else 0, role="raw_data", included_in_git=False, exclusion_reason="restricted_raw_data"))
+        for experiment in self.store.list_experiments(self._project_id_for_root(root)):
+            if experiment["status"] != "completed":
+                continue
+            for name in ("config.json", "metrics.json", "environment.json", "run.log"):
+                path = root / "experiments" / experiment["experiment_id"] / name
+                if path.is_file():
+                    files.append(self._delivery_file(root, path, "experiment_evidence", True))
         return sorted(files, key=lambda item: item.relative_path)
+
+    def _project_id_for_root(self, root: Path) -> str:
+        for project in self.store.list_projects():
+            if Path(project["workspace_path"]).resolve() == root:
+                return project["project_id"]
+        raise ValueError("Modeling project not found")
+
+    @staticmethod
+    def _validate_archive_path(root: Path, path: Path) -> None:
+        relative = path.relative_to(root).as_posix()
+        if path.is_symlink() and root not in path.resolve().parents:
+            raise ValueError("Unsafe archive path")
+        if any(part in FORBIDDEN_PARTS for part in Path(relative).parts) or Path(relative).name == ".env":
+            raise ValueError("Unsafe archive path")
+        try:
+            if SECRET_PATTERN.search(path.read_text(encoding="utf-8")):
+                raise ValueError("Unsafe archive path")
+        except UnicodeDecodeError:
+            pass
 
     @staticmethod
     def _delivery_file(root: Path, path: Path, role: str, included: bool) -> DeliveryFile:

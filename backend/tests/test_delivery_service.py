@@ -2,6 +2,7 @@ import json
 import zipfile
 from pathlib import Path
 
+import pytest
 from services.artifact_service import ArtifactService
 from services.delivery_service import DeliveryService
 from services.modeling_store import ModelingStore
@@ -47,7 +48,7 @@ def _workspace(tmp_path: Path) -> Path:
     (workspace / "requirements.txt").write_text("numpy==1.0", encoding="utf-8")
     (workspace / "reproduce.ps1").write_text("python src/train.py", encoding="utf-8")
     (workspace / "data/raw/source.csv").write_text("value\n1\n", encoding="utf-8")
-    (workspace / "data/data_manifest.json").write_text(json.dumps([{"relative_path": "data/raw/source.csv", "sha256": "ignored"}]), encoding="utf-8")
+    (workspace / "data/data_manifest.json").write_text(json.dumps({"files": [{"relative_path": "data/raw/source.csv", "sha256": "ignored"}]}), encoding="utf-8")
     for experiment_id in ("exp-0001", "exp-0002"):
         directory = workspace / "experiments" / experiment_id
         directory.mkdir(parents=True)
@@ -58,3 +59,58 @@ def _workspace(tmp_path: Path) -> Path:
 
 def _config(experiment_id: str) -> dict:
     return {"experiment_id": experiment_id, "seed": 42, "target": "sales", "features": ["price"], "model": {"kind": "baseline", "parameters": {}}, "metrics": [{"name": "rmse", "direction": "minimize"}]}
+
+
+def test_manifest_includes_data_manifest_and_experiment_evidence(tmp_path):
+    workspace = _workspace(tmp_path)
+    store = ModelingStore(str(tmp_path / "modeling.db"))
+    project = store.create_project("Forecast", "forecast", str(workspace), None)
+    artifacts = ArtifactService(store)
+    for artifact_type, relative_path in [("paper_pdf", "deliverables/paper.pdf"), ("paper_markdown", "paper/draft.md"), ("paper_latex", "paper/main.tex")]:
+        artifacts.register(project["project_id"], artifact_type, relative_path)
+    for experiment_id in ("exp-0001", "exp-0002"):
+        store.create_experiment(experiment_id, project["project_id"], _config(experiment_id), "a" * 64)
+        store.update_experiment_status(experiment_id, "completed")
+
+    DeliveryService(store, artifacts).build(project["project_id"])
+
+    manifest = json.loads((workspace / "deliverables/manifest.json").read_text(encoding="utf-8"))
+    paths = {item["relative_path"] for item in manifest["files"]}
+    assert "data/data_manifest.json" in paths
+    assert {"experiments/exp-0001/config.json", "experiments/exp-0001/metrics.json", "experiments/exp-0001/environment.json", "experiments/exp-0001/run.log"} <= paths
+
+
+def test_archive_excludes_external_symlinks_and_secret_files(tmp_path):
+    workspace = _workspace(tmp_path)
+    external = tmp_path / "secret.txt"
+    external.write_text("outside", encoding="utf-8")
+    link = workspace / "src/external.txt"
+    try:
+        link.symlink_to(external)
+    except OSError:
+        pytest.skip("symlink creation is unavailable on this Windows host")
+    (workspace / "src/.env").write_text("API_KEY=secret", encoding="utf-8")
+
+    store = ModelingStore(str(tmp_path / "db.sqlite"))
+    service = DeliveryService(store, ArtifactService(store))
+
+    with pytest.raises(ValueError, match="archive"):
+        service._write_archive(workspace, workspace / "deliverables/code.zip")
+
+
+def test_build_is_repeatable_when_manifest_is_registered_again(tmp_path):
+    workspace = _workspace(tmp_path)
+    store = ModelingStore(str(tmp_path / "modeling.db"))
+    project = store.create_project("Forecast", "forecast", str(workspace), None)
+    artifacts = ArtifactService(store)
+    for artifact_type, relative_path in [("paper_pdf", "deliverables/paper.pdf"), ("paper_markdown", "paper/draft.md"), ("paper_latex", "paper/main.tex")]:
+        artifacts.register(project["project_id"], artifact_type, relative_path)
+    for experiment_id in ("exp-0001", "exp-0002"):
+        store.create_experiment(experiment_id, project["project_id"], _config(experiment_id), "a" * 64)
+        store.update_experiment_status(experiment_id, "completed")
+    service = DeliveryService(store, artifacts)
+
+    service.build(project["project_id"])
+    result = service.build(project["project_id"])
+
+    assert result["manifest_artifact"]["artifact_type"] == "delivery_manifest"

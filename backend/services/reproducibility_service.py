@@ -49,6 +49,8 @@ class ReproducibilityService:
         artifacts = self.store.list_artifacts(project_id)
         artifact_by_id = {artifact["artifact_id"]: artifact for artifact in artifacts}
         for artifact in artifacts:
+            if artifact["artifact_type"] in {"delivery_manifest", "delivery_code_archive"}:
+                continue
             if not self._matches_hash(root, artifact):
                 issues.append(self._issue("artifact_hash_mismatch", artifact["relative_path"]))
         for claim in self.store.list_paper_claims(project_id):
