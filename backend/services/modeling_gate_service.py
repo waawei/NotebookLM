@@ -25,6 +25,16 @@ class ModelingGateService:
         if state != "model_approval_pending":
             if state == "result_validation":
                 self._require_experiment_results(project_id)
+            if state == "paper_drafting":
+                self._require_artifact_types(project_id, {"paper_markdown", "paper_latex"})
+            if state == "consistency_review":
+                review = self.store.latest_review(project_id)
+                if not review or review["status"] != "passed":
+                    raise ValueError("Paper has blocking review issues")
+            if state == "final_approval_pending":
+                review = self.store.latest_review(project_id)
+                if not review or review["status"] != "passed":
+                    raise ValueError("Paper has blocking review issues")
             return
 
         plans = [item for item in artifacts if item["artifact_type"] == "model_plan"]
@@ -72,3 +82,9 @@ class ModelingGateService:
         artifacts = self.store.list_artifacts(project_id)
         if not any(item["artifact_type"] in {"experiment_figure", "experiment_table"} for item in artifacts):
             raise ValueError("Result validation requires a registered figure or table")
+
+    def _require_artifact_types(self, project_id: str, required: set[str]) -> None:
+        found = {item["artifact_type"] for item in self.store.list_artifacts(project_id)}
+        missing = required - found
+        if missing:
+            raise ValueError("Missing required artifacts: " + ", ".join(sorted(missing)))

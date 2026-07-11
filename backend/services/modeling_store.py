@@ -488,6 +488,22 @@ class ModelingStore:
             rows = conn.execute(query, params).fetchall()
         return [dict(row) for row in rows]
 
+    def create_review_run(self, project_id: str, paper_hash: str, issues: list[dict], status: str) -> dict:
+        review = {"review_id": str(uuid.uuid4()), "project_id": project_id, "paper_hash": paper_hash, "issues_json": json.dumps(issues, ensure_ascii=False), "status": status, "created_at": datetime.now().isoformat()}
+        with self._connect() as conn:
+            conn.execute("INSERT INTO review_runs (review_id, project_id, paper_hash, issues_json, status, created_at) VALUES (?, ?, ?, ?, ?, ?)", tuple(review.values()))
+        review["issues"] = json.loads(review.pop("issues_json"))
+        return review
+
+    def latest_review(self, project_id: str) -> dict | None:
+        with self._connect() as conn:
+            row = conn.execute("SELECT * FROM review_runs WHERE project_id = ? ORDER BY created_at DESC, review_id DESC LIMIT 1", (project_id,)).fetchone()
+        if not row:
+            return None
+        review = dict(row)
+        review["issues"] = json.loads(review.pop("issues_json"))
+        return review
+
     @staticmethod
     def _approval_from_row(row) -> dict | None:
         if not row:

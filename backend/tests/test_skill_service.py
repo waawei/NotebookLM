@@ -22,6 +22,7 @@ class SkillServiceTests(unittest.TestCase):
                 "modeling_planner",
                 "modeling_programmer",
                 "modeling_paper_writer",
+                "modeling_reviewer",
             },
         )
         self.assertEqual(
