@@ -8,13 +8,13 @@
 workflow: mathematical-modeling
 current_phase: 5
 phase_status: in_progress
-current_task: "Task 1: Reproducibility and Delivery Contracts"
+current_task: "Task 2: Delivery Manifest, Code Archive, and Output Link"
 task_status: verified
 baseline_commit: 1a6a55a7c95cfd26a6568dbfda66d19f3a688c49
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase5"
-last_verified_commit: eab060d703eb7ac81ea3dcc77ebc7e6cebdb831c
-last_verification: "Phase 4 Gate regression 9 passed; Phase 5 Task 1 reproducibility tests 3 passed"
-next_action: "Start Phase 5 Task 2; do not start Phase 6"
+last_verified_commit: 155d8e5a034e2fcade694f10400e218daf891653
+last_verification: "Phase 4 Gate regression 9 passed; Phase 5 Task 1 3 passed; Task 2 delivery tests 2 passed"
+next_action: "Start Phase 5 Task 3; do not start Phase 6"
 ```
 
 ## 启动前风险
@@ -47,6 +47,16 @@ next_action: "Start Phase 5 Task 2; do not start Phase 6"
 - 提交：`eab060d703eb7ac81ea3dcc77ebc7e6cebdb831c`
 - 保留的用户改动：无；Phase 5 工作树从 `1a6a55a` 创建时干净
 - 备注：检查 PDF、论文源、依赖锁定、复现命令、源代码、至少两个完成实验、实验四类证据、登记 artifact 哈希和 paper claim target；错误信息不包含文件内容或密钥。
+
+### Phase 5 / Task 2: Delivery Manifest, Code Archive, and Output Link
+
+- 状态：verified
+- 实际文件：`backend/services/delivery_service.py`, `backend/services/output_service.py`, `backend/tests/test_delivery_service.py`, `backend/tests/test_modeling_output_link.py`
+- 失败测试：`DEBUG=false; PYTHONPATH=backend; python -m pytest backend/tests/test_delivery_service.py backend/tests/test_modeling_output_link.py -q`，退出码 2；按预期缺少 `services.delivery_service`
+- 聚焦验证：同一命令退出码 0，2 passed（既有 Pydantic 弃用警告）
+- 提交：`155d8e5a034e2fcade694f10400e218daf891653`
+- 保留的用户改动：无
+- 备注：code.zip 只归档源代码、测试、论文和明确的复现/依赖文件；`data/raw` 默认排除。manifest 保留每项受限原始数据的路径、哈希、大小和 `restricted_raw_data` 原因。Outputs 使用项目与 manifest artifact 链接，不复制 PDF。
 
 ### Phase 4 / Task 1: Paper Contracts, Claims, and Placeholder Resolution
 
