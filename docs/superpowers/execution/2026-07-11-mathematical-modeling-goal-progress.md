@@ -8,13 +8,13 @@
 workflow: mathematical-modeling
 current_phase: 2
 phase_status: in_progress
-current_task: "Task 3: Deterministic CSV Profiling"
+current_task: "Task 4: Structured Problem and Model-Plan Agents"
 task_status: in_progress
 baseline_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase2"
 last_verified_commit: e698df6
 last_verification: "Post-Gate review fixes passed: missing task/run resources return 404 and the workbench exposes only legal workflow actions for all declared states"
-next_action: "Write and verify failing Task 3 CSV profile tests"
+next_action: "Write and verify failing Task 4 role, lifecycle, and gate tests"
 ```
 
 ## 启动前风险
@@ -36,6 +36,18 @@ next_action: "Write and verify failing Task 3 CSV profile tests"
 | 6 | blocked_by_phase_5 | `2026-07-10-mathematical-modeling-phase6-hardening.md` | pending | — |
 
 ## 当前阶段 Task 记录
+
+### Phase 2 / Task 4: Structured Problem and Model-Plan Agents
+
+- 状态：verified
+- 预计文件：`backend/services/modeling_contracts.py`, `backend/services/modeling_role_service.py`, `backend/services/modeling_agent_run_service.py`, `backend/services/modeling_gate_service.py`, `backend/services/modeling_project_service.py`, `backend/skills/modeling_problem_parser/skill.json`, `backend/skills/modeling_planner/skill.json`, `backend/tests/test_modeling_role_service.py`, `backend/tests/test_modeling_agent_run_service.py`, `backend/tests/test_modeling_gate_service.py`, `backend/tests/test_skill_service.py`
+- 实际文件：`backend/services/modeling_contracts.py`, `backend/services/modeling_role_service.py`, `backend/services/modeling_agent_run_service.py`, `backend/services/modeling_gate_service.py`, `backend/services/modeling_project_service.py`, `backend/skills/modeling_problem_parser/skill.json`, `backend/skills/modeling_planner/skill.json`, `backend/tests/test_modeling_role_service.py`, `backend/tests/test_modeling_agent_run_service.py`, `backend/tests/test_modeling_gate_service.py`, `backend/tests/test_skill_service.py`
+- 失败测试：临时运行目录下执行 `DEBUG=false; PYTHONPATH=backend; python -m pytest backend/tests/test_modeling_role_service.py backend/tests/test_modeling_agent_run_service.py backend/tests/test_modeling_gate_service.py backend/tests/test_skill_service.py -q`；完整输出为 3 个预期收集错误，缺少 `modeling_agent_run_service` 与 `modeling_gate_service`（首轮 PowerShell finally 覆盖退出码，已修正后续命令保存真实退出码）
+- 聚焦验证：初始命令退出码 0，10 passed；审查修复后角色/生命周期/Gate/API/Skill 命令退出码 0，27 passed、1 个 unittest subtest passed；保留既有 deprecation warning
+- 相关回归：初始 Task 1–4 服务、Phase 1 状态/项目/Agent store 联合命令退出码 0，54 passed、1 skipped；审查修复后退出码 0，71 passed、1 skipped、1 个 unittest subtest passed；保留既有 deprecation warning
+- 提交：实现 `a96fa93bb6e50dedce8647d7de7ae5e4d5d02a9a`；审查修复 `c5dc9a965816e9ac9be0d18fa7a6a692665f1152`、`cccda858053f5c73f4eeb7fac18ba727b235ec44`
+- 保留的用户改动：无；Task 4 开始时工作树仅有本账本更新
+- 备注：复用现有 `DocumentMetadataStore` Agent run/step 持久化和 `LLMService.generate(prompt)`；Gate 在推进前检查必需成果及当前文件内容哈希绑定的模型审批。独立审查发现生产 API 未接 Gate、真实重试不能累计、跨 store 生命周期不一致、输入成果未复核、输出/成果/审批失败无补偿、错误可能泄密；新增真实三次角色失败、API 409、输入篡改、敏感 provider 错误、各登记/审批/完成失败回归，并完成 fail-closed Gate 接线、任务复用、生命周期补偿、SHA/边界/结构复核、原子输出与全链路回滚、安全错误摘要。复审继续发现 start 失败绕过摘要及 run 状态更新失败覆盖安全错误，新增先红后绿回归与一次重试/吞掉基础设施细节；最终复审无 Critical/Important，结论 Ready。剩余 Minor：永久 Agent store 故障可能保留 stale run、真实 PDF 未测、源哈希到读取有窄 TOCTOU。
 
 ### Phase 2 / Task 3: Deterministic CSV Profiling
 
