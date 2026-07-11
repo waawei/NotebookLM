@@ -8,13 +8,13 @@
 workflow: mathematical-modeling
 current_phase: 2
 phase_status: in_progress
-current_task: "Task 4: Structured Problem and Model-Plan Agents"
+current_task: "Task 5: Phase 2 API and Approval UI"
 task_status: in_progress
 baseline_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase2"
 last_verified_commit: e698df6
 last_verification: "Post-Gate review fixes passed: missing task/run resources return 404 and the workbench exposes only legal workflow actions for all declared states"
-next_action: "Write and verify failing Task 4 role, lifecycle, and gate tests"
+next_action: "Write and verify failing Task 5 backend API and frontend component tests"
 ```
 
 ## 启动前风险
@@ -36,6 +36,18 @@ next_action: "Write and verify failing Task 4 role, lifecycle, and gate tests"
 | 6 | blocked_by_phase_5 | `2026-07-10-mathematical-modeling-phase6-hardening.md` | pending | — |
 
 ## 当前阶段 Task 记录
+
+### Phase 2 / Task 5: Phase 2 API and Approval UI
+
+- 状态：verified
+- 预计文件：`backend/api/modeling.py`, `backend/tests/test_modeling_intake_api.py`, `frontend/src/services/api.ts`, `frontend/src/services/api.test.ts`, `frontend/src/components/ModelingInputPanel.tsx`, `frontend/src/components/ModelingInputPanel.test.tsx`, `frontend/src/components/ModelPlanApprovalCard.tsx`, `frontend/src/components/ModelPlanApprovalCard.test.tsx`, `frontend/src/views/ModelingProjectsView.tsx`, `frontend/src/views/ModelingProjectsView.test.tsx`
+- 实际文件：`backend/api/modeling.py`, `backend/services/approval_service.py`, `backend/tests/test_modeling_intake_api.py`, `frontend/src/services/api.ts`, `frontend/src/services/api.test.ts`, `frontend/src/components/ModelingInputPanel.tsx`, `frontend/src/components/ModelingInputPanel.test.tsx`, `frontend/src/components/ModelPlanApprovalCard.tsx`, `frontend/src/components/ModelPlanApprovalCard.test.tsx`, `frontend/src/views/ModelingProjectsView.tsx`, `frontend/src/views/ModelingProjectsView.test.tsx`
+- 失败测试：后端 `backend/tests/test_modeling_intake_api.py` 退出码 1，5 failures，缺少 InputUploadKind、upload/parse/decide 与全部 Phase 2 路由；前端 API/组件命令退出码 1，缺少两个组件与 `uploadInput`；视图命令退出码 1，4 failures，缺少三个阶段动作和审批卡
+- 聚焦验证：初始后端 intake API 5 passed、前端 API/组件 13 passed、建模视图 26 passed；审查修复后 Phase 2 聚焦后端 40 passed、1 skipped，聚焦前端 41 passed，生产构建通过
+- 相关回归：Phase 2 聚焦后端 37 passed、1 skipped；聚焦前端 39 passed；生产构建通过；完整后端 163 passed、13 subtests passed、1 skipped；完整前端 23 files、117 passed；保留既有 deprecation 与 Vite chunk-size warning
+- 提交：实现 `12d450e6db238b787e3c1b6dc172a93a3aff3d61`；审查修复 `c1935a46f40a961ac12b3c930bb7fccd5b4fdd58`、`76f0ef959e51250556c81c0e1cea6aa96f98c2bb`
+- 保留的用户改动：无；Task 5 开始时工作树仅有本账本更新；`frontend/node_modules` 为指向 Phase 1 本地依赖的 ignored junction，不联网安装
+- 备注：实现 multipart 输入、parse/profile/plan 动作、成果/审批查询与 hash-bound 决策；前端审批修改意见必填并发送 API 返回的精确 payload_hash。独立审查发现跨项目审批、无界 multipart、后期仍可上传、旧 pending 审批、异步证据竞态和哈希标签混淆；新增跨项目/超限/状态、最新审批、乱序响应回归，实施 project ownership、MAX+1 有界读取与关闭、仅初始化态 intake、generation guard，并分别显示 artifact SHA-256 与 approval payload hash。复审继续发现审批错误码、早拒绝未关闭文件、切换项目等待期旧卡和卡片本地状态继承；新增 400/404/409、所有早拒绝 close、evidenceProjectId 回归并以 approval_id key 渲染。最终复审无 Critical/Important，结论 Ready。
 
 ### Phase 2 / Task 4: Structured Problem and Model-Plan Agents
 
