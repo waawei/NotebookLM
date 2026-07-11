@@ -39,17 +39,27 @@ class RestrictedRunner:
                 "    import socket, _socket\n"
                 "    def denied(*args, **kwargs):\n"
                 "        raise RuntimeError('Network access is disabled for this experiment')\n"
-                "    socket.socket = denied\n    socket.create_connection = denied\n    _socket.socket = denied\n"
+                "    _original_socket = _socket.socket\n"
+                "    class DeniedSocket(_original_socket):\n"
+                "        connect = denied\n        connect_ex = denied\n"
+                "    socket.socket = DeniedSocket\n    socket.create_connection = denied\n    _socket.socket = DeniedSocket\n"
                 "    import os, subprocess\n"
+                "    _original_check_output = subprocess.check_output\n"
                 "    def deny_process(*args, **kwargs):\n"
+                "        command = args[0] if args else kwargs.get('args')\n"
+                "        if isinstance(command, str) and command in {'ver', 'command /c ver', 'cmd /c ver'} and kwargs.get('shell'):\n"
+                "            return _original_check_output(*args, **kwargs)\n"
                 "        raise RuntimeError('Process creation is disabled for this experiment')\n"
-                "    os.system = deny_process\n    subprocess.Popen = deny_process\n"
+                "    _original_popen = subprocess.Popen\n"
+                "    class DeniedPopen(_original_popen):\n"
+                "        def __init__(self, *args, **kwargs):\n            deny_process()\n"
+                "    os.system = deny_process\n    subprocess.Popen = DeniedPopen\n"
                 "    subprocess.run = deny_process\n    subprocess.call = deny_process\n"
                 "    subprocess.check_call = deny_process\n    subprocess.check_output = deny_process\n",
                 encoding="utf-8",
             )
             env["MODELING_NETWORK_DISABLED"] = "1"
-            env["PYTHONPATH"] = str(runtime)
+            env["PYTHONPATH"] = os.pathsep.join((str(runtime), str(cwd)))
         process = subprocess.Popen(command, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=False)
         if on_started:
             on_started(process.pid)

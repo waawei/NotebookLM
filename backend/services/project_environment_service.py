@@ -9,7 +9,13 @@ class ProjectEnvironmentService:
         python_path = root / ".venv" / "Scripts" / "python.exe"
         if not python_path.is_file():
             subprocess.run(
-                [sys.executable, "-m", "venv", str(root / ".venv")],
+                [
+                    sys.executable,
+                    "-m",
+                    "venv",
+                    "--system-site-packages",
+                    str(root / ".venv"),
+                ],
                 cwd=root,
                 check=True,
                 capture_output=True,

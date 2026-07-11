@@ -229,7 +229,7 @@ class ModelingCodeAgentService:
             target="target",
             features=[str(feature) for feature in features],
             model={
-                "kind": "baseline" if candidate.get("name", "").lower().startswith("baseline") else str(candidate.get("algorithm", "candidate")),
+                "kind": "baseline" if "baseline" in candidate.get("name", "").lower() else str(candidate.get("algorithm", "candidate")),
                 "parameters": {},
             },
             metrics=[

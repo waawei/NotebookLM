@@ -51,7 +51,13 @@ class DeliveryService:
         for root_name in self.ARCHIVE_ROOTS:
             directory = root / root_name
             if directory.is_dir():
-                candidates.extend(path for path in directory.rglob("*") if path.is_file())
+                candidates.extend(
+                    path
+                    for path in directory.rglob("*")
+                    if path.is_file()
+                    and "__pycache__" not in path.relative_to(root).parts
+                    and ".pytest_cache" not in path.relative_to(root).parts
+                )
         candidates.extend(root / name for name in self.ARCHIVE_FILES if (root / name).is_file())
         with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
             for path in sorted(candidates, key=lambda item: item.relative_to(root).as_posix()):

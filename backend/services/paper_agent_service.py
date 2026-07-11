@@ -15,7 +15,7 @@ LITERAL_RESULT = re.compile(r"(?i)(rmse|mae|accuracy|precision|recall|f1|auc|r\^
 
 
 def require_placeholder_results(text: str) -> None:
-    scrubbed = re.sub(r"\{\{metric:[^}]+\}\}", "", text)
+    scrubbed = re.sub(r"\{\{(?:metric|figure|table):[^}]+\}\}", "", text)
     if LITERAL_RESULT.search(scrubbed):
         raise ValueError("Experimental results must use metric placeholders")
 
