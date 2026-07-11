@@ -2,6 +2,7 @@ import asyncio
 from pathlib import Path
 
 from fastapi import HTTPException
+import pytest
 
 from api import modeling
 from services.document_metadata_store import DocumentMetadataStore
@@ -172,6 +173,52 @@ def test_recovery_retries_agent_interruption_after_agent_store_failure(tmp_path)
     assert recovery.recover_interrupted_projects() == []
     assert delegate.get_agent_run(run["run_id"])["status"] == "failed"
     assert delegate.get_agent_run(run["run_id"])["error"] == "interrupted"
+
+
+def test_recovery_continues_when_agent_store_is_temporarily_unavailable(tmp_path):
+    from services.modeling_recovery_service import ModelingRecoveryService
+
+    workspace = tmp_path / "project"
+    workspace.mkdir()
+    store = ModelingStore(str(tmp_path / "modeling.db"))
+    project = store.create_project("Forecast", "forecast", str(workspace), None)
+    store.update_state(project["project_id"], "problem_parsing")
+    task = store.create_task(project["project_id"], "problem_parsing", "modeling", {}, [])
+    store.update_task(task["task_id"], "running", 0)
+
+    class UnavailableAgentStore:
+        def list_agent_runs(self, **kwargs):
+            raise RuntimeError("agent database unavailable")
+
+    result = ModelingRecoveryService(store, UnavailableAgentStore()).recover_interrupted_projects()
+
+    assert result[0]["recovered_to"] == "project_initialized"
+    assert store.get_task(task["task_id"])["status"] == "failed"
+
+
+def test_recovery_rejects_pid_with_workspace_only_in_command_line(tmp_path, monkeypatch):
+    from services.modeling_recovery_service import ModelingRecoveryService
+
+    workspace = tmp_path / "project"
+    workspace.mkdir()
+    store = ModelingStore(str(tmp_path / "modeling.db"))
+    project = store.create_project("Forecast", "forecast", str(workspace), None)
+    store.update_state(project["project_id"], "experiment_running")
+    store.create_experiment("exp-0001", project["project_id"], _config(), None)
+    store.update_experiment_status("exp-0001", "running", pid=1234)
+
+    class Process:
+        def cmdline(self):
+            return ["python", str(workspace / "unrelated.py")]
+
+        def cwd(self):
+            return str(tmp_path / "outside")
+
+    monkeypatch.setattr("services.modeling_recovery_service.psutil.pid_exists", lambda pid: True)
+    monkeypatch.setattr("services.modeling_recovery_service.psutil.Process", lambda pid: Process())
+
+    with pytest.raises(RuntimeError, match="not owned"):
+        ModelingRecoveryService(store).recover_interrupted_projects()
 
 
 def test_recovery_continues_when_owned_pid_exits_during_inspection(tmp_path, monkeypatch):

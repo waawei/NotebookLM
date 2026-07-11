@@ -70,7 +70,11 @@ class ModelingRecoveryService:
     def _active_agent_run_ids(self, project_id: str) -> list[str]:
         if not self.agent_store:
             return []
-        for run in self.agent_store.list_agent_runs(project_id=project_id):
+        try:
+            runs = self.agent_store.list_agent_runs(project_id=project_id)
+        except (OSError, RuntimeError, ValueError):
+            return []
+        for run in runs:
             if run["status"] != "running":
                 continue
             yield run["run_id"]
@@ -93,11 +97,10 @@ class ModelingRecoveryService:
         try:
             process = psutil.Process(pid)
             workspace = Path(project["workspace_path"]).resolve()
-            command = " ".join(process.cmdline()).lower()
             cwd = Path(process.cwd()).resolve()
         except (psutil.AccessDenied, psutil.NoSuchProcess, OSError):
             return
-        if str(workspace).lower() not in command and cwd != workspace:
+        if cwd != workspace:
             raise RuntimeError("Refusing to terminate a process not owned by this project")
         try:
             for child in process.children(recursive=True):

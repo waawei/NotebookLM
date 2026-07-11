@@ -12,9 +12,9 @@ current_task: "Task 1: Idempotent Startup Recovery"
 task_status: verified
 baseline_commit: fd74c07a9b0b8e34c3b4c71bf8fef3f1a63420ae
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase6"
-last_verified_commit: 90427f902926669f9bcc45bc942825d5d12a0b40
-last_verification: "Task 1 recovery regression: 20 passed/5 subtests; Phase 5 Gate rechecked: backend 238 passed/3 skipped/13 subtests; frontend 30 files/127 tests; production build passed"
-next_action: "Complete Task 1 final re-review after evidence-driven recovery fixes, then continue Phase 6 Task 2"
+last_verified_commit: fa714efc55a9ac639998789ca255e1126c439501
+last_verification: "Task 1 recovery regression: 22 passed/5 subtests; Phase 5 Gate rechecked: backend 238 passed/3 skipped/13 subtests; frontend 30 files/127 tests; production build passed"
+next_action: "Complete Task 1 final re-review after security recovery fixes, then continue Phase 6 Task 2"
 ```
 
 ## 启动前风险
