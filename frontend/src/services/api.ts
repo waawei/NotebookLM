@@ -362,6 +362,23 @@ export interface PaperReview {
 
 export interface GitReview { ok: boolean; paths: string[]; diff: string; issues: Array<{ path?: string; code: string; message: string }> }
 
+export interface ModelingRuntimeStatus {
+  workspace: { configured: boolean; writable: boolean }
+  python: { available: boolean; version: string | null }
+  git: { available: boolean; version: string | null }
+  xelatex: { available: boolean; version: string | null }
+}
+
+export interface ModelingRecovery {
+  recovery_id: string
+  project_id: string
+  from_state: string
+  to_state: string
+  interrupted_run_ids: string[]
+  created_at: string
+  dismissed_at?: string | null
+}
+
 export const documentApi = {
   upload: async (file: File): Promise<UploadResponse> => {
     const formData = new FormData()
@@ -637,6 +654,9 @@ export const agentsApi = {
 }
 
 export const modelingApi = {
+  runtime: async (): Promise<ModelingRuntimeStatus> => (await api.get('/modeling/runtime')).data,
+  recoveries: async (): Promise<{ recoveries: ModelingRecovery[]; total: number }> => (await api.get('/modeling/recoveries')).data,
+  dismissRecovery: async (recoveryId: string): Promise<ModelingRecovery> => (await api.post(`/modeling/recoveries/${recoveryId}/dismiss`)).data,
   list: async (): Promise<{ projects: ModelingProject[]; total: number }> => (await api.get('/modeling/projects')).data,
   create: async (data: { name: string; deadline?: string }): Promise<ModelingProject> => (await api.post('/modeling/projects', data)).data,
   get: async (projectId: string): Promise<ModelingProject> => (await api.get(`/modeling/projects/${projectId}`)).data,

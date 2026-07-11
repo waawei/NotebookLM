@@ -215,6 +215,36 @@ describe('modelingApi', () => {
     expect(httpClient.post).toHaveBeenNthCalledWith(3, '/modeling/projects/project-1/rollback', { reason: 'Need another pass' })
   })
 
+  it('loads runtime readiness and retains recovery history until dismissal', async () => {
+    const runtime = {
+      workspace: { configured: true, writable: true },
+      python: { available: true, version: '3.12.0' },
+      git: { available: true, version: 'git version 2.45.0' },
+      xelatex: { available: false, version: null },
+    }
+    const recoveries = {
+      recoveries: [{
+        recovery_id: 'recovery-1',
+        project_id: 'project-1',
+        from_state: 'experiment_running',
+        to_state: 'experiment_implementation',
+        interrupted_run_ids: ['exp-0001'],
+        created_at: '2026-07-12T00:00:00',
+      }],
+      total: 1,
+    }
+    httpClient.get.mockResolvedValueOnce({ data: runtime }).mockResolvedValueOnce({ data: recoveries })
+    httpClient.post.mockResolvedValueOnce({ data: { ...recoveries.recoveries[0], dismissed_at: '2026-07-12T00:01:00' } })
+
+    await expect(modelingApi.runtime()).resolves.toEqual(runtime)
+    await expect(modelingApi.recoveries()).resolves.toEqual(recoveries)
+    await expect(modelingApi.dismissRecovery('recovery-1')).resolves.toMatchObject({ recovery_id: 'recovery-1' })
+
+    expect(httpClient.get).toHaveBeenCalledWith('/modeling/runtime')
+    expect(httpClient.get).toHaveBeenCalledWith('/modeling/recoveries')
+    expect(httpClient.post).toHaveBeenCalledWith('/modeling/recoveries/recovery-1/dismiss')
+  })
+
   it('uses intake, artifact, planning, and approval endpoints', async () => {
     const artifact = { artifact_id: 'artifact-1', project_id: 'project-1', artifact_type: 'data_input' }
     const approval = { approval_id: 'approval-1', project_id: 'project-1', payload_hash: 'hash-1' }

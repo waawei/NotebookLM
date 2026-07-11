@@ -21,6 +21,9 @@ const modelingApiMock = vi.hoisted(() => ({
   reviewGit: vi.fn(),
   requestCommit: vi.fn(),
   commit: vi.fn(),
+  runtime: vi.fn(),
+  recoveries: vi.fn(),
+  dismissRecovery: vi.fn(),
 }))
 
 vi.mock('../services/api', () => ({ modelingApi: modelingApiMock }))
@@ -73,6 +76,13 @@ describe('ModelingProjectsView', () => {
     modelingApiMock.getArtifact.mockResolvedValue({})
     modelingApiMock.checkDeliverables.mockResolvedValue({ ok: false, issues: [] })
     modelingApiMock.gitStatus.mockResolvedValue({ paths: [] })
+    modelingApiMock.runtime.mockResolvedValue({
+      workspace: { configured: true, writable: true },
+      python: { available: true, version: '3.12.0' },
+      git: { available: true, version: 'git version 2.45.0' },
+      xelatex: { available: true, version: 'XeLaTeX' },
+    })
+    modelingApiMock.recoveries.mockResolvedValue({ recoveries: [], total: 0 })
   })
 
   it('loads projects, selects one, and creates a project', async () => {
