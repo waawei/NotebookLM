@@ -5,9 +5,9 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
-import sys
 
 from fakes.fake_modeling_llm import BASELINE_FILES, CANDIDATE_FILES, FakeModelingLLM, RESPONSES
+from services.modeling_code_agent_service import GeneratedExperiment
 
 
 ROOT = Path(__file__).parent / "fixtures" / "modeling_competition"
@@ -38,18 +38,45 @@ def test_fake_llm_is_stage_keyed_deterministic_and_binds_prediction_artifact():
     assert "artifact-123" in paper["markdown"]
 
 
-def test_fixture_generated_files_execute_pipeline_and_candidate_registers_figure(tmp_path):
-    for files, expects_figure in ((BASELINE_FILES, False), (CANDIDATE_FILES, True)):
+def test_fixture_generated_files_execute_declared_pipeline_and_candidate_registers_figure(tmp_path):
+    fake = FakeModelingLLM()
+    expected_paths = {
+        "src/prepare.py",
+        "src/features.py",
+        "src/train.py",
+        "src/evaluate.py",
+        "src/visualize.py",
+        "tests/test_pipeline.py",
+        "requirements.txt",
+    }
+    for candidate, expected_files, expects_figure in (
+        ("mean_baseline", BASELINE_FILES, False),
+        ("linear_regression", CANDIDATE_FILES, True),
+    ):
         project = tmp_path / ("candidate" if expects_figure else "baseline")
+        payload = json.loads(asyncio.run(fake.generate(f"STAGE:programmer candidate {candidate}")))
+        generated = GeneratedExperiment.model_validate(payload)
+        files = {file.path: file.content for file in generated.files}
+
+        assert set(files) == expected_paths
+        assert files == expected_files
+        assert "train_test_split(frame, test_size=0.25, random_state=42)" in files["src/train.py"]
         shutil.copytree(ROOT, project / "data" / "raw", dirs_exist_ok=True)
         (project / "data" / "raw" / "problem.txt").unlink(missing_ok=True)
         for relative, content in files.items():
             path = project / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content, encoding="utf-8")
+        (project / "experiments" / "exp-0001").mkdir(parents=True)
         environment = {**os.environ, "PYTHONPATH": str(project)}
-        subprocess.run([sys.executable, "-m", "pytest", "tests/test_pipeline.py", "-q"], cwd=project, env=environment, check=True)
-        subprocess.run([sys.executable, "src/train.py"], cwd=project, env=environment, check=True)
-        metrics = json.loads((project / "metrics.json").read_text(encoding="utf-8"))
-        assert set(metrics) == {"validation_rmse", "validation_mae"}
-        assert (project / "figures" / "prediction.png").exists() is expects_figure
+        for command in generated.commands:
+            assert command[0] == "python"
+            subprocess.run(command, cwd=project, env=environment, check=True)
+        metrics = json.loads((project / "experiments" / "exp-0001" / "metrics.json").read_text(encoding="utf-8"))
+        assert metrics == [
+            {"name": "rmse", "value": metrics[0]["value"], "split": "validation"},
+            {"name": "mae", "value": metrics[1]["value"], "split": "validation"},
+        ]
+        assert (project / "experiments" / "exp-0001" / "figures" / "prediction.png").exists() is expects_figure
+        artifacts = json.loads((project / "experiments" / "exp-0001" / "artifacts.json").read_text(encoding="utf-8"))
+        assert artifacts == (["experiments/exp-0001/figures/prediction.png"] if expects_figure else [])

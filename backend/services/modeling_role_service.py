@@ -60,7 +60,7 @@ class ModelingRoleService:
         try:
             problem_text = self._read_problem(source)
             prompt = (
-                "Return only JSON matching this schema. Do not invent requirements.\n"
+                "STAGE:problem_parser\nReturn only JSON matching this schema. Do not invent requirements.\n"
                 + json.dumps(ProblemSpec.model_json_schema(), ensure_ascii=False)
                 + "\nCompetition prompt:\n"
                 + problem_text
@@ -147,7 +147,7 @@ class ModelingRoleService:
         approval = None
         try:
             prompt = (
-                "Return only JSON matching this schema. Propose at most three candidates and do not claim unrun results.\n"
+                "STAGE:model_planner\nReturn only JSON matching this schema. Propose at most three candidates and do not claim unrun results.\n"
                 + json.dumps(ModelPlan.model_json_schema(), ensure_ascii=False)
                 + "\nProblem specification:\n"
                 + json.dumps(problem_spec, ensure_ascii=False)

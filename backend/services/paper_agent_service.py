@@ -52,11 +52,13 @@ class PaperAgentService:
             ["paper/draft.md", "paper/main.tex"],
         )
         prompt = (
-            "Return only JSON containing markdown and latex. Use metric, figure, and table "
+            "STAGE:paper_writer\nReturn only JSON containing markdown and latex. Use metric, figure, and table "
             "placeholders for every experimental fact; never type a measured value directly.\n"
             + json.dumps(PaperDraftPayload.model_json_schema(), ensure_ascii=False)
             + "\nAvailable artifacts:\n"
             + json.dumps(artifacts, ensure_ascii=False)
+            + "\nPREDICTION_ARTIFACT_ID:"
+            + next((item["artifact_id"] for item in artifacts if item["artifact_type"] == "experiment_figure"), "")
             + "\nProblem specification:\n" + self._read_artifact(project, problem)
             + "\nApproved model plan:\n" + self._read_artifact(project, plan)
         )

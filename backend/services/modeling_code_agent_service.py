@@ -67,7 +67,7 @@ class ModelingCodeAgentService:
         candidate = candidates[candidate_index]
         experiment_id = self._next_experiment_id(project)
         prompt = (
-            "Return only JSON matching the supplied generated experiment schema. "
+            "STAGE:programmer\nReturn only JSON matching the supplied generated experiment schema. "
             "Use deterministic seeds, train-validation separation, machine-readable metrics, "
             "and project-relative paths.\n"
             + json.dumps(GeneratedExperiment.model_json_schema(), ensure_ascii=False)
