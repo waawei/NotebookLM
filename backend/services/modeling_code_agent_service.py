@@ -81,11 +81,12 @@ class ModelingCodeAgentService:
         root = Path(project["workspace_path"]).resolve()
         commands = self._normalize_commands(project, generated.commands)
         config = self._config(experiment_id, candidate, plan_payload)
+        config_content = json.dumps(config, ensure_ascii=False, indent=2) + "\n"
         input_hashes = self._input_hashes(project)
         source_hashes = self._source_hashes(
             generated.files,
             f"experiments/{experiment_id}/config.json",
-            json.dumps(config, ensure_ascii=False, sort_keys=True),
+            config_content,
         )
         source_hash = self._combined_hash(source_hashes)
         batch = ExecutionBatch(
@@ -108,7 +109,7 @@ class ModelingCodeAgentService:
         )
         paths = {root / file.path: file.content.encode("utf-8") for file in generated.files}
         paths[root / "experiments" / experiment_id / "config.json"] = (
-            json.dumps(config, ensure_ascii=False, indent=2) + "\n"
+            config_content
         ).encode("utf-8")
         paths[root / "reproduce.ps1"] = self._reproduce(experiment_id).encode("utf-8")
         paths[root / "README.md"] = (
