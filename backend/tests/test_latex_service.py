@@ -89,3 +89,22 @@ def test_compile_rejects_approval_without_current_passing_review(tmp_path):
 
     with pytest.raises(ValueError, match="review"):
         service.compile(project["project_id"])
+
+
+def test_final_payload_includes_bibliography_hash(tmp_path):
+    workspace = tmp_path / "workspace"
+    paper = workspace / "paper"
+    paper.mkdir(parents=True)
+    (paper / "draft.md").write_text("# Subproblem 1", encoding="utf-8")
+    (paper / "main.tex").write_text("\\begin{document}OK\\end{document}", encoding="utf-8")
+    (paper / "references.bib").write_text("@article{source, title={Source}}", encoding="utf-8")
+    store = ModelingStore(str(tmp_path / "modeling.db"))
+    project = store.create_project("Forecast", "forecast", str(workspace), None)
+    artifacts = ArtifactService(store)
+    artifacts.register(project["project_id"], "paper_markdown", "paper/draft.md")
+    artifacts.register(project["project_id"], "paper_latex", "paper/main.tex")
+    bibliography = artifacts.register(project["project_id"], "paper_bibliography", "paper/references.bib")
+
+    payload = LatexService(store, artifacts, ApprovalService(store), runner=FakeRunner()).current_payload(project["project_id"])
+
+    assert payload["bibliography"]["artifact_id"] == bibliography["artifact_id"]

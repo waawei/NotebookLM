@@ -25,9 +25,19 @@ class LatexService:
             path = self._path(project, artifact)
             digest = hashlib.sha256(path.read_bytes()).hexdigest()
             sources.append({"artifact_id": artifact["artifact_id"], "artifact_type": kind, "sha256": digest, "version": artifact["version"]})
+        bibliography = [item for item in artifacts if item["artifact_type"] == "paper_bibliography"]
+        bibliography_payload = None
+        if bibliography:
+            artifact = max(bibliography, key=lambda item: (item["created_at"], item["artifact_id"]))
+            bibliography_payload = {
+                "artifact_id": artifact["artifact_id"],
+                "sha256": hashlib.sha256(self._path(project, artifact).read_bytes()).hexdigest(),
+                "version": artifact["version"],
+            }
         review = self.store.latest_review(project_id)
         return {
             "sources": sources,
+            "bibliography": bibliography_payload,
             "claims": self.store.list_paper_claims(project_id),
             "review_hash": review["paper_hash"] if review and review["status"] == "passed" else None,
         }
