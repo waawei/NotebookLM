@@ -8,13 +8,13 @@
 workflow: mathematical-modeling
 current_phase: 5
 phase_status: in_progress
-current_task: "Task 2: Delivery Manifest, Code Archive, and Output Link"
+current_task: "Task 3: Git Policy Scan and Reviewable Diff"
 task_status: verified
 baseline_commit: 1a6a55a7c95cfd26a6568dbfda66d19f3a688c49
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase5"
-last_verified_commit: 155d8e5a034e2fcade694f10400e218daf891653
-last_verification: "Phase 4 Gate regression 9 passed; Phase 5 Task 1 3 passed; Task 2 delivery tests 2 passed"
-next_action: "Start Phase 5 Task 3; do not start Phase 6"
+last_verified_commit: d7099da882222587d30143cca658a0e98e13500d
+last_verification: "Phase 4 Gate regression 9 passed; Phase 5 Task 1 3 passed; Task 2 2 passed; Task 3 2 passed/1 skipped"
+next_action: "Start Phase 5 Task 4; do not start Phase 6"
 ```
 
 ## 启动前风险
@@ -57,6 +57,16 @@ next_action: "Start Phase 5 Task 3; do not start Phase 6"
 - 提交：`155d8e5a034e2fcade694f10400e218daf891653`
 - 保留的用户改动：无
 - 备注：code.zip 只归档源代码、测试、论文和明确的复现/依赖文件；`data/raw` 默认排除。manifest 保留每项受限原始数据的路径、哈希、大小和 `restricted_raw_data` 原因。Outputs 使用项目与 manifest artifact 链接，不复制 PDF。
+
+### Phase 5 / Task 3: Git Policy Scan and Reviewable Diff
+
+- 状态：verified
+- 实际文件：`backend/services/git_policy_service.py`, `backend/tests/test_git_policy_service.py`
+- 失败测试：`DEBUG=false; PYTHONPATH=backend; python -m pytest backend/tests/test_git_policy_service.py -q`，退出码 2；按预期缺少 Git policy service
+- 聚焦验证：同一命令退出码 0，2 passed、1 skipped（Windows host 不允许创建 symlink）
+- 提交：`d7099da882222587d30143cca658a0e98e13500d`
+- 保留的用户改动：无
+- 备注：只接受显式项目相对路径，拒绝 secret、`.env`、虚拟环境、缓存、build 临时目录、超过 20 MiB 文件和外部 symlink；untracked text 使用统一 diff，二进制仅显示名称与 SHA-256，总输出最多 2 MiB。
 
 ### Phase 4 / Task 1: Paper Contracts, Claims, and Placeholder Resolution
 
