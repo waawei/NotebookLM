@@ -8,13 +8,13 @@
 workflow: mathematical-modeling
 current_phase: 4
 phase_status: in_progress
-current_task: "Task 2: Paper Writer Agent and Versioned Drafts"
-task_status: verified
+current_task: "Task 6: Phase 4 Traceability Checkpoint"
+task_status: in_progress
 baseline_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase4"
-last_verified_commit: 313e66c
-last_verification: "Phase 4 Task 2: focused 5 passed; Task 1-2 regression 10 passed"
-next_action: "Review Task 2, then start Task 3"
+last_verified_commit: f38bbd2
+last_verification: "Task 6 checkpoint: 5 passed, including actual two-pass XeLaTeX compilation with -no-shell-escape"
+next_action: "Complete independent phase review and final Gate 4 verification"
 ```
 
 ## 启动前风险
@@ -31,7 +31,7 @@ next_action: "Review Task 2, then start Task 3"
 | 1 | completed | `2026-07-10-mathematical-modeling-phase1-foundation.md` | passed | Task 6 ledger commit |
 | 2 | completed | `2026-07-10-mathematical-modeling-phase2-intake-planning.md` | passed | `09000b4` + completion ledger commit |
 | 3 | completed | `2026-07-10-mathematical-modeling-phase3-experiments.md` | passed | `0a6e542` + `c72749f` + completion ledger commit |
-| 4 | in_progress | `2026-07-10-mathematical-modeling-phase4-paper.md` | pending | Task 1 `34fea97` + `ee6ed66`; Task 2 `313e66c` |
+| 4 | in_progress | `2026-07-10-mathematical-modeling-phase4-paper.md` | pending | Task 1 `34fea97` + `ee6ed66`; Task 2 `313e66c` + `b0c167b`; Task 3 `9d2e4cd` + `fc0205e`; Task 4 `4648b01`; Task 5 `a645dda`; Task 6 `54f3fc8` |
 | 5 | blocked_by_phase_4 | `2026-07-10-mathematical-modeling-phase5-delivery-git.md` | pending | — |
 | 6 | blocked_by_phase_5 | `2026-07-10-mathematical-modeling-phase6-hardening.md` | pending | — |
 
@@ -60,6 +60,38 @@ next_action: "Review Task 2, then start Task 3"
 - 提交：`313e66c`
 - 保留的用户改动：无
 - 备注：编辑态 Markdown/LaTeX 保留 placeholder；带结果名的字面指标数值会被拒绝。
+
+### Phase 4 / Task 3: Independent Review and Paper Gates
+
+- 状态：verified
+- 实际文件：`backend/services/review_agent_service.py`, `backend/services/modeling_gate_service.py`, `backend/services/modeling_store.py`, `backend/skills/modeling_reviewer/skill.json`, 及聚焦测试
+- 聚焦验证：`DEBUG=false; python -m pytest tests/test_review_agent_service.py tests/test_paper_gates.py tests/test_paper_agent_service.py tests/test_paper_placeholder_service.py tests/test_paper_claim_service.py tests/test_skill_service.py -q`，退出码 0，19 passed
+- 提交：实现 `9d2e4cd`；当前 claim/hash 审查修复 `fc0205e`
+- 备注：审稿对完成实验、artifact SHA 和 paper_claims 逐项复核；编辑源修改后 review hash 不再匹配，最终 Gate 拒绝。
+
+### Phase 4 / Task 4: Final Approval and Restricted XeLaTeX Compilation
+
+- 状态：verified
+- 实际文件：`backend/services/latex_service.py`, `backend/tests/test_latex_service.py`
+- 聚焦验证：`DEBUG=false; python -m pytest tests/test_latex_service.py tests/test_phase4_traceability_checkpoint.py -q`，退出码 0，5 passed
+- 提交：实现 `4648b01`；bibliography 审批绑定修复 `f38bbd2`
+- 备注：构建树位于 `.workflow/build/paper`，XeLaTeX 两遍执行且固定 `-no-shell-escape -interaction=nonstopmode -halt-on-error`。审批 payload 包含 Markdown、LaTeX、可选 bibliography、claims 和通过 review hash。
+
+### Phase 4 / Task 5: Paper API and Workbench
+
+- 状态：verified
+- 实际文件：`backend/api/modeling.py`, `backend/tests/test_paper_api.py`, `frontend/src/services/api.ts`, `frontend/src/components/PaperWorkspace.tsx`, `frontend/src/components/ReviewIssuesPanel.tsx`, `frontend/src/components/FinalPaperApprovalCard.tsx`, `frontend/src/views/ModelingProjectsView.tsx` 及对应测试
+- 聚焦验证：后端 API 2 passed；前端 4 files / 12 tests passed，生产构建通过
+- 提交：`a645dda`
+- 备注：保存 Markdown 注册新 artifact 版本；后续 render/review/approval/compile 依据当前哈希自然使旧结果失效；PDF endpoint 仅从项目工作区 deliverables 路径响应。
+
+### Phase 4 / Task 6: Phase 4 Traceability Checkpoint
+
+- 状态：in_progress
+- 实际文件：`backend/tests/test_phase4_traceability_checkpoint.py`
+- 聚焦验证：`DEBUG=false; python -m pytest tests/test_phase4_traceability_checkpoint.py tests/test_latex_service.py -q -s`，退出码 0，4 passed；后续 bibliography 绑定验证 5 passed
+- 提交：`54f3fc8`；Gate 绑定修复 `f38bbd2`
+- 备注：真实 checkpoint 创建完成实验指标与图表、解析两个 claim、通过审稿、批准精确 payload、两次 XeLaTeX 编译并检查 PDF；篡改 Markdown 后编译被拒绝。
 
 ### Phase 3 / Task 1: Experiment Contracts and Records
 
