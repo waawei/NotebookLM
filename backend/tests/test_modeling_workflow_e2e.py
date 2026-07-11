@@ -1,4 +1,5 @@
 import asyncio
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -40,6 +41,22 @@ def modeling_harness(tmp_path):
     return ModelingHarness(tmp_path)
 
 
+def test_modeling_workflow_renders_and_approves_paper_without_xelatex(modeling_harness):
+    project = modeling_harness.create_project("Fixture Paper")
+    modeling_harness.import_fixture(project)
+    modeling_harness.parse_profile_and_plan(project)
+    modeling_harness.approve_current(project, "model_approval")
+    modeling_harness.prepare_approve_and_run(project, candidate_index=0)
+    modeling_harness.prepare_approve_and_run(project, candidate_index=1)
+    modeling_harness.validate_results(project)
+    modeling_harness.write_and_review_paper(project)
+    approved = modeling_harness.approve_current(project, "final_approval")
+
+    assert approved["state"] == "packaging"
+    assert modeling_harness.unresolved_claims(project) == []
+
+
+@pytest.mark.skipif(shutil.which("xelatex") is None, reason="xelatex is not installed")
 def test_modeling_workflow_produces_traceable_pdf_and_commit(modeling_harness):
     project = modeling_harness.create_project("Fixture Forecast")
     modeling_harness.import_fixture(project)
@@ -187,7 +204,7 @@ class ModelingHarness:
         asyncio.run(self.roles.create_model_plan(project["project_id"], profile["artifact_id"]))
         self.projects.advance(project["project_id"])
 
-    def approve_current(self, project: dict, gate: str) -> None:
+    def approve_current(self, project: dict, gate: str) -> dict | None:
         request = next(
             request
             for request in reversed(self.approvals.list_for_project(project["project_id"]))
@@ -195,7 +212,8 @@ class ModelingHarness:
         )
         self.approvals.decide(request["approval_id"], "approved", request["payload_hash"])
         if gate in {"model_approval", "final_approval"}:
-            self.projects.advance(project["project_id"])
+            return self.projects.advance(project["project_id"])
+        return None
 
     def prepare_experiment(self, project: dict, candidate_index: int) -> dict:
         return asyncio.run(self.code.prepare_experiment(project["project_id"], candidate_index))
@@ -236,6 +254,7 @@ class ModelingHarness:
         review = asyncio.run(self.reviewer.review(project["project_id"]))
         assert review["status"] == "passed"
         self.projects.advance(project["project_id"])
+        self.projects.advance(project["project_id"])
         self.approvals.request(
             project["project_id"],
             "final_approval",
@@ -265,8 +284,7 @@ class ModelingHarness:
         ]
         request = self.git.request_commit(project["project_id"], paths, message)
         self.approvals.decide(request["approval_id"], "approved", request["payload_hash"])
-        state = self.projects.advance(project["project_id"])
-        return {"paths": paths, "request": request, "state": state["state"]}
+        return {"paths": paths, "request": request, "state": self.store.get_project(project["project_id"])["state"]}
 
     def commit(self, project: dict) -> dict:
         request = self.review_and_approve_commit
