@@ -122,6 +122,7 @@ class ModelingStore:
                     project_id TEXT NOT NULL,
                     config_json TEXT NOT NULL,
                     execution_payload_hash TEXT,
+                    execution_batch_json TEXT,
                     status TEXT NOT NULL,
                     pid INTEGER,
                     exit_code INTEGER,
@@ -132,6 +133,11 @@ class ModelingStore:
                 )
                 """
             )
+            columns = {
+                row[1] for row in conn.execute("PRAGMA table_info(experiment_runs)")
+            }
+            if "execution_batch_json" not in columns:
+                conn.execute("ALTER TABLE experiment_runs ADD COLUMN execution_batch_json TEXT")
 
     def create_project(
         self,
@@ -545,6 +551,9 @@ class ModelingStore:
             return None
         experiment = dict(row)
         experiment["config"] = json.loads(experiment.pop("config_json"))
+        batch_json = experiment.pop("execution_batch_json", None)
+        if batch_json:
+            experiment["execution_batch"] = json.loads(batch_json)
         return experiment
 
     def create_experiment(
@@ -572,6 +581,7 @@ class ModelingStore:
                 validated_config.model_dump(mode="json"), ensure_ascii=False, sort_keys=True
             ),
             "execution_payload_hash": execution_payload_hash,
+            "execution_batch_json": None,
             "status": "prepared",
             "pid": None,
             "exit_code": None,
@@ -586,8 +596,9 @@ class ModelingStore:
                     """
                     INSERT INTO experiment_runs (
                         experiment_id, project_id, config_json, execution_payload_hash,
-                        status, pid, exit_code, error_code, started_at, finished_at, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        execution_batch_json, status, pid, exit_code, error_code,
+                        started_at, finished_at, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     tuple(experiment.values()),
                 )
@@ -635,3 +646,22 @@ class ModelingStore:
                 f"UPDATE experiment_runs SET {', '.join(f'{name} = ?' for name, _ in updates)} WHERE experiment_id = ?",
                 tuple(value for _, value in updates) + (experiment_id,),
             )
+
+    def set_experiment_execution_batch(
+        self, experiment_id: str, execution_payload_hash: str, batch: dict
+    ) -> None:
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE experiment_runs
+                SET execution_payload_hash = ?, execution_batch_json = ?
+                WHERE experiment_id = ? AND status = 'prepared'
+                """,
+                (
+                    execution_payload_hash,
+                    json.dumps(batch, ensure_ascii=False, sort_keys=True),
+                    experiment_id,
+                ),
+            )
+            if cursor.rowcount == 0:
+                raise ValueError("Experiment is not available for execution approval")
