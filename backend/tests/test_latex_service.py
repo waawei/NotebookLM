@@ -108,3 +108,27 @@ def test_final_payload_includes_bibliography_hash(tmp_path):
     payload = LatexService(store, artifacts, ApprovalService(store), runner=FakeRunner()).current_payload(project["project_id"])
 
     assert payload["bibliography"]["artifact_id"] == bibliography["artifact_id"]
+
+
+def test_final_payload_only_contains_claims_for_current_markdown(tmp_path):
+    workspace = tmp_path / "workspace"
+    paper = workspace / "paper"
+    paper.mkdir(parents=True)
+    (paper / "draft.md").write_text("# Current", encoding="utf-8")
+    (paper / "main.tex").write_text("\\begin{document}OK\\end{document}", encoding="utf-8")
+    store = ModelingStore(str(tmp_path / "modeling.db"))
+    project = store.create_project("Forecast", "forecast", str(workspace), None)
+    artifacts = ArtifactService(store)
+    old = artifacts.register(project["project_id"], "paper_markdown", "paper/draft.md")
+    (paper / "draft.md").write_text("# New", encoding="utf-8")
+    current = artifacts.register(project["project_id"], "paper_markdown", "paper/draft.md")
+    artifacts.register(project["project_id"], "paper_latex", "paper/main.tex")
+    store.replace_paper_claims(project["project_id"], old["artifact_id"], [{
+        "placeholder": "{{metric:old.validation_rmse}}", "claim_type": "metric", "artifact_id": "old-metric",
+        "experiment_id": "exp-0001", "metric_name": "validation_rmse", "rendered_value": "9.99",
+    }])
+
+    payload = LatexService(store, artifacts, ApprovalService(store), runner=FakeRunner()).current_payload(project["project_id"])
+
+    assert current["artifact_id"] == payload["sources"][0]["artifact_id"]
+    assert payload["claims"] == []

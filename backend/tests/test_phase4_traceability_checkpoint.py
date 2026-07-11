@@ -31,6 +31,8 @@ def test_phase4_traceable_paper_compiles_and_stale_content_is_rejected(tmp_path)
     latex = paper / "main.tex"
     markdown.write_text("# Subproblem 1\nRMSE {{metric:exp-0001.validation_rmse}}\nFigure {{figure:FIGURE_ID}}", encoding="utf-8")
     latex.write_text("\\documentclass{article}\n\\begin{document}\nRMSE {{metric:exp-0001.validation_rmse}}\\par\nFigure {{figure:FIGURE_ID}}\n\\end{document}\n", encoding="utf-8")
+    bibliography = paper / "references.bib"
+    bibliography.write_text("@article{source, title={Source}}", encoding="utf-8")
     store = ModelingStore(str(tmp_path / "modeling.db"))
     project = store.create_project("Forecast", "forecast", str(workspace), None)
     artifacts = ArtifactService(store)
@@ -45,6 +47,7 @@ def test_phase4_traceable_paper_compiles_and_stale_content_is_rejected(tmp_path)
     latex.write_text(latex.read_text(encoding="utf-8").replace("FIGURE_ID", figure_artifact["artifact_id"]), encoding="utf-8")
     markdown_artifact = artifacts.register(project["project_id"], "paper_markdown", "paper/draft.md")
     artifacts.register(project["project_id"], "paper_latex", "paper/main.tex")
+    artifacts.register(project["project_id"], "paper_bibliography", "paper/references.bib")
     resolver = PaperPlaceholderService(store, artifacts)
     _, claims = resolver.resolve_markdown(project["project_id"], markdown.read_text(encoding="utf-8"))
     PaperClaimService(store).replace_for_paper(project["project_id"], markdown_artifact["artifact_id"], claims)
@@ -60,6 +63,7 @@ def test_phase4_traceable_paper_compiles_and_stale_content_is_rejected(tmp_path)
 
     assert review["status"] == "passed"
     assert Path(result["pdf_path"]).is_file()
+    assert (Path(result["build_dir"]) / "references.bib").is_file()
     assert len(store.list_paper_claims(project["project_id"], markdown_artifact["artifact_id"])) == 2
     with pytest.raises(ValueError, match="review|approval"):
         latex_service.compile(project["project_id"])

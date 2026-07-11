@@ -35,10 +35,11 @@ class LatexService:
                 "version": artifact["version"],
             }
         review = self.store.latest_review(project_id)
+        markdown_artifact_id = sources[0]["artifact_id"]
         return {
             "sources": sources,
             "bibliography": bibliography_payload,
-            "claims": self.store.list_paper_claims(project_id),
+            "claims": self.store.list_paper_claims(project_id, markdown_artifact_id),
             "review_hash": review["paper_hash"] if review and review["status"] == "passed" else None,
         }
 
@@ -62,6 +63,10 @@ class LatexService:
         build_main = build / "main.tex"
         build_markdown.write_text(self._resolve(project_id, markdown.read_text(encoding="utf-8")), encoding="utf-8")
         build_main.write_text(self._resolve(project_id, latex.read_text(encoding="utf-8")), encoding="utf-8")
+        if payload["bibliography"]:
+            bibliography_artifact = self.store.get_artifact(payload["bibliography"]["artifact_id"])
+            bibliography = self._path(project, bibliography_artifact)
+            shutil.copy2(bibliography, build / bibliography.name)
         output = build / "output"
         output.mkdir()
         command = ["xelatex", "-no-shell-escape", "-interaction=nonstopmode", "-halt-on-error", "-output-directory", str(output), str(build_main)]
