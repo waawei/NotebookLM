@@ -10,6 +10,7 @@ class GitCommitService:
         self.approval_service = approval_service
         self.policy = policy
         self.reproducibility = reproducibility
+        self._uses_default_git = git_run is None
         self.git_run = git_run or self._git_run
 
     def request_commit(self, project_id: str, paths: list[str], message: str) -> dict:
@@ -22,7 +23,7 @@ class GitCommitService:
         payload_hash = canonical_hash(payload)
         self.approval_service.require_approved(project_id, "commit_approval", payload_hash)
         self.git_run(["git", "add", "--", *payload["paths"]], cwd=project["workspace_path"])
-        cached = self.git_run(["git", "diff", "--cached", "--quiet"], cwd=project["workspace_path"])
+        cached = self._cached_diff(project["workspace_path"])
         if cached.returncode == 0:
             raise ValueError("No approved changes are staged")
         if cached.returncode != 1:
@@ -59,3 +60,8 @@ class GitCommitService:
     @staticmethod
     def _git_run(command: list[str], **kwargs):
         return subprocess.run(command, capture_output=True, text=True, check=True, **kwargs)
+
+    def _cached_diff(self, workspace_path: str):
+        if self._uses_default_git:
+            return subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=workspace_path, capture_output=True, text=True, check=False)
+        return self.git_run(["git", "diff", "--cached", "--quiet"], cwd=workspace_path)
