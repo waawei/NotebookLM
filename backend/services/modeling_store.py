@@ -665,3 +665,16 @@ class ModelingStore:
             )
             if cursor.rowcount == 0:
                 raise ValueError("Experiment is not available for execution approval")
+
+    def claim_experiment(self, experiment_id: str, started_at: str) -> None:
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE experiment_runs
+                SET status = 'running', started_at = ?
+                WHERE experiment_id = ? AND status = 'prepared'
+                """,
+                (started_at, experiment_id),
+            )
+            if cursor.rowcount == 0:
+                raise ValueError("Experiment is not available for execution")

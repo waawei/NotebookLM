@@ -21,6 +21,7 @@ def policy_context(tmp_path):
         network_allowed=False,
         code_hash="a" * 64,
         input_hashes={"data/raw/sales.csv": "b" * 64},
+        source_hashes={"src/train.py": "c" * 64},
     )
     approvals = ApprovalService(store)
     return ExecutionPolicy(approvals), approvals, project, batch

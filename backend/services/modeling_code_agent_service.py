@@ -81,11 +81,12 @@ class ModelingCodeAgentService:
         root = Path(project["workspace_path"]).resolve()
         config = self._config(experiment_id, candidate, plan_payload)
         input_hashes = self._input_hashes(project)
-        source_hash = self._source_hash(
+        source_hashes = self._source_hashes(
             generated.files,
             f"experiments/{experiment_id}/config.json",
             json.dumps(config, ensure_ascii=False, sort_keys=True),
         )
+        source_hash = self._combined_hash(source_hashes)
         batch = ExecutionBatch(
             experiment_id=experiment_id,
             commands=generated.commands,
@@ -94,6 +95,7 @@ class ModelingCodeAgentService:
             network_allowed=False,
             code_hash=source_hash,
             input_hashes=input_hashes,
+            source_hashes=source_hashes,
         )
         task, run = self.run_service.start(
             project_id,
@@ -164,16 +166,23 @@ class ModelingCodeAgentService:
         return hashes
 
     @staticmethod
-    def _source_hash(
+    def _source_hashes(
         files: list[GeneratedFile], config_path: str, config_content: str
-    ) -> str:
-        digest = hashlib.sha256()
+    ) -> dict[str, str]:
         content = {file.path: file.content for file in files}
         content[config_path] = config_content
-        for path in sorted(content):
+        return {
+            path: hashlib.sha256(value.encode("utf-8")).hexdigest()
+            for path, value in content.items()
+        }
+
+    @staticmethod
+    def _combined_hash(source_hashes: dict[str, str]) -> str:
+        digest = hashlib.sha256()
+        for path, value in sorted(source_hashes.items()):
             digest.update(path.encode("utf-8"))
             digest.update(b"\0")
-            digest.update(content[path].encode("utf-8"))
+            digest.update(value.encode("ascii"))
             digest.update(b"\0")
         return digest.hexdigest()
 

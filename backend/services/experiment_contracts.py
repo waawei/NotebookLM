@@ -32,6 +32,7 @@ class ExecutionBatch(StrictModel):
     network_allowed: bool = False
     code_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
     input_hashes: dict[str, str]
+    source_hashes: dict[str, str] = Field(min_length=1)
 
 
 class MetricRecord(StrictModel):

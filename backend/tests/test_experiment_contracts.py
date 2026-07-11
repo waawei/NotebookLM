@@ -14,6 +14,7 @@ def test_batch_rejects_shell_string_and_invalid_experiment_id():
             network_allowed=False,
             code_hash="a" * 64,
             input_hashes={"data/raw.csv": "b" * 64},
+            source_hashes={"src/train.py": "c" * 64},
         )
 
 
