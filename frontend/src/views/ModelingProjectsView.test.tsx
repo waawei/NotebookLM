@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const modelingApiMock = vi.hoisted(() => ({
@@ -239,5 +239,32 @@ describe('ModelingProjectsView', () => {
 
     await waitFor(() => expect(screen.queryByText(/old.csv/)).not.toBeInTheDocument())
     expect(screen.getByText(/second.csv/)).toBeInTheDocument()
+  })
+
+  it('does not render the previous project approval while new evidence loads', async () => {
+    let resolveSecond: (value: unknown) => void = () => undefined
+    const secondArtifacts = new Promise((resolve) => { resolveSecond = resolve })
+    const second = { ...forecast, project_id: 'project-2', name: 'Second', slug: 'second', state: 'model_approval_pending' }
+    modelingApiMock.list.mockResolvedValue({ projects: [{ ...forecast, state: 'model_approval_pending' }, second], total: 2 })
+    modelingApiMock.listArtifacts
+      .mockResolvedValueOnce({ artifacts: [], total: 0 })
+      .mockReturnValueOnce(secondArtifacts)
+    modelingApiMock.listApprovals.mockResolvedValueOnce({
+      approvals: [{ approval_id: 'old', project_id: 'project-1', gate: 'model_approval', payload_hash: 'old-hash', payload: { artifact_id: 'old-plan', artifact_sha256: 'old-sha', version: 1 }, status: 'pending' }],
+      total: 1,
+    }).mockResolvedValueOnce({ approvals: [], total: 0 })
+    modelingApiMock.getArtifact.mockResolvedValueOnce({
+      artifact_id: 'old-plan',
+      content: { problem_summary: 'Old plan', candidates: [] },
+    })
+    render(<ModelingProjectsView />)
+
+    expect(await screen.findByText('Model plan approval')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Second/ }))
+    expect(await screen.findByRole('heading', { name: 'Second' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('Model plan approval')).not.toBeInTheDocument())
+    await act(async () => {
+      resolveSecond({ artifacts: [], total: 0 })
+    })
   })
 })

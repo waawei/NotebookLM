@@ -58,6 +58,7 @@ export default function ModelingProjectsView() {
   const [artifacts, setArtifacts] = useState<ModelingArtifact[]>([])
   const [approvals, setApprovals] = useState<ApprovalRequest[]>([])
   const [modelPlan, setModelPlan] = useState<ModelPlan | null>(null)
+  const [evidenceProjectId, setEvidenceProjectId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const evidenceGeneration = useRef(0)
 
@@ -96,6 +97,10 @@ export default function ModelingProjectsView() {
 
   const loadEvidence = async (projectId: string) => {
     const generation = ++evidenceGeneration.current
+    setArtifacts([])
+    setApprovals([])
+    setModelPlan(null)
+    setEvidenceProjectId(null)
     try {
       const [artifactData, approvalData] = await Promise.all([
         modelingApi.listArtifacts(projectId),
@@ -116,8 +121,10 @@ export default function ModelingProjectsView() {
         const planArtifact = await modelingApi.getArtifact(projectId, pending.payload.artifact_id)
         if (generation !== evidenceGeneration.current) return
         setModelPlan(planArtifact.content as ModelPlan)
+        setEvidenceProjectId(projectId)
       } else {
         setModelPlan(null)
+        setEvidenceProjectId(projectId)
       }
     } catch {
       if (generation === evidenceGeneration.current) {
@@ -132,6 +139,7 @@ export default function ModelingProjectsView() {
       setArtifacts([])
       setApprovals([])
       setModelPlan(null)
+      setEvidenceProjectId(null)
     }
   }, [selectedProject?.project_id, selectedProject?.state])
 
@@ -193,13 +201,13 @@ export default function ModelingProjectsView() {
     }
   }
 
-  const pendingModelApproval = approvals
+  const pendingModelApproval = evidenceProjectId === selectedProject?.project_id ? approvals
     .filter((item) => item.gate === 'model_approval' && item.status === 'pending')
     .sort((left, right) => {
       const created = (right.created_at || '').localeCompare(left.created_at || '')
       if (created !== 0) return created
       return (right.payload?.version || 0) - (left.payload?.version || 0)
-    })[0]
+    })[0] : undefined
 
   return (
     <div className="grid h-full grid-cols-[minmax(260px,340px)_1fr] bg-gray-100 dark:bg-gray-950">
@@ -245,7 +253,7 @@ export default function ModelingProjectsView() {
               {selectedProject.state === 'problem_parsing' && <button type="button" disabled={stageBusy} onClick={() => void runStageAction()} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Parse problem</button>}
               {selectedProject.state === 'data_profiling' && <button type="button" disabled={stageBusy || !artifacts.some((item) => item.artifact_type === 'data_input')} onClick={() => void runStageAction()} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Profile data</button>}
               {selectedProject.state === 'model_planning' && <button type="button" disabled={stageBusy} onClick={() => void runStageAction()} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Create model plan</button>}
-              {pendingModelApproval && modelPlan && <ModelPlanApprovalCard projectId={selectedProject.project_id} approval={pendingModelApproval} plan={modelPlan} onDecided={() => loadEvidence(selectedProject.project_id)} />}
+              {pendingModelApproval && modelPlan && <ModelPlanApprovalCard key={pendingModelApproval.approval_id} projectId={selectedProject.project_id} approval={pendingModelApproval} plan={modelPlan} onDecided={() => loadEvidence(selectedProject.project_id)} />}
               {artifacts.length > 0 && <section aria-label="Modeling artifacts" className="rounded border border-gray-200 p-3 dark:border-gray-800"><h2 className="text-sm font-semibold">Artifacts</h2><ul className="mt-2 space-y-1 text-xs text-gray-600 dark:text-gray-300">{artifacts.map((artifact) => <li key={artifact.artifact_id}>{artifact.artifact_type}: {artifact.relative_path}</li>)}</ul></section>}
             </div>
             <div className="mt-6 flex flex-wrap items-end gap-3 border-t border-gray-100 pt-5 dark:border-gray-800">

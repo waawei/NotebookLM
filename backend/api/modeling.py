@@ -162,11 +162,11 @@ async def upload_input(
     file: UploadFile = File(...),
     kind: str = "problem",
 ):
-    _require_state(project_id, "project_initialized")
-    clean_kind = await validate_input_kind(InputUploadKind(kind=kind))
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="Input filename is required")
     try:
+        _require_state(project_id, "project_initialized")
+        clean_kind = await validate_input_kind(InputUploadKind(kind=kind))
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="Input filename is required")
         content = await file.read(settings.MAX_FILE_SIZE + 1)
         if len(content) > settings.MAX_FILE_SIZE:
             raise HTTPException(status_code=400, detail="Input file exceeds size limit")
@@ -248,6 +248,8 @@ async def decide_approval(
     project_id: str, approval_id: str, request: ApprovalDecision
 ):
     _require_project(project_id)
+    if request.decision not in {"approved", "changes_requested", "rejected"}:
+        raise HTTPException(status_code=400, detail="Invalid approval decision")
     if request.decision == "changes_requested" and not request.comment.strip():
         raise HTTPException(
             status_code=400, detail="A comment is required when requesting changes"
@@ -261,4 +263,11 @@ async def decide_approval(
             request.comment.strip(),
         )
     except ValueError as error:
-        raise HTTPException(status_code=409, detail=str(error)) from error
+        detail = str(error)
+        if "not found" in detail.lower():
+            status = 404
+        elif "invalid approval decision" in detail.lower():
+            status = 400
+        else:
+            status = 409
+        raise HTTPException(status_code=status, detail=detail) from error

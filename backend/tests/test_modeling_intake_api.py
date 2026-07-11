@@ -65,6 +65,14 @@ def test_upload_rejects_unknown_kind():
     assert raised.value.status_code == 400
 
 
+def test_invalid_kind_closes_upload(fake_services):
+    upload = UploadFile(filename="train.csv", file=BytesIO(b"x\n1\n"))
+    with pytest.raises(HTTPException) as raised:
+        asyncio.run(modeling.upload_input("p-1", upload, "executable"))
+    assert raised.value.status_code == 400
+    assert upload.file.closed
+
+
 def test_upload_reads_bytes_and_preserves_filename(fake_services):
     _, inputs, _ = fake_services
     upload = UploadFile(filename="赛题.txt", file=BytesIO("预测销量".encode("utf-8")))
@@ -150,6 +158,15 @@ def test_upload_is_rejected_after_project_initialization(fake_services):
 
     assert raised.value.status_code == 409
     assert inputs.calls == []
+    assert upload.file.closed
+
+
+def test_missing_filename_closes_upload(fake_services):
+    upload = UploadFile(filename=None, file=BytesIO(b"x\n1\n"))
+    with pytest.raises(HTTPException) as raised:
+        asyncio.run(modeling.upload_input("p-1", upload, "data"))
+    assert raised.value.status_code == 400
+    assert upload.file.closed
 
 
 def test_approval_decision_rejects_cross_project_request(monkeypatch, tmp_path):
@@ -181,5 +198,19 @@ def test_approval_decision_rejects_cross_project_request(monkeypatch, tmp_path):
             )
         )
 
-    assert raised.value.status_code == 409
+    assert raised.value.status_code == 404
     assert store.get_approval_request(request["approval_id"])["status"] == "pending"
+
+
+def test_invalid_approval_decision_returns_bad_request(fake_services):
+    with pytest.raises(HTTPException) as raised:
+        asyncio.run(
+            modeling.decide_approval(
+                "p-1",
+                "a-1",
+                modeling.ApprovalDecision(
+                    decision="maybe", payload_hash="hash", comment=""
+                ),
+            )
+        )
+    assert raised.value.status_code == 400
