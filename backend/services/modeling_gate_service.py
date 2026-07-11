@@ -5,6 +5,7 @@ from pathlib import Path
 from services.approval_service import canonical_hash
 from services.experiment_contracts import MetricRecord
 from services.review_agent_service import ReviewAgentService
+from services.reproducibility_service import ReproducibilityService
 
 
 class ModelingGateService:
@@ -32,6 +33,12 @@ class ModelingGateService:
                 self._require_current_review(project_id)
             if state == "final_approval_pending":
                 self._require_current_review(project_id)
+            if state == "packaging":
+                self._require_delivery_manifest(project_id)
+            if state == "commit_approval_pending":
+                self._require_delivery_manifest(project_id)
+            if state == "committing":
+                self._require_current_commit(project_id)
             return
 
         plans = [item for item in artifacts if item["artifact_type"] == "model_plan"]
@@ -94,3 +101,16 @@ class ModelingGateService:
             raise ValueError("Paper has blocking review issues") from error
         if not review or review["status"] != "passed" or review["paper_hash"] != current_hash:
             raise ValueError("Paper has blocking review issues")
+
+    def _require_delivery_manifest(self, project_id: str) -> dict:
+        manifests = [item for item in self.store.list_artifacts(project_id) if item["artifact_type"] == "delivery_manifest"]
+        if not manifests:
+            raise ValueError("Packaging requires a delivery manifest")
+        if not ReproducibilityService(self.store).check(project_id)["ok"]:
+            raise ValueError("Packaging requires passing reproducibility checks")
+        return max(manifests, key=lambda item: (item["created_at"], item["artifact_id"]))
+
+    def _require_current_commit(self, project_id: str) -> None:
+        manifest = self._require_delivery_manifest(project_id)
+        if not any(record["manifest_hash"] == manifest["sha256"] for record in self.store.list_project_commits(project_id)):
+            raise ValueError("Committing requires a persisted approved commit")

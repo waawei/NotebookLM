@@ -161,6 +161,19 @@ class ModelingStore:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS project_commits (
+                    record_id TEXT PRIMARY KEY,
+                    project_id TEXT NOT NULL,
+                    approval_payload_hash TEXT NOT NULL,
+                    commit_hash TEXT NOT NULL,
+                    commit_message TEXT NOT NULL,
+                    manifest_hash TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
             columns = {
                 row[1] for row in conn.execute("PRAGMA table_info(experiment_runs)")
             }
@@ -503,6 +516,17 @@ class ModelingStore:
         review = dict(row)
         review["issues"] = json.loads(review.pop("issues_json"))
         return review
+
+    def create_project_commit(self, project_id: str, approval_payload_hash: str, commit_hash: str, commit_message: str, manifest_hash: str) -> dict:
+        record = {"record_id": str(uuid.uuid4()), "project_id": project_id, "approval_payload_hash": approval_payload_hash, "commit_hash": commit_hash, "commit_message": commit_message, "manifest_hash": manifest_hash, "created_at": datetime.now().isoformat()}
+        with self._connect() as conn:
+            conn.execute("INSERT INTO project_commits (record_id, project_id, approval_payload_hash, commit_hash, commit_message, manifest_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", tuple(record.values()))
+        return record
+
+    def list_project_commits(self, project_id: str) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT * FROM project_commits WHERE project_id = ? ORDER BY created_at, record_id", (project_id,)).fetchall()
+        return [dict(row) for row in rows]
 
     @staticmethod
     def _approval_from_row(row) -> dict | None:
