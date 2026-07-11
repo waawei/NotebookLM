@@ -12,9 +12,9 @@ current_task: "Task 6: Phase 5 Independent-Repository Checkpoint"
 task_status: verified
 baseline_commit: 1a6a55a7c95cfd26a6568dbfda66d19f3a688c49
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase5"
-last_verified_commit: 64cb92db5f9e5aff0bf44137b43a44e5efa5e54f
-last_verification: "Phase 4 Gate regression 9 passed; Phase 5 Task 1 3 passed; Task 2 review regression 7 passed/1 skipped; Task 3 2 passed/1 skipped; Task 4 5 passed; Task 5 backend 10 passed/2 skipped and frontend 3 files/11 tests/build; Task 6 checkpoint 4 passed"
-next_action: "Run final Phase 5 Gate and whole-branch review; do not start Phase 6"
+last_verified_commit: 2b5459147b94d72a8a4ed4d71a563fe18fd6b76c
+last_verification: "Phase 4 Gate regression 9 passed; Phase 5 Task 1 3 passed; Task 2 review regression 7 passed/1 skipped; Task 3 2 passed/1 skipped; Task 4 5 passed; Task 5 backend 10 passed/2 skipped and frontend 3 files/11 tests/build; Task 6 checkpoint 4 passed; Gate 5 frontend 30 files/127 tests and production build passed"
+next_action: "Run final Phase 5 backend Gate and whole-branch review; do not start Phase 6"
 ```
 
 ## 启动前风险
@@ -97,6 +97,14 @@ next_action: "Run final Phase 5 Gate and whole-branch review; do not start Phase
 - 提交：`64cb92db5f9e5aff0bf44137b43a44e5efa5e54f`
 - 保留的用户改动：运行时 `data/` 目录未跟踪且未暂存
 - 备注：fixture 交付 manifest/code archive/论文源/依赖/复现命令/实验记录/受限数据条目齐全；secret 与超过 20 MiB 文件被 policy 拒绝；文件篡改使旧审批拒绝且不会提交；重新批准后产生一条批准信息的本地 commit，`git remote` 为空。
+
+### Phase 5 Gate Compatibility Fix
+
+- 状态：verified
+- 根因：旧 `ModelingProjectsView` mock 未包含新 `checkDeliverables`，在 packaging 状态渲染时使组件崩溃。
+- 红灯：完整前端 suite 1 failed、1 unhandled error；具体为 `modelingApi.checkDeliverables is not a function`。
+- 绿灯：`ModelingProjectsView.test.tsx` 29 passed；完整前端 30 files、127 tests passed；`npm run build` 退出码 0。
+- 提交：`2b5459147b94d72a8a4ed4d71a563fe18fd6b76c`
 
 ### Phase 5 / Task 2 Review Fixes
 
