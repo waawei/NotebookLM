@@ -7,14 +7,14 @@
 ```yaml
 workflow: mathematical-modeling
 current_phase: 4
-phase_status: in_progress
+phase_status: completed
 current_task: "Task 6: Phase 4 Traceability Checkpoint"
-task_status: in_progress
+task_status: verified
 baseline_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase4"
-last_verified_commit: f38bbd2
-last_verification: "Task 6 checkpoint: 5 passed, including actual two-pass XeLaTeX compilation with -no-shell-escape"
-next_action: "Complete independent phase review and final Gate 4 verification"
+last_verified_commit: 8363a3e
+last_verification: "Gate 4 passed: backend 219 passed/1 skipped/13 subtests; frontend 28 files/125 tests; production build; traceability checkpoint with real XeLaTeX PDF"
+next_action: "Stop after Phase 4 and wait for user review; do not start Phase 5"
 ```
 
 ## 启动前风险
@@ -31,8 +31,8 @@ next_action: "Complete independent phase review and final Gate 4 verification"
 | 1 | completed | `2026-07-10-mathematical-modeling-phase1-foundation.md` | passed | Task 6 ledger commit |
 | 2 | completed | `2026-07-10-mathematical-modeling-phase2-intake-planning.md` | passed | `09000b4` + completion ledger commit |
 | 3 | completed | `2026-07-10-mathematical-modeling-phase3-experiments.md` | passed | `0a6e542` + `c72749f` + completion ledger commit |
-| 4 | in_progress | `2026-07-10-mathematical-modeling-phase4-paper.md` | pending | Task 1 `34fea97` + `ee6ed66`; Task 2 `313e66c` + `b0c167b`; Task 3 `9d2e4cd` + `fc0205e`; Task 4 `4648b01`; Task 5 `a645dda`; Task 6 `54f3fc8` |
-| 5 | blocked_by_phase_4 | `2026-07-10-mathematical-modeling-phase5-delivery-git.md` | pending | — |
+| 4 | completed | `2026-07-10-mathematical-modeling-phase4-paper.md` | passed | Task 1 `34fea97` + `ee6ed66`; Task 2 `313e66c` + `b0c167b`; Task 3 `9d2e4cd` + `fc0205e`; Task 4 `4648b01` + `f38bbd2`; Task 5 `a645dda`; Task 6 `54f3fc8` + `8363a3e` |
+| 5 | not_started | `2026-07-10-mathematical-modeling-phase5-delivery-git.md` | pending | — |
 | 6 | blocked_by_phase_5 | `2026-07-10-mathematical-modeling-phase6-hardening.md` | pending | — |
 
 ## 当前阶段 Task 记录
@@ -87,11 +87,12 @@ next_action: "Complete independent phase review and final Gate 4 verification"
 
 ### Phase 4 / Task 6: Phase 4 Traceability Checkpoint
 
-- 状态：in_progress
+- 状态：verified
 - 实际文件：`backend/tests/test_phase4_traceability_checkpoint.py`
-- 聚焦验证：`DEBUG=false; python -m pytest tests/test_phase4_traceability_checkpoint.py tests/test_latex_service.py -q -s`，退出码 0，4 passed；后续 bibliography 绑定验证 5 passed
-- 提交：`54f3fc8`；Gate 绑定修复 `f38bbd2`
-- 备注：真实 checkpoint 创建完成实验指标与图表、解析两个 claim、通过审稿、批准精确 payload、两次 XeLaTeX 编译并检查 PDF；篡改 Markdown 后编译被拒绝。
+- 聚焦验证：`DEBUG=false; python -m pytest tests/test_review_agent_service.py tests/test_phase4_traceability_checkpoint.py tests/test_latex_service.py tests/test_paper_gates.py -q`，退出码 0，13 passed；完整后端 `DEBUG=false; python -m pytest tests -q`，退出码 0，219 passed、1 skipped、13 subtests
+- 相关回归：前端 `npm test -- --run`，退出码 0，28 files/125 tests；`npm run build`，退出码 0（保留既有 Vite chunk-size warning）
+- 提交：`54f3fc8`；Gate/审批绑定修复 `f38bbd2`、`bad2dde`、`e8e2bdb`、`8363a3e`
+- 备注：真实 checkpoint 创建完成实验指标与图表、解析两个 claim、通过审稿、批准包含 Markdown/LaTeX/bibliography/claims/review hash 的精确 payload、两次 `-no-shell-escape` XeLaTeX 编译并检查 PDF；删除引用图表生成 blocking review，篡改 Markdown 或 bibliography 后旧 review/approval 失效。
 
 ### Phase 3 / Task 1: Experiment Contracts and Records
 
@@ -332,6 +333,7 @@ next_action: "Complete independent phase review and final Gate 4 verification"
 | --- | --- | --- | --- | --- |
 | 2026-07-11 | 规划基线 | `git show --stat bd167bf` | 六阶段计划提交存在 | `bd167bf` |
 | 2026-07-11 | Phase 2 / Gate 2 | `python -m pytest backend/tests -q`; `npm test -- --run`; `npm run build`; `git diff --check` | 后端 170 passed、1 skipped、13 subtests；前端 120 passed；构建与 diff 检查通过；最终只读审查无 Critical/Important | `09000b4` |
+| 2026-07-11 | Phase 4 / Gate 4 | `DEBUG=false; python -m pytest backend/tests -q`; `npm test -- --run`; `npm run build`; phase traceability checkpoint | 后端 219 passed、1 skipped、13 subtests；前端 28 files/125 tests；构建通过；实际 XeLaTeX 禁用 shell escape 生成并验证 PDF | `8363a3e` |
 
 ## 阻塞项
 
@@ -343,6 +345,7 @@ next_action: "Complete independent phase review and final Gate 4 verification"
 | --- | --- | --- | --- | --- |
 | Phase 1 | 尚未创建 | — | — | pending |
 | Phase 2 | 当前会话 | 2026-07-11 | 2026-07-11 | completed; Gate 2 passed; Phase 3 not started |
+| Phase 4 | 当前会话 | 2026-07-11 | 2026-07-11 | completed; Gate 4 passed; Phase 5 not started |
 
 ## 更新规则
 
