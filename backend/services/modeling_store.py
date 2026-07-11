@@ -776,8 +776,20 @@ class ModelingStore:
             ).fetchall()
         return [self._experiment_from_row(row) for row in rows]
 
+    def active_tasks(self, project_id: str) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM workflow_tasks
+                WHERE project_id = ? AND status = 'running'
+                ORDER BY created_at, task_id
+                """,
+                (project_id,),
+            ).fetchall()
+        return [self._task_from_row(row) for row in rows]
+
     def project_has_active_run(self, project_id: str) -> bool:
-        return bool(self.active_experiments(project_id))
+        return bool(self.active_experiments(project_id) or self.active_tasks(project_id))
 
     def mark_experiment_interrupted(self, experiment_id: str) -> None:
         with self._connect() as conn:
@@ -849,7 +861,11 @@ class ModelingStore:
         return self._recovery_from_row(row)
 
     def interrupt_active_runs_and_transition(
-        self, project_id: str, from_state: str, to_state: str
+        self,
+        project_id: str,
+        from_state: str,
+        to_state: str,
+        additional_interrupted_run_ids: list[str] | None = None,
     ) -> dict | None:
         now = datetime.now().isoformat()
         with self._connect() as conn:
@@ -868,11 +884,29 @@ class ModelingStore:
                 """,
                 (project_id,),
             ).fetchall()
+            tasks = conn.execute(
+                """
+                SELECT task_id FROM workflow_tasks
+                WHERE project_id = ? AND status = 'running'
+                ORDER BY created_at, task_id
+                """,
+                (project_id,),
+            ).fetchall()
             interrupted_run_ids = [row["experiment_id"] for row in experiments]
+            interrupted_run_ids.extend(row["task_id"] for row in tasks)
+            interrupted_run_ids.extend(additional_interrupted_run_ids or [])
             conn.execute(
                 """
                 UPDATE experiment_runs
                 SET status = 'failed', pid = NULL, error_code = 'interrupted', finished_at = ?
+                WHERE project_id = ? AND status = 'running'
+                """,
+                (now, project_id),
+            )
+            conn.execute(
+                """
+                UPDATE workflow_tasks
+                SET status = 'failed', updated_at = ?
                 WHERE project_id = ? AND status = 'running'
                 """,
                 (now, project_id),

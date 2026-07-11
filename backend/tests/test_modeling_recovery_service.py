@@ -4,6 +4,8 @@ from pathlib import Path
 from fastapi import HTTPException
 
 from api import modeling
+from services.document_metadata_store import DocumentMetadataStore
+from services.modeling_agent_run_service import ModelingAgentRunService
 from services.modeling_store import ModelingStore
 
 
@@ -64,6 +66,57 @@ def test_recovery_is_idempotent_even_without_a_child_run(tmp_path):
     assert second == []
     assert store.get_project(project["project_id"])["state"] == "packaging"
     assert len(store.list_recoveries()) == 1
+
+
+def test_recovery_interrupts_running_workflow_task_and_agent_run(tmp_path):
+    from services.modeling_recovery_service import ModelingRecoveryService
+
+    workspace = tmp_path / "project"
+    workspace.mkdir()
+    store = ModelingStore(str(tmp_path / "modeling.db"))
+    project = store.create_project("Forecast", "forecast", str(workspace), None)
+    store.update_state(project["project_id"], "problem_parsing")
+    agent_store = DocumentMetadataStore(str(tmp_path / "agents.db"))
+    task, run = ModelingAgentRunService(store, agent_store).start(
+        project["project_id"],
+        "problem_parsing",
+        "modeling",
+        "modeling_problem_parser",
+        {},
+        ["problem/problem_spec.json"],
+    )
+
+    result = ModelingRecoveryService(store, agent_store).recover_interrupted_projects()
+
+    assert result[0]["recovered_to"] == "project_initialized"
+    assert store.get_task(task["task_id"])["status"] == "failed"
+    assert agent_store.get_agent_run(run["run_id"])["status"] == "failed"
+    assert agent_store.get_agent_run(run["run_id"])["error"] == "interrupted"
+    [recovery] = store.list_recoveries()
+    assert run["run_id"] in recovery["interrupted_run_ids"]
+
+
+def test_recovery_continues_when_owned_pid_exits_during_inspection(tmp_path, monkeypatch):
+    from services.modeling_recovery_service import ModelingRecoveryService
+
+    workspace = tmp_path / "project"
+    workspace.mkdir()
+    store = ModelingStore(str(tmp_path / "modeling.db"))
+    project = store.create_project("Forecast", "forecast", str(workspace), None)
+    store.update_state(project["project_id"], "experiment_running")
+    store.create_experiment("exp-0001", project["project_id"], _config(), None)
+    store.update_experiment_status("exp-0001", "running", pid=1234)
+
+    monkeypatch.setattr("services.modeling_recovery_service.psutil.pid_exists", lambda pid: True)
+    monkeypatch.setattr(
+        "services.modeling_recovery_service.psutil.Process",
+        lambda pid: (_ for _ in ()).throw(__import__("psutil").NoSuchProcess(pid)),
+    )
+
+    result = ModelingRecoveryService(store).recover_interrupted_projects()
+
+    assert result[0]["recovered_to"] == "experiment_implementation"
+    assert store.get_experiment("exp-0001")["error_code"] == "interrupted"
 
 
 def test_recovery_refuses_to_stop_a_pid_outside_the_project_workspace(tmp_path, monkeypatch):

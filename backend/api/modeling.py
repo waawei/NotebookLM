@@ -70,7 +70,7 @@ latex_service = LatexService(modeling_store, artifact_service, approval_service,
 delivery_service = DeliveryService(modeling_store, artifact_service, OutputService())
 git_policy_service = GitPolicyService()
 git_commit_service = GitCommitService(modeling_store, approval_service, git_policy_service, delivery_service.reproducibility)
-recovery_service = ModelingRecoveryService(modeling_store)
+recovery_service = ModelingRecoveryService(modeling_store, project_service.agent_store)
 
 
 class ProjectCreate(BaseModel):

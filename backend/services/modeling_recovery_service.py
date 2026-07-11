@@ -18,8 +18,9 @@ RECOVERY_TARGETS = {
 
 
 class ModelingRecoveryService:
-    def __init__(self, store):
+    def __init__(self, store, agent_store=None):
         self.store = store
+        self.agent_store = agent_store
 
     def recover_interrupted_projects(self) -> list[dict]:
         recovered = []
@@ -31,13 +32,23 @@ class ModelingRecoveryService:
                 and latest_transition["to_state"] == project["state"]
             ):
                 continue
+            active_tasks = self.store.active_tasks(project["project_id"])
+            interrupted_agent_run_ids = list(
+                self._active_agent_run_ids(
+                    project["project_id"], {task["task_id"] for task in active_tasks}
+                )
+            )
             for experiment in self.store.active_experiments(project["project_id"]):
                 self._stop_owned_process(project, experiment.get("pid"))
             target = RECOVERY_TARGETS[project["state"]]
             recovery = self.store.interrupt_active_runs_and_transition(
-                project["project_id"], project["state"], target
+                project["project_id"],
+                project["state"],
+                target,
+                interrupted_agent_run_ids,
             )
             if recovery:
+                self._interrupt_agent_runs(interrupted_agent_run_ids)
                 recovered.append(
                     {
                         "project_id": project["project_id"],
@@ -47,19 +58,38 @@ class ModelingRecoveryService:
                 )
         return recovered
 
+    def _active_agent_run_ids(self, project_id: str, task_ids: set[str]) -> list[str]:
+        if not self.agent_store or not task_ids:
+            return []
+        for run in self.agent_store.list_agent_runs(project_id=project_id):
+            if run["status"] != "running" or run.get("task_id") not in task_ids:
+                continue
+            yield run["run_id"]
+
+    def _interrupt_agent_runs(self, run_ids) -> None:
+        if not self.agent_store:
+            return
+        for run_id in run_ids:
+            self.agent_store.update_agent_run_status(
+                run_id, "failed", error="interrupted"
+            )
+
     @staticmethod
     def _stop_owned_process(project: dict, pid: int | None) -> None:
         if not pid or not psutil.pid_exists(pid):
             return
-        process = psutil.Process(pid)
-        workspace = Path(project["workspace_path"]).resolve()
-        command = " ".join(process.cmdline()).lower()
         try:
+            process = psutil.Process(pid)
+            workspace = Path(project["workspace_path"]).resolve()
+            command = " ".join(process.cmdline()).lower()
             cwd = Path(process.cwd()).resolve()
         except (psutil.AccessDenied, psutil.NoSuchProcess, OSError):
-            cwd = None
+            return
         if str(workspace).lower() not in command and cwd != workspace:
             raise RuntimeError("Refusing to terminate a process not owned by this project")
-        for child in process.children(recursive=True):
-            child.kill()
-        process.kill()
+        try:
+            for child in process.children(recursive=True):
+                child.kill()
+            process.kill()
+        except (psutil.AccessDenied, psutil.NoSuchProcess):
+            return
