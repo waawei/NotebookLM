@@ -8,13 +8,13 @@
 workflow: mathematical-modeling
 current_phase: 6
 phase_status: in_progress
-current_task: "Task 6: Runtime and Recovery UI Integration"
+current_task: "Task 7: Documentation and Phase 6 Gate"
 task_status: in_progress
 baseline_commit: fd74c07a9b0b8e34c3b4c71bf8fef3f1a63420ae
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase6"
-last_verified_commit: 4661b833d34f2b150ff3a879e02dec2f841bc896
-last_verification: "Task 5 E2E: 3 passed; code-agent plus no-XeLaTeX paper approval regression: 5 passed"
-next_action: "Implement and verify Phase 6 Task 6 runtime and recovery UI integration"
+last_verified_commit: 820ca98
+last_verification: "Task 6: frontend 33 files/148 tests passed; Git backend regression 10 passed, 1 Windows symlink skip; production build passed"
+next_action: "Update user documentation and run the complete Phase 6 Gate"
 ```
 
 ## 启动前风险
@@ -68,6 +68,14 @@ next_action: "Implement and verify Phase 6 Task 6 runtime and recovery UI integr
 - 红灯：固定赛题 E2E 初始暴露虚拟环境依赖、项目导入路径、运行缓存归档、状态推进和配置 target 元数据问题；其中 `target` 初始错误为字面量 `target` 而非 `sales`。
 - 聚焦验证：`DEBUG=false; python -B -m pytest tests/test_modeling_workflow_e2e.py -q`，退出码 0，3 passed（包括 XeLaTeX PDF/批准 Git commit、无 XeLaTeX 仍执行的论文渲染/最终批准、运行中 PID 恢复）。`test_modeling_code_agent_service.py` 加无 XeLaTeX 论文批准回归，5 passed。
 - 审查：独立复审批准；实验配置从哈希验证的数据 profile 推导 target，E2E 明确断言 target、features、seed、validation metrics 与固定赛题契约一致。
+
+### Phase 6 / Task 6: Runtime and Recovery UI Integration
+
+- 状态：verified；提交：`b38d000`、`660b014`、`820ca98`
+- 红灯：独立复审发现工作区不可用时仍可写入审批、论文、状态转换和 Git；Git 审批卡只比较部分载荷，批准后不能刷新取证，且未配置工作区仍能运行准备好的实验。
+- 聚焦验证：`npm test -- --run src/components/GitCommitApprovalCard.test.tsx src/views/ModelingWorkflow.integration.test.tsx src/views/ModelingProjectsView.test.tsx`，退出码 0，40 passed；`DEBUG=false; PYTHONPATH=backend; python -m pytest backend/tests/test_git_commit_service.py backend/tests/test_delivery_git_api.py backend/tests/test_git_policy_service.py -q`，退出码 0，10 passed、1 skipped（Windows symlink）。
+- 完整验证：`npm test -- --run`，退出码 0，33 files、148 tests passed；`npm run build`，退出码 0（仅保留 Vite chunk-size warning）。
+- 审查：最终独立复审确认无 Critical/Important/P2；UI 在工作区不可用时 fail-closed，Git 前端比较 paths、diff、file、manifest 和消息，并允许审批后的只读刷新以移除陈旧提交操作。
 
 ### Phase 5 / Task 1: Reproducibility and Delivery Contracts
 
