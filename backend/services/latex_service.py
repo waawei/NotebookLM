@@ -53,6 +53,7 @@ class LatexService:
         build_markdown.write_text(self._resolve(project_id, markdown.read_text(encoding="utf-8")), encoding="utf-8")
         build_main.write_text(self._resolve(project_id, latex.read_text(encoding="utf-8")), encoding="utf-8")
         output = build / "output"
+        output.mkdir()
         command = ["xelatex", "-no-shell-escape", "-interaction=nonstopmode", "-halt-on-error", "-output-directory", str(output), str(build_main)]
         first = self.runner.run(command, build, 120, 2_000_000, False)
         second = self.runner.run(command, build, 120, 2_000_000, False)
