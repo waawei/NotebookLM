@@ -70,6 +70,9 @@ def test_imports_utf8_problem_and_records_problem_manifest(input_context):
     [
         ("payload.py", "data", "Unsupported data file"),
         ("nested/train.csv", "data", "Invalid input filename"),
+        (r"nested\train.csv", "data", "Invalid input filename"),
+        (r"C:\temp\train.csv", "data", "Invalid input filename"),
+        ("/tmp/train.csv", "data", "Invalid input filename"),
         ("train.csv", "executable", "Unsupported executable file"),
     ],
 )
@@ -90,3 +93,37 @@ def test_rejects_duplicate_names_and_oversized_content(input_context):
         service.import_input(project["project_id"], "train.csv", b"x\n2\n", "data")
     with pytest.raises(ValueError, match="size limit"):
         service.import_input(project["project_id"], "large.csv", b"x" * 65, "data")
+
+
+def test_artifact_failure_rolls_back_raw_file_and_manifest(input_context):
+    project, service, store, workspace = input_context
+    service.import_input(project["project_id"], "first.csv", b"x\n1\n", "data")
+    manifest_path = workspace / "data" / "data_manifest.json"
+    original_manifest = manifest_path.read_bytes()
+
+    class FailingArtifactService:
+        def register(self, *args, **kwargs):
+            raise RuntimeError("artifact index unavailable")
+
+    failing = ModelingInputService(store, FailingArtifactService(), max_file_size=64)
+    with pytest.raises(RuntimeError, match="artifact index unavailable"):
+        failing.import_input(project["project_id"], "retry.csv", b"x\n2\n", "data")
+
+    assert not (workspace / "data" / "raw" / "retry.csv").exists()
+    assert manifest_path.read_bytes() == original_manifest
+
+    recovered = service.import_input(
+        project["project_id"], "retry.csv", b"x\n2\n", "data"
+    )
+    assert recovered["relative_path"] == "data/raw/retry.csv"
+
+
+def test_malformed_manifest_is_rejected_before_writing_raw_file(input_context):
+    project, service, _, workspace = input_context
+    manifest_path = workspace / "data" / "data_manifest.json"
+    manifest_path.write_text("not json", encoding="utf-8")
+
+    with pytest.raises(json.JSONDecodeError):
+        service.import_input(project["project_id"], "train.csv", b"x\n1\n", "data")
+
+    assert not (workspace / "data" / "raw" / "train.csv").exists()
