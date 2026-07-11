@@ -8,13 +8,13 @@
 workflow: mathematical-modeling
 current_phase: 2
 phase_status: in_progress
-current_task: "Task 1: Artifact and Approval Persistence"
+current_task: "Task 2: Immutable Input Import and Manifests"
 task_status: in_progress
 baseline_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase2"
 last_verified_commit: e698df6
 last_verification: "Post-Gate review fixes passed: missing task/run resources return 404 and the workbench exposes only legal workflow actions for all declared states"
-next_action: "Write and verify failing Task 1 artifact and approval tests"
+next_action: "Write and verify failing Task 2 immutable input tests"
 ```
 
 ## 启动前风险
@@ -36,6 +36,18 @@ next_action: "Write and verify failing Task 1 artifact and approval tests"
 | 6 | blocked_by_phase_5 | `2026-07-10-mathematical-modeling-phase6-hardening.md` | pending | — |
 
 ## 当前阶段 Task 记录
+
+### Phase 2 / Task 2: Immutable Input Import and Manifests
+
+- 状态：verified
+- 预计文件：`backend/services/modeling_input_service.py`, `backend/tests/test_modeling_input_service.py`
+- 实际文件：`backend/services/modeling_input_service.py`, `backend/tests/test_modeling_input_service.py`
+- 失败测试：`DEBUG=false; PYTHONPATH=backend; python -m pytest backend/tests/test_modeling_input_service.py -q`，退出码 1；按预期因 `services.modeling_input_service` 不存在而出现 1 个收集错误
+- 聚焦验证：同一命令初始退出码 0，6 passed；审查修复后退出码 0，11 passed
+- 相关回归：聚焦测试加 `backend/tests/test_artifact_service.py backend/tests/test_modeling_store.py`，实现提交前退出码 0，11 passed；审查修复后退出码 0，16 passed
+- 提交：实现 `24b4e924cb103b39c213ae3e9bc8766a7762b0c2`；审查修复 `6b9c4c82498b887cce7b59fe4966a36e39111dca`
+- 保留的用户改动：无；Task 2 开始时工作树仅有本账本更新
+- 备注：严格限制问题输入 `.pdf/.md/.txt`、数据输入 `.csv`，拒绝路径逃逸、重复名称和超限内容；原始输入写入后只读并记录 SHA-256 清单。独立审查发现宿主 OS 相关路径校验和失败后孤儿 raw/manifest；新增路径风格、登记失败回滚重试、畸形 manifest 写前失败回归，改为显式跨平台 basename 校验、独占 raw 创建和原子 manifest 替换/恢复。复审无剩余 Critical/Important，结论 Ready；并发导入 manifest 更新序列化仍为 Minor 加固项。
 
 ### Phase 2 / Task 1: Artifact and Approval Persistence
 
