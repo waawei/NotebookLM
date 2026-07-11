@@ -4,6 +4,7 @@ from pathlib import Path
 
 from services.approval_service import canonical_hash
 from services.experiment_contracts import MetricRecord
+from services.review_agent_service import ReviewAgentService
 
 
 class ModelingGateService:
@@ -28,13 +29,9 @@ class ModelingGateService:
             if state == "paper_drafting":
                 self._require_artifact_types(project_id, {"paper_markdown", "paper_latex"})
             if state == "consistency_review":
-                review = self.store.latest_review(project_id)
-                if not review or review["status"] != "passed":
-                    raise ValueError("Paper has blocking review issues")
+                self._require_current_review(project_id)
             if state == "final_approval_pending":
-                review = self.store.latest_review(project_id)
-                if not review or review["status"] != "passed":
-                    raise ValueError("Paper has blocking review issues")
+                self._require_current_review(project_id)
             return
 
         plans = [item for item in artifacts if item["artifact_type"] == "model_plan"]
@@ -88,3 +85,12 @@ class ModelingGateService:
         missing = required - found
         if missing:
             raise ValueError("Missing required artifacts: " + ", ".join(sorted(missing)))
+
+    def _require_current_review(self, project_id: str) -> None:
+        review = self.store.latest_review(project_id)
+        try:
+            current_hash = ReviewAgentService(self.store, None, None).current_paper_hash(project_id)
+        except ValueError as error:
+            raise ValueError("Paper has blocking review issues") from error
+        if not review or review["status"] != "passed" or review["paper_hash"] != current_hash:
+            raise ValueError("Paper has blocking review issues")
