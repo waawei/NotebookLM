@@ -26,7 +26,7 @@ class ModelingGateService:
         plans = [item for item in artifacts if item["artifact_type"] == "model_plan"]
         if not plans:
             raise ValueError("Missing required model plan artifact")
-        plan = max(plans, key=lambda item: (item["version"], item["created_at"]))
+        plan = max(plans, key=lambda item: (item["created_at"], item["artifact_id"]))
         project = self.store.get_project(project_id)
         root = Path(project["workspace_path"]).resolve()
         target = (root / plan["relative_path"]).resolve()

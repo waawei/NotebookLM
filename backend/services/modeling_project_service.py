@@ -9,6 +9,11 @@ class ModelingProjectService:
         self.store = store
         self.workspace_service = workspace_service
         self.agent_store = agent_store or DocumentMetadataStore()
+        if gate_service is None:
+            from services.approval_service import ApprovalService
+            from services.modeling_gate_service import ModelingGateService
+
+            gate_service = ModelingGateService(store, ApprovalService(store))
         self.gate_service = gate_service
 
     @staticmethod
@@ -44,8 +49,7 @@ class ModelingProjectService:
 
     def advance(self, project_id: str) -> dict:
         project = self._require(project_id)
-        if self.gate_service:
-            self.gate_service.require_exit(project_id, project["state"])
+        self.gate_service.require_exit(project_id, project["state"])
         target = next_state(project["state"])
         self.store.transition_state(project_id, project["state"], target, "advance")
         return self._require(project_id)

@@ -1,18 +1,27 @@
 """Modeling project API endpoints."""
 
+from pathlib import Path
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from core.config import PROJECT_ROOT, settings
+from services.approval_service import ApprovalService
+from services.modeling_gate_service import ModelingGateService
 from services.modeling_project_service import ModelingProjectService
 from services.modeling_store import ModelingStore
 from services.modeling_workspace import ModelingWorkspaceService
 
 
 router = APIRouter()
+data_dir = Path(settings.UPLOAD_DIR).resolve().parent
+data_dir.mkdir(parents=True, exist_ok=True)
+modeling_store = ModelingStore(str(data_dir / "notebooklm.db"))
+approval_service = ApprovalService(modeling_store)
 project_service = ModelingProjectService(
-    ModelingStore("./data/notebooklm.db"),
+    modeling_store,
     ModelingWorkspaceService(settings.MODELING_WORKSPACE_ROOT, str(PROJECT_ROOT)),
+    gate_service=ModelingGateService(modeling_store, approval_service),
 )
 
 

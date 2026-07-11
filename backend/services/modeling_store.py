@@ -318,13 +318,22 @@ class ModelingStore:
                 """,
                 (project_id,),
             ).fetchall()
-        tasks = []
-        for row in rows:
-            task = dict(row)
-            task["input_payload"] = json.loads(task.pop("input_payload_json"))
-            task["output_requirements"] = json.loads(task.pop("output_requirements_json"))
-            tasks.append(task)
-        return tasks
+        return [self._task_from_row(row) for row in rows]
+
+    def get_task(self, task_id: str) -> dict | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM workflow_tasks WHERE task_id = ?",
+                (task_id,),
+            ).fetchone()
+        return self._task_from_row(row) if row else None
+
+    @staticmethod
+    def _task_from_row(row) -> dict:
+        task = dict(row)
+        task["input_payload"] = json.loads(task.pop("input_payload_json"))
+        task["output_requirements"] = json.loads(task.pop("output_requirements_json"))
+        return task
 
     def create_artifact(
         self,
@@ -433,6 +442,18 @@ class ModelingStore:
             ).fetchone()
         return self._approval_from_row(row)
 
+    def list_approval_requests(self, project_id: str) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM approval_requests
+                WHERE project_id = ?
+                ORDER BY created_at, approval_id
+                """,
+                (project_id,),
+            ).fetchall()
+        return [self._approval_from_row(row) for row in rows]
+
     def create_approval_decision(
         self,
         approval_id: str,
@@ -485,3 +506,14 @@ class ModelingStore:
                 (project_id, gate, payload_hash, payload_hash),
             ).fetchone()
         return dict(row) if row else None
+
+    def delete_approval_request(self, approval_id: str) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "DELETE FROM approval_decisions WHERE approval_id = ?",
+                (approval_id,),
+            )
+            conn.execute(
+                "DELETE FROM approval_requests WHERE approval_id = ?",
+                (approval_id,),
+            )

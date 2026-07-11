@@ -5,6 +5,10 @@ from fastapi import HTTPException
 
 from api import modeling
 from main import app
+from services.approval_service import ApprovalService
+from services.modeling_gate_service import ModelingGateService
+from services.modeling_project_service import ModelingProjectService
+from services.modeling_store import ModelingStore
 
 
 class FakeProjectService:
@@ -120,6 +124,27 @@ class ModelingApiTests(unittest.TestCase):
 
         self.assertIn("/api/modeling/projects", paths)
         self.assertIn("/api/modeling/projects/{project_id}/advance", paths)
+
+    def test_real_api_service_rejects_advancement_without_gate_artifacts(self):
+        with self.subTest("production service is fail-closed"):
+            self.assertIsNotNone(self.original.gate_service)
+
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            store = ModelingStore(f"{tmp}/modeling.db")
+            project = store.create_project("Forecast", "forecast", tmp, None)
+            store.update_state(project["project_id"], "problem_parsing")
+            modeling.project_service = ModelingProjectService(
+                store,
+                None,
+                gate_service=ModelingGateService(store, ApprovalService(store)),
+            )
+            with self.assertRaises(HTTPException) as raised:
+                asyncio.run(modeling.advance_project(project["project_id"]))
+
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertIn("problem_spec", raised.exception.detail)
 
 
 if __name__ == "__main__":

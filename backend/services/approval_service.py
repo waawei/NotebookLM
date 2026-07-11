@@ -46,3 +46,9 @@ class ApprovalService:
         if not decision:
             raise ValueError("Required approval does not match current content")
         return decision
+
+    def remove_request(self, project_id: str, approval_id: str) -> None:
+        request = self.store.get_approval_request(approval_id)
+        if not request or request["project_id"] != project_id:
+            raise ValueError("Approval request not found")
+        self.store.delete_approval_request(approval_id)
