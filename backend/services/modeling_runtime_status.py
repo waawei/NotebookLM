@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -19,9 +20,13 @@ def probe(command: list[str]) -> dict:
         )
     except (OSError, subprocess.TimeoutExpired):
         return {"available": False, "version": None}
-    output = result.stdout or result.stderr
-    version = output.splitlines()[0][:200] if output else ""
-    return {"available": result.returncode == 0, "version": version}
+    if result.returncode != 0:
+        return {"available": False, "version": None}
+    output = result.stdout.splitlines()
+    version = output[0][:200] if output else ""
+    if not re.match(r"^(git version|XeTeX|XeLaTeX|xelatex)\b", version):
+        version = ""
+    return {"available": True, "version": version}
 
 
 class ModelingRuntimeStatus:

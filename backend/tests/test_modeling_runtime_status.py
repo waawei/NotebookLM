@@ -3,6 +3,7 @@ import json
 
 from api import modeling
 from services.modeling_runtime_status import ModelingRuntimeStatus
+from services import modeling_runtime_status
 
 
 def test_status_reports_tools_without_secrets(tmp_path, monkeypatch):
@@ -32,3 +33,18 @@ def test_runtime_endpoint_returns_capability_status(monkeypatch):
     monkeypatch.setattr(modeling, "runtime_status_service", Status())
 
     assert asyncio.run(modeling.runtime_status()) == expected
+
+
+def test_probe_never_returns_untrusted_tool_output(monkeypatch):
+    class Result:
+        returncode = 1
+        stdout = ""
+        stderr = "LLM_API_KEY=never-return-this C:/private/tool.conf"
+
+    monkeypatch.setattr(modeling_runtime_status.shutil, "which", lambda _: "tool")
+    monkeypatch.setattr(modeling_runtime_status.subprocess, "run", lambda *args, **kwargs: Result())
+
+    assert modeling_runtime_status.probe(["tool", "--version"]) == {
+        "available": False,
+        "version": None,
+    }
