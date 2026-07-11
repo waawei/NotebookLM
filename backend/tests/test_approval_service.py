@@ -55,3 +55,23 @@ def test_approval_hash_is_canonical_and_decision_hash_must_match(project_store):
     assert request["payload"] == payload
     with pytest.raises(ValueError, match="payload has changed"):
         service.decide(request["approval_id"], "approved", "stale")
+
+
+def test_later_changes_request_revokes_an_earlier_approval(project_store):
+    project, store = project_store
+    service = ApprovalService(store)
+    request = service.request(
+        project["project_id"], "model_approval", {"artifact_id": "a-1"}
+    )
+    service.decide(request["approval_id"], "approved", request["payload_hash"])
+    service.decide(
+        request["approval_id"],
+        "changes_requested",
+        request["payload_hash"],
+        "Revise assumptions",
+    )
+
+    with pytest.raises(ValueError, match="approval does not match"):
+        service.require_approved(
+            project["project_id"], "model_approval", request["payload_hash"]
+        )

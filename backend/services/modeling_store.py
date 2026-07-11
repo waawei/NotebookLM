@@ -471,7 +471,7 @@ class ModelingStore:
                 JOIN approval_requests AS r ON r.approval_id = d.approval_id
                 WHERE r.project_id = ? AND r.gate = ?
                   AND r.payload_hash = ? AND d.payload_hash = ?
-                  AND d.decision = 'approved'
+                  AND r.status = 'approved' AND d.decision = 'approved'
                 ORDER BY d.created_at DESC
                 LIMIT 1
                 """,
