@@ -30,6 +30,7 @@ class ModelingRecoveryService:
                 latest_transition
                 and latest_transition["reason"] == "interrupted"
                 and latest_transition["to_state"] == project["state"]
+                and not self.store.project_has_active_run(project["project_id"])
             ):
                 continue
             active_tasks = self.store.active_tasks(project["project_id"])

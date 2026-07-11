@@ -68,6 +68,28 @@ def test_recovery_is_idempotent_even_without_a_child_run(tmp_path):
     assert len(store.list_recoveries()) == 1
 
 
+def test_recovery_handles_new_running_task_after_an_earlier_recovery(tmp_path):
+    from services.modeling_recovery_service import ModelingRecoveryService
+
+    workspace = tmp_path / "project"
+    workspace.mkdir()
+    store = ModelingStore(str(tmp_path / "modeling.db"))
+    project = store.create_project("Forecast", "forecast", str(workspace), None)
+    store.update_state(project["project_id"], "experiment_running")
+    store.create_experiment("exp-0001", project["project_id"], _config(), None)
+    store.update_experiment_status("exp-0001", "running")
+    recovery = ModelingRecoveryService(store)
+
+    assert recovery.recover_interrupted_projects()[0]["recovered_to"] == "experiment_implementation"
+    task = store.create_task(
+        project["project_id"], "experiment_implementation", "programmer", {}, []
+    )
+    store.update_task(task["task_id"], "running", 0)
+
+    assert recovery.recover_interrupted_projects()[0]["recovered_to"] == "model_planning"
+    assert store.get_task(task["task_id"])["status"] == "failed"
+
+
 def test_recovery_interrupts_running_workflow_task_and_agent_run(tmp_path):
     from services.modeling_recovery_service import ModelingRecoveryService
 
