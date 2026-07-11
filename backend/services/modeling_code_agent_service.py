@@ -98,6 +98,10 @@ class ModelingCodeAgentService:
             code_hash=source_hash,
             input_hashes=input_hashes,
             source_hashes=source_hashes,
+            dependency_lock=next((file.content for file in generated.files if file.path == "requirements.txt"), ""),
+            dependency_diff=[
+                f"+ {line}" for line in next((file.content for file in generated.files if file.path == "requirements.txt"), "").splitlines() if line.strip()
+            ],
         )
         task, run = self.run_service.start(
             project_id,

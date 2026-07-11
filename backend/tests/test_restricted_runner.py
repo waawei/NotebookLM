@@ -64,3 +64,8 @@ def test_runner_rejects_sitecustomize_bypass_options(tmp_path):
         [sys.executable, "-E", "-c", "print('unsafe')"], tmp_path, 10, 1024, False
     )
     assert environment.error_code == "policy_error"
+
+    low_level = RestrictedRunner().run(
+        [sys.executable, "-c", "import _socket; _socket.socket().connect(('example.com', 80))"], tmp_path, 10, 1024, False
+    )
+    assert "Network access is disabled" in low_level.stderr

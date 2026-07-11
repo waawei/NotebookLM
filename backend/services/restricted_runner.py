@@ -36,10 +36,10 @@ class RestrictedRunner:
             runtime.mkdir(parents=True, exist_ok=True)
             (runtime / "sitecustomize.py").write_text(
                 "import os\nif os.getenv('MODELING_NETWORK_DISABLED') == '1':\n"
-                "    import socket\n"
+                "    import socket, _socket\n"
                 "    def denied(*args, **kwargs):\n"
                 "        raise RuntimeError('Network access is disabled for this experiment')\n"
-                "    socket.socket = denied\n    socket.create_connection = denied\n"
+                "    socket.socket = denied\n    socket.create_connection = denied\n    _socket.socket = denied\n"
                 "    import os, subprocess\n"
                 "    def deny_process(*args, **kwargs):\n"
                 "        raise RuntimeError('Process creation is disabled for this experiment')\n"

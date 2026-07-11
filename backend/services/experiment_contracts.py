@@ -33,6 +33,8 @@ class ExecutionBatch(StrictModel):
     code_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
     input_hashes: dict[str, str]
     source_hashes: dict[str, str] = Field(min_length=1)
+    dependency_lock: str = ""
+    dependency_diff: list[str] = []
 
 
 class MetricRecord(StrictModel):

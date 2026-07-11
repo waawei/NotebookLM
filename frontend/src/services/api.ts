@@ -314,6 +314,8 @@ export interface ExecutionBatch {
   code_hash: string
   input_hashes: Record<string, string>
   source_hashes: Record<string, string>
+  dependency_lock: string
+  dependency_diff: string[]
 }
 
 export interface ExperimentRun {
