@@ -24,26 +24,34 @@ class ModelingRecoveryService:
 
     def recover_interrupted_projects(self) -> list[dict]:
         recovered = []
+        for recovery in self.store.list_recoveries():
+            self._interrupt_agent_runs(recovery["interrupted_run_ids"])
         for project in self.store.list_projects_in_states(list(RECOVERY_TARGETS)):
+            project_id = project["project_id"]
+            active_tasks = self.store.active_tasks(project_id)
+            active_experiments = self.store.active_experiments(project_id)
+            interrupted_agent_run_ids = list(self._active_agent_run_ids(project_id))
+            requires_recovery = bool(
+                active_tasks
+                or active_experiments
+                or interrupted_agent_run_ids
+                or project["state"] in {"experiment_running", "committing"}
+            )
             latest_transition = self.store.latest_transition(project["project_id"])
             if (
                 latest_transition
                 and latest_transition["reason"] == "interrupted"
                 and latest_transition["to_state"] == project["state"]
-                and not self.store.project_has_active_run(project["project_id"])
+                and not requires_recovery
             ):
                 continue
-            active_tasks = self.store.active_tasks(project["project_id"])
-            interrupted_agent_run_ids = list(
-                self._active_agent_run_ids(
-                    project["project_id"], {task["task_id"] for task in active_tasks}
-                )
-            )
-            for experiment in self.store.active_experiments(project["project_id"]):
+            if not requires_recovery:
+                continue
+            for experiment in active_experiments:
                 self._stop_owned_process(project, experiment.get("pid"))
             target = RECOVERY_TARGETS[project["state"]]
             recovery = self.store.interrupt_active_runs_and_transition(
-                project["project_id"],
+                project_id,
                 project["state"],
                 target,
                 interrupted_agent_run_ids,
@@ -59,11 +67,11 @@ class ModelingRecoveryService:
                 )
         return recovered
 
-    def _active_agent_run_ids(self, project_id: str, task_ids: set[str]) -> list[str]:
-        if not self.agent_store or not task_ids:
+    def _active_agent_run_ids(self, project_id: str) -> list[str]:
+        if not self.agent_store:
             return []
         for run in self.agent_store.list_agent_runs(project_id=project_id):
-            if run["status"] != "running" or run.get("task_id") not in task_ids:
+            if run["status"] != "running":
                 continue
             yield run["run_id"]
 
@@ -71,9 +79,12 @@ class ModelingRecoveryService:
         if not self.agent_store:
             return
         for run_id in run_ids:
-            self.agent_store.update_agent_run_status(
-                run_id, "failed", error="interrupted"
-            )
+            try:
+                self.agent_store.update_agent_run_status(
+                    run_id, "failed", error="interrupted"
+                )
+            except (RuntimeError, ValueError):
+                continue
 
     @staticmethod
     def _stop_owned_process(project: dict, pid: int | None) -> None:

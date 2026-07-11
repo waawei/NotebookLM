@@ -68,6 +68,20 @@ def test_recovery_is_idempotent_even_without_a_child_run(tmp_path):
     assert len(store.list_recoveries()) == 1
 
 
+def test_recovery_does_not_roll_back_an_idle_intermediate_project(tmp_path):
+    from services.modeling_recovery_service import ModelingRecoveryService
+
+    workspace = tmp_path / "project"
+    workspace.mkdir()
+    store = ModelingStore(str(tmp_path / "modeling.db"))
+    project = store.create_project("Forecast", "forecast", str(workspace), None)
+    store.update_state(project["project_id"], "problem_parsing")
+
+    assert ModelingRecoveryService(store).recover_interrupted_projects() == []
+    assert store.get_project(project["project_id"])["state"] == "problem_parsing"
+    assert store.list_recoveries() == []
+
+
 def test_recovery_handles_new_running_task_after_an_earlier_recovery(tmp_path):
     from services.modeling_recovery_service import ModelingRecoveryService
 
@@ -116,6 +130,48 @@ def test_recovery_interrupts_running_workflow_task_and_agent_run(tmp_path):
     assert agent_store.get_agent_run(run["run_id"])["error"] == "interrupted"
     [recovery] = store.list_recoveries()
     assert run["run_id"] in recovery["interrupted_run_ids"]
+
+
+def test_recovery_retries_agent_interruption_after_agent_store_failure(tmp_path):
+    from services.modeling_recovery_service import ModelingRecoveryService
+
+    workspace = tmp_path / "project"
+    workspace.mkdir()
+    store = ModelingStore(str(tmp_path / "modeling.db"))
+    project = store.create_project("Forecast", "forecast", str(workspace), None)
+    store.update_state(project["project_id"], "problem_parsing")
+    delegate = DocumentMetadataStore(str(tmp_path / "agents.db"))
+    task, run = ModelingAgentRunService(store, delegate).start(
+        project["project_id"],
+        "problem_parsing",
+        "modeling",
+        "modeling_problem_parser",
+        {},
+        ["problem/problem_spec.json"],
+    )
+
+    class FailingOnceAgentStore:
+        def __init__(self):
+            self.failed = False
+
+        def list_agent_runs(self, **kwargs):
+            return delegate.list_agent_runs(**kwargs)
+
+        def update_agent_run_status(self, *args, **kwargs):
+            if not self.failed:
+                self.failed = True
+                raise RuntimeError("agent database unavailable")
+            return delegate.update_agent_run_status(*args, **kwargs)
+
+    agent_store = FailingOnceAgentStore()
+    recovery = ModelingRecoveryService(store, agent_store)
+
+    assert recovery.recover_interrupted_projects()[0]["recovered_to"] == "project_initialized"
+    assert store.get_task(task["task_id"])["status"] == "failed"
+    assert delegate.get_agent_run(run["run_id"])["status"] == "running"
+    assert recovery.recover_interrupted_projects() == []
+    assert delegate.get_agent_run(run["run_id"])["status"] == "failed"
+    assert delegate.get_agent_run(run["run_id"])["error"] == "interrupted"
 
 
 def test_recovery_continues_when_owned_pid_exits_during_inspection(tmp_path, monkeypatch):
