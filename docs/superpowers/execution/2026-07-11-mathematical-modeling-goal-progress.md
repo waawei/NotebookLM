@@ -6,15 +6,15 @@
 
 ```yaml
 workflow: mathematical-modeling
-current_phase: 4
-phase_status: completed
-current_task: "Task 6: Phase 4 Traceability Checkpoint"
+current_phase: 5
+phase_status: in_progress
+current_task: "Task 1: Reproducibility and Delivery Contracts"
 task_status: verified
-baseline_commit: 038199f39bf7a6d72c205d269aa3dc83371d7b87
-worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase4"
-last_verified_commit: 8363a3e
-last_verification: "Gate 4 passed: backend 219 passed/1 skipped/13 subtests; frontend 28 files/125 tests; production build; traceability checkpoint with real XeLaTeX PDF"
-next_action: "Stop after Phase 4 and wait for user review; do not start Phase 5"
+baseline_commit: 1a6a55a7c95cfd26a6568dbfda66d19f3a688c49
+worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase5"
+last_verified_commit: eab060d703eb7ac81ea3dcc77ebc7e6cebdb831c
+last_verification: "Phase 4 Gate regression 9 passed; Phase 5 Task 1 reproducibility tests 3 passed"
+next_action: "Start Phase 5 Task 2; do not start Phase 6"
 ```
 
 ## 启动前风险
@@ -32,10 +32,21 @@ next_action: "Stop after Phase 4 and wait for user review; do not start Phase 5"
 | 2 | completed | `2026-07-10-mathematical-modeling-phase2-intake-planning.md` | passed | `09000b4` + completion ledger commit |
 | 3 | completed | `2026-07-10-mathematical-modeling-phase3-experiments.md` | passed | `0a6e542` + `c72749f` + completion ledger commit |
 | 4 | completed | `2026-07-10-mathematical-modeling-phase4-paper.md` | passed | Task 1 `34fea97` + `ee6ed66`; Task 2 `313e66c` + `b0c167b`; Task 3 `9d2e4cd` + `fc0205e`; Task 4 `4648b01` + `f38bbd2`; Task 5 `a645dda`; Task 6 `54f3fc8` + `8363a3e` |
-| 5 | not_started | `2026-07-10-mathematical-modeling-phase5-delivery-git.md` | pending | — |
+| 5 | in_progress | `2026-07-10-mathematical-modeling-phase5-delivery-git.md` | pending | Task 1 `eab060d` |
 | 6 | blocked_by_phase_5 | `2026-07-10-mathematical-modeling-phase6-hardening.md` | pending | — |
 
 ## 当前阶段 Task 记录
+
+### Phase 5 / Task 1: Reproducibility and Delivery Contracts
+
+- 状态：verified
+- 实际文件：`backend/services/delivery_contracts.py`, `backend/services/reproducibility_service.py`, `backend/tests/test_reproducibility_service.py`
+- 失败测试：`DEBUG=false; PYTHONPATH=backend; python -m pytest backend/tests/test_reproducibility_service.py -q`，退出码 2；按预期缺少 `services.reproducibility_service`
+- 聚焦验证：同一命令退出码 0，3 passed
+- 相关回归：阶段 4 `test_phase4_traceability_checkpoint.py`、`test_latex_service.py`、`test_paper_gates.py` 退出码 0，9 passed
+- 提交：`eab060d703eb7ac81ea3dcc77ebc7e6cebdb831c`
+- 保留的用户改动：无；Phase 5 工作树从 `1a6a55a` 创建时干净
+- 备注：检查 PDF、论文源、依赖锁定、复现命令、源代码、至少两个完成实验、实验四类证据、登记 artifact 哈希和 paper claim target；错误信息不包含文件内容或密钥。
 
 ### Phase 4 / Task 1: Paper Contracts, Claims, and Placeholder Resolution
 
