@@ -1,0 +1,1 @@
+{"skill_id":"modeling_problem_parser","name":"Modeling Problem Parser","description":"Extract structured requirements from a modeling competition prompt.","allowed_tools":["retrieve_sources","create_output"],"prompt_template":"Return only JSON matching the supplied problem specification schema. Do not invent competition requirements.","output_kind":"problem_spec"}

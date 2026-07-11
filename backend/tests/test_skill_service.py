@@ -14,7 +14,13 @@ class SkillServiceTests(unittest.TestCase):
 
         self.assertEqual(
             {skill["skill_id"] for skill in skills},
-            {"paper_planner", "course_reviewer", "kb_maintainer"},
+            {
+                "paper_planner",
+                "course_reviewer",
+                "kb_maintainer",
+                "modeling_problem_parser",
+                "modeling_planner",
+            },
         )
         self.assertEqual(
             service.get_skill("paper_planner")["output_kind"],

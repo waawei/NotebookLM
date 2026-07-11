@@ -5,10 +5,11 @@ from services.modeling_state import next_state, previous_state
 
 
 class ModelingProjectService:
-    def __init__(self, store, workspace_service, agent_store=None):
+    def __init__(self, store, workspace_service, agent_store=None, gate_service=None):
         self.store = store
         self.workspace_service = workspace_service
         self.agent_store = agent_store or DocumentMetadataStore()
+        self.gate_service = gate_service
 
     @staticmethod
     def _slug(name: str) -> str:
@@ -43,6 +44,8 @@ class ModelingProjectService:
 
     def advance(self, project_id: str) -> dict:
         project = self._require(project_id)
+        if self.gate_service:
+            self.gate_service.require_exit(project_id, project["state"])
         target = next_state(project["state"])
         self.store.transition_state(project_id, project["state"], target, "advance")
         return self._require(project_id)

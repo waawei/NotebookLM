@@ -1,0 +1,1 @@
+{"skill_id":"modeling_planner","name":"Modeling Planner","description":"Propose up to three data-driven modeling candidates from approved inputs.","allowed_tools":["retrieve_sources","create_output"],"prompt_template":"Return only JSON matching the supplied model plan schema. Describe expected evaluation but never claim unrun results.","output_kind":"model_plan"}
