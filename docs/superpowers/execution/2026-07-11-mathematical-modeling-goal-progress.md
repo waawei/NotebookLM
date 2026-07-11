@@ -8,13 +8,13 @@
 workflow: mathematical-modeling
 current_phase: 6
 phase_status: in_progress
-current_task: "Task 5: Full Backend Workflow E2E"
+current_task: "Task 6: Runtime and Recovery UI Integration"
 task_status: in_progress
 baseline_commit: fd74c07a9b0b8e34c3b4c71bf8fef3f1a63420ae
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase6"
-last_verified_commit: 890fe5bc9d6a52d4397297639f1431b6f1e3bb62
-last_verification: "Task 4 fixture/review regressions: 8 passed; role/code/paper regressions: 22 passed"
-next_action: "Implement and verify Phase 6 Task 5 backend workflow E2E"
+last_verified_commit: 4661b833d34f2b150ff3a879e02dec2f841bc896
+last_verification: "Task 5 E2E: 3 passed; code-agent plus no-XeLaTeX paper approval regression: 5 passed"
+next_action: "Implement and verify Phase 6 Task 6 runtime and recovery UI integration"
 ```
 
 ## 启动前风险
@@ -61,6 +61,13 @@ next_action: "Implement and verify Phase 6 Task 5 backend workflow E2E"
 - 红灯：`DEBUG=false; python -m pytest tests/test_modeling_fixture.py tests/test_review_agent_service.py -q` 初始退出码 1，`ReviewAgentService` 未声明 `STAGE:reviewer`，Fake LLM 因此拒绝提示词。
 - 聚焦验证：同一命令退出码 0，8 passed；`DEBUG=false; python -m pytest tests/test_modeling_role_service.py tests/test_modeling_code_agent_service.py tests/test_paper_agent_service.py -q` 退出码 0，22 passed。
 - 审查：独立复审批准；固定 24 行 CSV、七个生成路径、确定性拆分、MetricRecord、图像成果声明和审稿 Fake 全部可执行。
+
+### Phase 6 / Task 5: Full Backend Workflow E2E
+
+- 状态：verified；提交：`650960f`、`4f1ec24`、`4661b83`
+- 红灯：固定赛题 E2E 初始暴露虚拟环境依赖、项目导入路径、运行缓存归档、状态推进和配置 target 元数据问题；其中 `target` 初始错误为字面量 `target` 而非 `sales`。
+- 聚焦验证：`DEBUG=false; python -B -m pytest tests/test_modeling_workflow_e2e.py -q`，退出码 0，3 passed（包括 XeLaTeX PDF/批准 Git commit、无 XeLaTeX 仍执行的论文渲染/最终批准、运行中 PID 恢复）。`test_modeling_code_agent_service.py` 加无 XeLaTeX 论文批准回归，5 passed。
+- 审查：独立复审批准；实验配置从哈希验证的数据 profile 推导 target，E2E 明确断言 target、features、seed、validation metrics 与固定赛题契约一致。
 
 ### Phase 5 / Task 1: Reproducibility and Delivery Contracts
 
