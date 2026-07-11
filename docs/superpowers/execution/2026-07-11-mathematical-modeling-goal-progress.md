@@ -8,13 +8,13 @@
 workflow: mathematical-modeling
 current_phase: 5
 phase_status: in_progress
-current_task: "Task 4: Approval-Gated Explicit Git Commit"
+current_task: "Task 6: Phase 5 Independent-Repository Checkpoint"
 task_status: verified
 baseline_commit: 1a6a55a7c95cfd26a6568dbfda66d19f3a688c49
 worktree_path: "D:/develop/python/NotebookLM-mathematical-modeling-phase5"
-last_verified_commit: b3906df0e34bd726cf3719c3e95be20807b28c70
-last_verification: "Phase 4 Gate regression 9 passed; Phase 5 Task 1 3 passed; Task 2 review regression 7 passed/1 skipped; Task 3 2 passed/1 skipped; Task 4 5 passed"
-next_action: "Start Phase 5 Task 5; do not start Phase 6"
+last_verified_commit: 64cb92db5f9e5aff0bf44137b43a44e5efa5e54f
+last_verification: "Phase 4 Gate regression 9 passed; Phase 5 Task 1 3 passed; Task 2 review regression 7 passed/1 skipped; Task 3 2 passed/1 skipped; Task 4 5 passed; Task 5 backend 10 passed/2 skipped and frontend 3 files/11 tests/build; Task 6 checkpoint 4 passed"
+next_action: "Run final Phase 5 Gate and whole-branch review; do not start Phase 6"
 ```
 
 ## 启动前风险
@@ -32,7 +32,7 @@ next_action: "Start Phase 5 Task 5; do not start Phase 6"
 | 2 | completed | `2026-07-10-mathematical-modeling-phase2-intake-planning.md` | passed | `09000b4` + completion ledger commit |
 | 3 | completed | `2026-07-10-mathematical-modeling-phase3-experiments.md` | passed | `0a6e542` + `c72749f` + completion ledger commit |
 | 4 | completed | `2026-07-10-mathematical-modeling-phase4-paper.md` | passed | Task 1 `34fea97` + `ee6ed66`; Task 2 `313e66c` + `b0c167b`; Task 3 `9d2e4cd` + `fc0205e`; Task 4 `4648b01` + `f38bbd2`; Task 5 `a645dda`; Task 6 `54f3fc8` + `8363a3e` |
-| 5 | in_progress | `2026-07-10-mathematical-modeling-phase5-delivery-git.md` | pending | Tasks 1–4 completed |
+| 5 | in_progress | `2026-07-10-mathematical-modeling-phase5-delivery-git.md` | pending | Tasks 1–6 completed; final Gate pending |
 | 6 | blocked_by_phase_5 | `2026-07-10-mathematical-modeling-phase6-hardening.md` | pending | — |
 
 ## 当前阶段 Task 记录
@@ -77,6 +77,26 @@ next_action: "Start Phase 5 Task 5; do not start Phase 6"
 - 提交：`b3906df0e34bd726cf3719c3e95be20807b28c70`
 - 保留的用户改动：无
 - 备注：审批 payload 绑定排序路径、每文件 hash、diff hash、manifest hash 和 subject；提交仅以参数数组调用 `git add --`、`git commit -m` 与 `git rev-parse HEAD`，从不调用 remote。提交前重建 payload，因此修改路径、内容或信息会失效。
+
+### Phase 5 / Task 5: Delivery and Git API/UI
+
+- 状态：verified
+- 实际文件：`backend/api/modeling.py`, `backend/tests/test_delivery_git_api.py`, `frontend/src/services/api.ts`, `frontend/src/components/DeliveryChecklist.tsx`, `frontend/src/components/GitCommitApprovalCard.tsx`, `frontend/src/views/ModelingProjectsView.tsx` 及对应测试
+- 失败测试：API 初始 2 failed，缺少 delivery/git 路由与 commit service
+- 聚焦验证：后端 `test_delivery_git_api.py test_delivery_service.py test_git_policy_service.py test_git_commit_service.py` 退出码 0，10 passed、2 skipped；前端 API/组件 3 files、11 tests passed，生产 build 退出码 0（保留既有 chunk-size warning）
+- 提交：`cd59950531beafc19c0aebc8ecb0d93e1eb689d8`
+- 保留的用户改动：运行时 `data/` 目录未跟踪且未暂存
+- 备注：API 公开 check/build/list/review/request-commit/commit 与 porcelain status；UI 只从 status 选择、复核明确路径，展示 capped diff，并在审批 payload current 时允许审批和提交。
+
+### Phase 5 / Task 6: Independent-Repository Checkpoint
+
+- 状态：verified
+- 实际文件：`backend/tests/test_phase5_delivery_checkpoint.py`, `backend/services/git_commit_service.py`
+- 失败测试：第一次 checkpoint 失败，因 `git diff --cached --quiet` 的预期退出码 1 被通用 `check=True` 视为 subprocess 错误。
+- 聚焦验证：`DEBUG=false; PYTHONPATH=backend; python -m pytest backend/tests/test_git_commit_service.py backend/tests/test_phase5_delivery_checkpoint.py -q`，退出码 0，4 passed
+- 提交：`64cb92db5f9e5aff0bf44137b43a44e5efa5e54f`
+- 保留的用户改动：运行时 `data/` 目录未跟踪且未暂存
+- 备注：fixture 交付 manifest/code archive/论文源/依赖/复现命令/实验记录/受限数据条目齐全；secret 与超过 20 MiB 文件被 policy 拒绝；文件篡改使旧审批拒绝且不会提交；重新批准后产生一条批准信息的本地 commit，`git remote` 为空。
 
 ### Phase 5 / Task 2 Review Fixes
 
