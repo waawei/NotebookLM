@@ -1,4 +1,9 @@
+import hashlib
 import json
+import math
+import os
+import tempfile
+import warnings
 from pathlib import Path
 
 import pandas as pd
@@ -16,7 +21,16 @@ class DataProfileService:
         artifact = self.artifact_service.resolve(project_id, artifact_id)
         if artifact["artifact_type"] != "data_input":
             raise ValueError("Artifact must be a CSV data input")
-        source = Path(project["workspace_path"]) / artifact["relative_path"]
+        root = Path(project["workspace_path"]).resolve()
+        source = (root / artifact["relative_path"]).resolve()
+        if source == root or root not in source.parents:
+            raise ValueError("CSV data input is outside project workspace")
+        if source.suffix.lower() != ".csv":
+            raise ValueError("Artifact must be a CSV data input")
+        if not source.is_file():
+            raise ValueError("CSV data input does not exist")
+        if hashlib.sha256(source.read_bytes()).hexdigest() != artifact["sha256"]:
+            raise ValueError("CSV data input hash does not match registered artifact")
         frame = pd.read_csv(source)
 
         columns = {}
@@ -29,12 +43,14 @@ class DataProfileService:
             }
             if pd.api.types.is_numeric_dtype(series) and not series.dropna().empty:
                 clean = series.dropna()
-                item["numeric"] = {
-                    "min": float(clean.min()),
-                    "max": float(clean.max()),
-                    "mean": float(clean.mean()),
-                    "std": float(clean.std(ddof=0)),
-                }
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", RuntimeWarning)
+                    item["numeric"] = {
+                        "min": self._finite_or_none(clean.min()),
+                        "max": self._finite_or_none(clean.max()),
+                        "mean": self._finite_or_none(clean.mean()),
+                        "std": self._finite_or_none(clean.std(ddof=0)),
+                    }
             columns[str(name)] = item
 
         result = {
@@ -47,10 +63,9 @@ class DataProfileService:
         analysis = Path(project["workspace_path"]) / "analysis"
         profile_path = analysis / "data_profile.json"
         report_path = analysis / "data_report.md"
-        profile_path.write_text(
-            json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False) + "\n",
-            encoding="utf-8",
-        )
+        profile_bytes = (
+            json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
+        ).encode("utf-8")
         lines = [
             "# Data Profile",
             "",
@@ -65,11 +80,54 @@ class DataProfileService:
             lines.append(
                 f"- {name}: dtype={item['dtype']}, missing={item['missing']}, unique={item['unique']}"
             )
-        report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-        self.artifact_service.register(
-            project_id, "data_profile", "analysis/data_profile.json"
+        report_bytes = ("\n".join(lines) + "\n").encode("utf-8")
+        previous = {
+            profile_path: profile_path.read_bytes() if profile_path.exists() else None,
+            report_path: report_path.read_bytes() if report_path.exists() else None,
+        }
+        registered = []
+        try:
+            self._atomic_write(profile_path, profile_bytes)
+            self._atomic_write(report_path, report_bytes)
+            registered.append(
+                self.artifact_service.register(
+                    project_id, "data_profile", "analysis/data_profile.json"
+                )
+            )
+            registered.append(
+                self.artifact_service.register(
+                    project_id, "data_report", "analysis/data_report.md"
+                )
+            )
+            return result
+        except Exception:
+            for created in reversed(registered):
+                self.artifact_service.remove(project_id, created["artifact_id"])
+            for path, content in previous.items():
+                if content is None:
+                    path.unlink(missing_ok=True)
+                else:
+                    self._atomic_write(path, content)
+            raise
+
+    @staticmethod
+    def _finite_or_none(value) -> float | None:
+        number = float(value)
+        return number if math.isfinite(number) else None
+
+    @staticmethod
+    def _atomic_write(path: Path, content: bytes) -> None:
+        descriptor, temporary_name = tempfile.mkstemp(
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
         )
-        self.artifact_service.register(
-            project_id, "data_report", "analysis/data_report.md"
-        )
-        return result
+        temporary = Path(temporary_name)
+        try:
+            with os.fdopen(descriptor, "wb") as handle:
+                handle.write(content)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)

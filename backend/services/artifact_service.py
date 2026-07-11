@@ -54,3 +54,7 @@ class ArtifactService:
             ModelingArtifact.model_validate(item).model_dump()
             for item in self.store.list_artifacts(project_id)
         ]
+
+    def remove(self, project_id: str, artifact_id: str) -> None:
+        self.resolve(project_id, artifact_id)
+        self.store.delete_artifact(artifact_id)

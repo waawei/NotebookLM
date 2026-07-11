@@ -379,6 +379,13 @@ class ModelingStore:
             ).fetchone()
         return dict(row) if row else None
 
+    def delete_artifact(self, artifact_id: str) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "DELETE FROM project_artifacts WHERE artifact_id = ?",
+                (artifact_id,),
+            )
+
     @staticmethod
     def _approval_from_row(row) -> dict | None:
         if not row:
