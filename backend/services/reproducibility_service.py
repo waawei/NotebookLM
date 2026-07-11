@@ -46,11 +46,9 @@ class ReproducibilityService:
             for filename in self.EXPERIMENT_FILES:
                 if not (directory / filename).is_file():
                     issues.append(self._issue("missing_experiment_evidence", f"{experiment['experiment_id']}/{filename}"))
-        artifacts = self.store.list_artifacts(project_id)
+        artifacts = self._latest_artifacts(self.store.list_artifacts(project_id))
         artifact_by_id = {artifact["artifact_id"]: artifact for artifact in artifacts}
         for artifact in artifacts:
-            if artifact["artifact_type"] in {"delivery_manifest", "delivery_code_archive"}:
-                continue
             if not self._matches_hash(root, artifact):
                 issues.append(self._issue("artifact_hash_mismatch", artifact["relative_path"]))
         for claim in self.store.list_paper_claims(project_id):
@@ -65,6 +63,15 @@ class ReproducibilityService:
         if target == root or root not in target.parents or not target.is_file():
             return False
         return hashlib.sha256(target.read_bytes()).hexdigest() == artifact["sha256"]
+
+    @staticmethod
+    def _latest_artifacts(artifacts: list[dict]) -> list[dict]:
+        latest = {}
+        for artifact in artifacts:
+            current = latest.get(artifact["relative_path"])
+            if current is None or (artifact["created_at"], artifact["version"], artifact["artifact_id"]) > (current["created_at"], current["version"], current["artifact_id"]):
+                latest[artifact["relative_path"]] = artifact
+        return list(latest.values())
 
     @staticmethod
     def _issue(code: str, subject: str) -> ReproductionIssue:

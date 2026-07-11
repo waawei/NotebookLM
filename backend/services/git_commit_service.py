@@ -14,6 +14,7 @@ class GitCommitService:
         self.git_run = git_run or self._git_run
 
     def request_commit(self, project_id: str, paths: list[str], message: str) -> dict:
+        self._require_empty_index(self._project(project_id)["workspace_path"])
         payload = self.current_payload(project_id, paths, message)
         return self.approval_service.request(project_id, "commit_approval", payload)
 
@@ -22,7 +23,13 @@ class GitCommitService:
         payload = self.current_payload(project_id, paths, message)
         payload_hash = canonical_hash(payload)
         self.approval_service.require_approved(project_id, "commit_approval", payload_hash)
+        self._require_empty_index(project["workspace_path"])
         self.git_run(["git", "add", "--", *payload["paths"]], cwd=project["workspace_path"])
+        staged_paths = self._cached_paths(project["workspace_path"])
+        if staged_paths != payload["paths"]:
+            raise ValueError("Staged paths do not match approved paths")
+        if self._cached_file_hashes(project["workspace_path"], payload["paths"]) != payload["file_hashes"]:
+            raise ValueError("Staged file hashes do not match approved content")
         cached = self._cached_diff(project["workspace_path"])
         if cached.returncode == 0:
             raise ValueError("No approved changes are staged")
@@ -43,7 +50,8 @@ class GitCommitService:
         if not review["ok"]:
             raise ValueError("Git policy review failed")
         manifest = self._manifest(project_id)
-        return {"paths": review["paths"], "file_hashes": self.policy.file_hashes(project, review["paths"]), "diff_hash": hashlib.sha256(review["diff"].encode("utf-8")).hexdigest(), "manifest_hash": manifest["sha256"], "commit_message": clean_message}
+        self.policy.file_hashes(project, review["paths"])
+        return {"paths": review["paths"], "file_hashes": self._future_staged_hashes(project["workspace_path"], review["paths"]), "diff_hash": hashlib.sha256(review["diff"].encode("utf-8")).hexdigest(), "manifest_hash": manifest["sha256"], "commit_message": clean_message}
 
     def _manifest(self, project_id: str) -> dict:
         manifests = [item for item in self.store.list_artifacts(project_id) if item["artifact_type"] == "delivery_manifest"]
@@ -65,3 +73,39 @@ class GitCommitService:
         if self._uses_default_git:
             return subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=workspace_path, capture_output=True, text=True, check=False)
         return self.git_run(["git", "diff", "--cached", "--quiet"], cwd=workspace_path)
+
+    def _require_empty_index(self, workspace_path: str) -> None:
+        if self._cached_paths(workspace_path):
+            raise ValueError("Repository already has staged changes")
+
+    def _cached_paths(self, workspace_path: str) -> list[str]:
+        if self._uses_default_git:
+            result = subprocess.run(["git", "diff", "--cached", "--name-only", "--"], cwd=workspace_path, capture_output=True, text=True, check=True)
+        else:
+            result = self.git_run(["git", "diff", "--cached", "--name-only", "--"], cwd=workspace_path)
+        return sorted(path for path in result.stdout.splitlines() if path)
+
+    def _cached_file_hashes(self, workspace_path: str, paths: list[str]) -> dict[str, str]:
+        if self._uses_default_git:
+            return {
+                path: subprocess.run(["git", "rev-parse", f":{path}"], cwd=workspace_path, capture_output=True, text=True, check=True).stdout.strip()
+                for path in paths
+            }
+        hashes = {}
+        for path in paths:
+            if self._uses_default_git:
+                result = subprocess.run(["git", "show", f":{path}"], cwd=workspace_path, capture_output=True, check=True)
+                content = result.stdout
+            else:
+                result = self.git_run(["git", "show", f":{path}"], cwd=workspace_path)
+                content = result.stdout.encode("utf-8")
+            hashes[path] = hashlib.sha256(content).hexdigest()
+        return hashes
+
+    def _future_staged_hashes(self, workspace_path: str, paths: list[str]) -> dict[str, str]:
+        if not self._uses_default_git:
+            return self.policy.file_hashes({"workspace_path": workspace_path}, paths)
+        return {
+            path: subprocess.run(["git", "hash-object", "--path", path, path], cwd=workspace_path, capture_output=True, text=True, check=True).stdout.strip()
+            for path in paths
+        }

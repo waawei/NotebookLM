@@ -285,6 +285,10 @@ export interface ApprovalRequest {
     artifact_id?: string
     artifact_sha256?: string
     version?: number
+    paths?: string[]
+    diff_hash?: string
+    manifest_hash?: string
+    commit_message?: string
   }
   status: string
   created_at?: string
@@ -664,6 +668,7 @@ export const modelingApi = {
   createPaperDraft: async (projectId: string) => (await api.post(`/modeling/projects/${projectId}/paper/draft`)).data,
   checkDeliverables: async (projectId: string) => (await api.post(`/modeling/projects/${projectId}/deliverables/check`)).data,
   buildDeliverables: async (projectId: string) => (await api.post(`/modeling/projects/${projectId}/deliverables/build`)).data,
+  listDeliverables: async (projectId: string): Promise<{ artifacts: ModelingArtifact[]; total: number }> => (await api.get(`/modeling/projects/${projectId}/deliverables`)).data,
   gitStatus: async (projectId: string): Promise<{ paths: string[] }> => (await api.get(`/modeling/projects/${projectId}/git/status`)).data,
   reviewGit: async (projectId: string, paths: string[]): Promise<GitReview> => (await api.post(`/modeling/projects/${projectId}/git/review`, { paths })).data,
   requestCommit: async (projectId: string, data: { paths: string[]; commit_message: string }) => (await api.post(`/modeling/projects/${projectId}/git/request-commit`, data)).data,

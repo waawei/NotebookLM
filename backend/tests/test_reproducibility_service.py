@@ -37,6 +37,22 @@ def test_check_detects_artifact_hash_mismatch(tmp_path):
     assert "artifact_hash_mismatch" in {item["code"] for item in result["issues"]}
 
 
+def test_check_detects_current_delivery_manifest_hash_mismatch(tmp_path):
+    workspace = tmp_path / "workspace"
+    artifact_path = workspace / "deliverables" / "manifest.json"
+    artifact_path.parent.mkdir(parents=True)
+    artifact_path.write_text("original", encoding="utf-8")
+    store = ModelingStore(str(tmp_path / "modeling.db"))
+    project = store.create_project("Forecast", "forecast", str(workspace), None)
+    artifacts = ArtifactService(store)
+    artifacts.register(project["project_id"], "delivery_manifest", "deliverables/manifest.json")
+    artifact_path.write_text("changed", encoding="utf-8")
+
+    result = ReproducibilityService(store).check(project["project_id"])
+
+    assert "artifact_hash_mismatch" in {item["code"] for item in result["issues"]}
+
+
 def test_check_accepts_complete_registered_delivery_inputs(tmp_path):
     workspace = tmp_path / "workspace"
     _write_complete_workspace(workspace)

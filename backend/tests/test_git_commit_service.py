@@ -11,17 +11,24 @@ class FakePolicy:
         return {"ok": True, "paths": sorted(paths), "issues": [], "diff": "diff"}
 
     def file_hashes(self, project, paths):
-        return {path: "a" * 64 for path in sorted(paths)}
+        return {path: __import__("hashlib").sha256(path.encode("utf-8")).hexdigest() for path in sorted(paths)}
 
 
 class FakeGit:
     def __init__(self):
         self.commands = []
+        self.staged_paths = ""
 
     def __call__(self, command, **kwargs):
         self.commands.append(command)
+        if command[1:3] == ["add", "--"]:
+            self.staged_paths = "\n".join(command[3:]) + "\n"
+        if command[1:4] == ["diff", "--cached", "--name-only"]:
+            return subprocess.CompletedProcess(command, 0, self.staged_paths, "")
         if command[1:4] == ["diff", "--cached", "--quiet"]:
             return subprocess.CompletedProcess(command, 1, "", "")
+        if command[1] == "show":
+            return subprocess.CompletedProcess(command, 0, command[2][1:], "")
         if command[1:] == ["rev-parse", "HEAD"]:
             return subprocess.CompletedProcess(command, 0, "abc123\n", "")
         return subprocess.CompletedProcess(command, 0, "", "")
@@ -44,7 +51,7 @@ def test_commit_adds_only_approved_paths(tmp_path):
 
     result = service.commit(project["project_id"], ["README.md", "deliverables/manifest.json"], "feat: add modeling solution")
 
-    assert fake_git.commands[0] == ["git", "add", "--", "README.md", "deliverables/manifest.json"]
+    assert ["git", "add", "--", "README.md", "deliverables/manifest.json"] in fake_git.commands
     assert result["commit_hash"] == "abc123"
 
 
@@ -61,6 +68,14 @@ def test_request_commit_requires_passing_reproducibility_check(tmp_path):
     project, _, service, _ = _service(tmp_path, reproducibility=FailingReproducibility())
 
     with pytest.raises(ValueError, match="Reproducibility"):
+        service.request_commit(project["project_id"], ["README.md"], "feat: add modeling solution")
+
+
+def test_commit_rejects_pre_staged_unapproved_paths(tmp_path):
+    project, store, service, fake_git = _service(tmp_path)
+    fake_git.staged_paths = "evil.py\n"
+
+    with pytest.raises(ValueError, match="staged"):
         service.request_commit(project["project_id"], ["README.md"], "feat: add modeling solution")
 
 

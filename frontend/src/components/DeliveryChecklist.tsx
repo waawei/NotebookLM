@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { modelingApi } from '../services/api'
+import { modelingApi, type ModelingArtifact } from '../services/api'
 
 export default function DeliveryChecklist({ projectId, onChanged }: { projectId: string; onChanged: () => void | Promise<void> }) {
   const [check, setCheck] = useState<{ ok: boolean; issues: Array<{ code: string; message: string }> } | null>(null)
   const [busy, setBusy] = useState(false)
-  useEffect(() => { if (typeof modelingApi.checkDeliverables === 'function') void modelingApi.checkDeliverables(projectId).then(setCheck) }, [projectId])
+  const [files, setFiles] = useState<Array<{ relative_path: string; sha256: string; included_in_git: boolean; exclusion_reason?: string | null }>>([])
+  useEffect(() => { if (typeof modelingApi.checkDeliverables === 'function') void modelingApi.checkDeliverables(projectId).then(setCheck); if (typeof modelingApi.listDeliverables === 'function') void modelingApi.listDeliverables(projectId).then(async ({ artifacts }) => { const manifest = artifacts.filter((item: ModelingArtifact) => item.artifact_type === 'delivery_manifest').sort((left, right) => right.version - left.version)[0]; if (manifest) { const resolved = await modelingApi.getArtifact(projectId, manifest.artifact_id); const content = resolved.content as { files?: typeof files }; setFiles(content?.files || []) } }) }, [projectId])
   const build = async () => { if (typeof modelingApi.buildDeliverables !== 'function' || typeof modelingApi.checkDeliverables !== 'function') return; setBusy(true); try { await modelingApi.buildDeliverables(projectId); await onChanged(); setCheck(await modelingApi.checkDeliverables(projectId)) } finally { setBusy(false) } }
-  return <section className="rounded border border-gray-200 p-3 dark:border-gray-800"><h2 className="text-sm font-semibold">Delivery checklist</h2>{check && <ul className="mt-2 text-sm">{check.issues.map((issue) => <li key={issue.code}>{issue.code}: {issue.message}</li>)}</ul>}<button type="button" disabled={!check?.ok || busy} onClick={() => void build()} className="mt-3 rounded bg-blue-600 px-3 py-2 text-sm text-white disabled:bg-gray-400">Build deliverables</button></section>
+  return <section className="rounded border border-gray-200 p-3 dark:border-gray-800"><h2 className="text-sm font-semibold">Delivery checklist</h2>{check && <ul className="mt-2 text-sm">{check.issues.map((issue) => <li key={issue.code}>{issue.code}: {issue.message}</li>)}</ul>}{files.length > 0 && <ul aria-label="Delivery manifest files" className="mt-2 text-xs">{files.map((file) => <li key={file.relative_path}>{file.relative_path} {file.sha256} {file.included_in_git ? 'included' : `excluded: ${file.exclusion_reason || 'policy'}`}</li>)}</ul>}<button type="button" disabled={!check?.ok || busy} onClick={() => void build()} className="mt-3 rounded bg-blue-600 px-3 py-2 text-sm text-white disabled:bg-gray-400">Build deliverables</button></section>
 }
