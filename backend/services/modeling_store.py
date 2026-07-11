@@ -111,6 +111,23 @@ class ModelingStore:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS experiment_runs (
+                    experiment_id TEXT PRIMARY KEY,
+                    project_id TEXT NOT NULL,
+                    config_json TEXT NOT NULL,
+                    execution_payload_hash TEXT,
+                    status TEXT NOT NULL,
+                    pid INTEGER,
+                    exit_code INTEGER,
+                    error_code TEXT,
+                    started_at TEXT,
+                    finished_at TEXT,
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
 
     def create_project(
         self,
@@ -516,4 +533,84 @@ class ModelingStore:
             conn.execute(
                 "DELETE FROM approval_requests WHERE approval_id = ?",
                 (approval_id,),
+            )
+
+    @staticmethod
+    def _experiment_from_row(row) -> dict | None:
+        if not row:
+            return None
+        experiment = dict(row)
+        experiment["config"] = json.loads(experiment.pop("config_json"))
+        return experiment
+
+    def create_experiment(
+        self,
+        experiment_id: str,
+        project_id: str,
+        config: dict,
+        execution_payload_hash: str | None,
+    ) -> dict:
+        experiment = {
+            "experiment_id": experiment_id,
+            "project_id": project_id,
+            "config_json": json.dumps(config, ensure_ascii=False, sort_keys=True),
+            "execution_payload_hash": execution_payload_hash,
+            "status": "prepared",
+            "pid": None,
+            "exit_code": None,
+            "error_code": None,
+            "started_at": None,
+            "finished_at": None,
+            "created_at": datetime.now().isoformat(),
+        }
+        try:
+            with self._connect() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO experiment_runs (
+                        experiment_id, project_id, config_json, execution_payload_hash,
+                        status, pid, exit_code, error_code, started_at, finished_at, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    tuple(experiment.values()),
+                )
+        except sqlite3.IntegrityError as error:
+            raise ValueError("Experiment already exists") from error
+        return self._experiment_from_row(experiment)
+
+    def get_experiment(self, experiment_id: str) -> dict | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM experiment_runs WHERE experiment_id = ?", (experiment_id,)
+            ).fetchone()
+        return self._experiment_from_row(row)
+
+    def list_experiments(self, project_id: str) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM experiment_runs WHERE project_id = ? ORDER BY created_at",
+                (project_id,),
+            ).fetchall()
+        return [self._experiment_from_row(row) for row in rows]
+
+    def update_experiment_status(
+        self,
+        experiment_id: str,
+        status: str,
+        *,
+        pid: int | None = None,
+        exit_code: int | None = None,
+        error_code: str | None = None,
+        started_at: str | None = None,
+        finished_at: str | None = None,
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE experiment_runs
+                SET status = ?, pid = ?, exit_code = ?, error_code = ?,
+                    started_at = ?, finished_at = ?
+                WHERE experiment_id = ?
+                """,
+                (status, pid, exit_code, error_code, started_at, finished_at, experiment_id),
             )
