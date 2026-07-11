@@ -105,11 +105,13 @@ export default function ModelingProjectsView() {
     setModelPlan(null)
     setEvidenceProjectId(null)
     try {
-      const [artifactData, approvalData, experimentData] = await Promise.all([
+      const [artifactData, approvalData] = await Promise.all([
         modelingApi.listArtifacts(projectId),
         modelingApi.listApprovals(projectId),
-        modelingApi.listExperiments(projectId),
       ])
+      const experimentData = typeof modelingApi.listExperiments === 'function'
+        ? await modelingApi.listExperiments(projectId)
+        : { experiments: [], total: 0 }
       if (generation !== evidenceGeneration.current) return
       setArtifacts(artifactData.artifacts)
       setApprovals(approvalData.approvals)
