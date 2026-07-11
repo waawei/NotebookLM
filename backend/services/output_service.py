@@ -57,6 +57,17 @@ class OutputService:
             source_doc_ids=source_doc_ids,
         )
 
+    def create_modeling_delivery_link(self, project_id: str, manifest_artifact_id: str) -> dict:
+        return self.create_output(
+            kind="paper_plan",
+            title="Modeling delivery",
+            content=(
+                f"[Modeling project](modeling-project://{project_id})\n\n"
+                f"[Delivery manifest](modeling-artifact://{manifest_artifact_id})"
+            ),
+            source_doc_ids=[],
+        )
+
     def list_outputs(self, kind: Optional[str] = None, include_archived: bool = False) -> list[dict]:
         if kind:
             self._validate_kind(kind)
