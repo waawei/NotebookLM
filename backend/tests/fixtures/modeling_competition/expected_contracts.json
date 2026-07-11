@@ -1,0 +1,9 @@
+{
+  "target": "sales",
+  "features": ["price", "promotion", "weekday"],
+  "seed": 42,
+  "candidates": ["mean_baseline", "linear_regression"],
+  "validation_metrics": ["rmse", "mae"],
+  "required_artifact_type": "figure",
+  "row_count": 24
+}

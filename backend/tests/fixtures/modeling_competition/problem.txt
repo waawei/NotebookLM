@@ -1,0 +1,1 @@
+Build and compare a mean baseline and a linear-regression model that predicts sales from price, promotion, and weekday. Use a deterministic train/validation split, report validation RMSE and MAE, create one prediction-versus-actual figure, discuss limitations, and deliver a reproducible paper.
