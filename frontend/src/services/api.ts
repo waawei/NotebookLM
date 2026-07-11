@@ -331,6 +331,31 @@ export interface ExperimentRun {
   artifacts?: ModelingArtifact[]
 }
 
+export interface PaperClaim {
+  claim_id?: string
+  placeholder: string
+  claim_type: 'metric' | 'figure' | 'table'
+  artifact_id: string
+  experiment_id: string
+  metric_name?: string | null
+  rendered_value: string
+}
+
+export interface PaperReviewIssue {
+  severity: 'blocking' | 'warning' | 'info'
+  code: string
+  message: string
+  location: string
+  artifact_ids: string[]
+}
+
+export interface PaperReview {
+  review_id?: string
+  paper_hash?: string
+  status: 'passed' | 'failed'
+  issues: PaperReviewIssue[]
+}
+
 export const documentApi = {
   upload: async (file: File): Promise<UploadResponse> => {
     const formData = new FormData()
@@ -634,6 +659,14 @@ export const modelingApi = {
   listExperiments: async (projectId: string): Promise<{ experiments: ExperimentRun[]; total: number }> => (await api.get(`/modeling/projects/${projectId}/experiments`)).data,
   requestExecution: async (projectId: string, experimentId: string): Promise<ApprovalRequest> => (await api.post(`/modeling/projects/${projectId}/experiments/${experimentId}/request-execution`)).data,
   executeExperiment: async (projectId: string, experimentId: string): Promise<ExperimentRun> => (await api.post(`/modeling/projects/${projectId}/experiments/${experimentId}/execute`)).data,
+  createPaperDraft: async (projectId: string) => (await api.post(`/modeling/projects/${projectId}/paper/draft`)).data,
+  savePaperMarkdown: async (projectId: string, markdown: string): Promise<ModelingArtifact> => (await api.put(`/modeling/projects/${projectId}/paper/markdown`, { markdown })).data,
+  renderPaper: async (projectId: string): Promise<{ rendered: string; claims: PaperClaim[] }> => (await api.post(`/modeling/projects/${projectId}/paper/render`)).data,
+  reviewPaper: async (projectId: string): Promise<PaperReview> => (await api.post(`/modeling/projects/${projectId}/paper/review`)).data,
+  listPaperReviews: async (projectId: string): Promise<{ reviews: PaperReview[]; total: number }> => (await api.get(`/modeling/projects/${projectId}/paper/reviews`)).data,
+  requestFinalApproval: async (projectId: string): Promise<ApprovalRequest> => (await api.post(`/modeling/projects/${projectId}/paper/request-final-approval`)).data,
+  compilePaper: async (projectId: string): Promise<{ pdf_path: string; build_dir: string; payload_hash: string }> => (await api.post(`/modeling/projects/${projectId}/paper/compile`)).data,
+  paperPdfUrl: (projectId: string): string => `${API_BASE_URL}/modeling/projects/${projectId}/paper/pdf`,
 }
 
 export default api

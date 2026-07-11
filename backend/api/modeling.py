@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from core.config import PROJECT_ROOT, settings
@@ -22,6 +23,11 @@ from services.modeling_code_agent_service import ModelingCodeAgentService
 from services.execution_policy import ExecutionPolicy
 from services.experiment_service import ExperimentService
 from services.experiment_contracts import ExecutionBatch
+from services.paper_agent_service import PaperAgentService
+from services.paper_claim_service import PaperClaimService
+from services.paper_placeholder_service import PaperPlaceholderService
+from services.review_agent_service import ReviewAgentService
+from services.latex_service import LatexService
 
 
 router = APIRouter()
@@ -52,6 +58,10 @@ code_agent_service = ModelingCodeAgentService(
 )
 execution_policy = ExecutionPolicy(approval_service)
 experiment_service = ExperimentService(modeling_store, artifact_service, execution_policy)
+paper_placeholder_service = PaperPlaceholderService(modeling_store, artifact_service)
+paper_agent_service = PaperAgentService(modeling_store, artifact_service, approval_service, run_service, LLMService())
+review_agent_service = ReviewAgentService(modeling_store, artifact_service, LLMService())
+latex_service = LatexService(modeling_store, artifact_service, approval_service, paper_placeholder_service)
 
 
 class ProjectCreate(BaseModel):
@@ -71,6 +81,10 @@ class ApprovalDecision(BaseModel):
     decision: str
     payload_hash: str
     comment: str = ""
+
+
+class PaperSaveRequest(BaseModel):
+    markdown: str
 
 
 async def validate_input_kind(request: InputUploadKind) -> str:
@@ -343,3 +357,94 @@ async def execute_experiment(project_id: str, experiment_id: str):
         detail = str(error)
         status = 409 if "approval" in detail.lower() or "content" in detail.lower() else 400
         raise HTTPException(status_code=status, detail=detail) from error
+
+
+@router.post("/projects/{project_id}/paper/draft")
+async def create_paper_draft(project_id: str):
+    _require_project(project_id)
+    try:
+        return await paper_agent_service.create_draft(project_id)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@router.put("/projects/{project_id}/paper/markdown")
+async def save_paper_markdown(project_id: str, request: PaperSaveRequest):
+    project = _require_project(project_id)
+    root = Path(project["workspace_path"]).resolve()
+    path = (root / "paper" / "draft.md").resolve()
+    if root not in path.parents:
+        raise HTTPException(status_code=400, detail="Paper path is invalid")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(request.markdown, encoding="utf-8")
+    try:
+        return artifact_service.register(project_id, "paper_markdown", "paper/draft.md")
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.post("/projects/{project_id}/paper/render")
+async def render_paper(project_id: str):
+    _require_project(project_id)
+    markdown = _latest_artifact(project_id, "paper_markdown")
+    try:
+        content = _paper_content(project_id, markdown)
+        rendered, claims = paper_placeholder_service.resolve_markdown(project_id, content)
+        PaperClaimService(modeling_store).replace_for_paper(project_id, markdown["artifact_id"], claims)
+        return {"rendered": rendered, "claims": modeling_store.list_paper_claims(project_id, markdown["artifact_id"])}
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@router.post("/projects/{project_id}/paper/review")
+async def review_paper(project_id: str):
+    _require_project(project_id)
+    try:
+        return await review_agent_service.review(project_id)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@router.get("/projects/{project_id}/paper/reviews")
+async def list_paper_reviews(project_id: str):
+    _require_project(project_id)
+    review = modeling_store.latest_review(project_id)
+    return {"reviews": [review] if review else [], "total": 1 if review else 0}
+
+
+@router.post("/projects/{project_id}/paper/request-final-approval")
+async def request_final_paper_approval(project_id: str):
+    _require_project(project_id)
+    try:
+        ModelingGateService(modeling_store, approval_service)._require_current_review(project_id)
+        return approval_service.request(project_id, "final_approval", latex_service.current_payload(project_id))
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@router.post("/projects/{project_id}/paper/compile")
+async def compile_paper(project_id: str):
+    _require_project(project_id)
+    try:
+        return latex_service.compile(project_id)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@router.get("/projects/{project_id}/paper/pdf")
+async def get_paper_pdf(project_id: str):
+    project = _require_project(project_id)
+    root = Path(project["workspace_path"]).resolve()
+    path = (root / "deliverables" / "paper.pdf").resolve()
+    if root not in path.parents or not path.is_file():
+        raise HTTPException(status_code=404, detail="Paper PDF not found")
+    return FileResponse(path, media_type="application/pdf", filename="paper.pdf")
+
+
+def _paper_content(project_id: str, artifact: dict) -> str:
+    project = _require_project(project_id)
+    root = Path(project["workspace_path"]).resolve()
+    path = (root / artifact["relative_path"]).resolve()
+    if path == root or root not in path.parents or not path.is_file():
+        raise ValueError("Paper source is unavailable")
+    return path.read_text(encoding="utf-8")

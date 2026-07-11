@@ -6,6 +6,7 @@ import ModelingInputPanel from '../components/ModelingInputPanel'
 import ModelPlanApprovalCard from '../components/ModelPlanApprovalCard'
 import ExperimentApprovalCard from '../components/ExperimentApprovalCard'
 import ExperimentRunPanel from '../components/ExperimentRunPanel'
+import PaperWorkspace from '../components/PaperWorkspace'
 
 const MODELING_WORKFLOW_STATES = new Set([
   'project_initialized',
@@ -113,7 +114,11 @@ export default function ModelingProjectsView() {
         ? await modelingApi.listExperiments(projectId)
         : { experiments: [], total: 0 }
       if (generation !== evidenceGeneration.current) return
-      setArtifacts(artifactData.artifacts)
+      const paperArtifacts = artifactData.artifacts.filter((item) => item.artifact_type === 'paper_markdown' || item.artifact_type === 'paper_latex')
+      const paperContents = await Promise.all(paperArtifacts.map((item) => modelingApi.getArtifact(projectId, item.artifact_id)))
+      if (generation !== evidenceGeneration.current) return
+      const contentById = new Map(paperContents.map((item) => [item.artifact_id, item.content]))
+      setArtifacts(artifactData.artifacts.map((item) => contentById.has(item.artifact_id) ? { ...item, content: contentById.get(item.artifact_id) } : item))
       setApprovals(approvalData.approvals)
       setExperiments(experimentData.experiments)
       const pending = approvalData.approvals
@@ -220,6 +225,9 @@ export default function ModelingProjectsView() {
   const pendingExecutionApproval = evidenceProjectId === selectedProject?.project_id ? approvals
     .filter((item) => item.gate === 'execution_approval' && item.status === 'pending')[0] : undefined
   const approvalExperiment = pendingExecutionApproval ? experiments.find((item) => item.execution_payload_hash === pendingExecutionApproval.payload_hash) : undefined
+  const paperMarkdown = artifacts.filter((item) => item.artifact_type === 'paper_markdown').sort((left, right) => right.version - left.version)[0]
+  const paperLatex = artifacts.filter((item) => item.artifact_type === 'paper_latex').sort((left, right) => right.version - left.version)[0]
+  const pendingFinalApproval = evidenceProjectId === selectedProject?.project_id ? approvals.filter((item) => item.gate === 'final_approval' && item.status === 'pending')[0] : undefined
 
   const prepareExperiment = async () => {
     if (!selectedProject) return
@@ -300,6 +308,8 @@ export default function ModelingProjectsView() {
               {selectedProject.state === 'execution_approval_pending' && experiments.filter((item) => item.status === 'prepared').map((item) => <button key={item.experiment_id} type="button" disabled={stageBusy} onClick={() => void requestExecution(item.experiment_id)} className="mr-2 rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Request execution approval: {item.experiment_id}</button>)}
               {pendingExecutionApproval && approvalExperiment?.execution_batch && <ExperimentApprovalCard projectId={selectedProject.project_id} approval={pendingExecutionApproval} batch={approvalExperiment.execution_batch as ExecutionBatch} onDecided={() => loadEvidence(selectedProject.project_id)} />}
               {experiments.length > 0 && <ExperimentRunPanel projectId={selectedProject.project_id} experiments={experiments} onChanged={() => void loadEvidence(selectedProject.project_id)} onExecute={(experimentId) => void executeExperiment(experimentId)} />}
+              {['paper_drafting', 'consistency_review', 'final_approval_pending'].includes(selectedProject.state) && (!paperMarkdown || !paperLatex) && <button type="button" disabled={stageBusy} onClick={async () => { setStageBusy(true); try { await modelingApi.createPaperDraft(selectedProject.project_id); await loadEvidence(selectedProject.project_id) } catch { setError('Unable to generate the paper draft.') } finally { setStageBusy(false) } }} className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:bg-gray-400">Generate paper draft</button>}
+              {paperMarkdown && paperLatex && <PaperWorkspace projectId={selectedProject.project_id} markdown={String(paperMarkdown.content || '')} latex={String(paperLatex.content || '')} approval={pendingFinalApproval} onChanged={() => loadEvidence(selectedProject.project_id)} />}
               {artifacts.length > 0 && <section aria-label="Modeling artifacts" className="rounded border border-gray-200 p-3 dark:border-gray-800"><h2 className="text-sm font-semibold">Artifacts</h2><ul className="mt-2 space-y-1 text-xs text-gray-600 dark:text-gray-300">{artifacts.map((artifact) => <li key={artifact.artifact_id}>{artifact.artifact_type}: {artifact.relative_path}</li>)}</ul></section>}
             </div>
             <div className="mt-6 flex flex-wrap items-end gap-3 border-t border-gray-100 pt-5 dark:border-gray-800">
