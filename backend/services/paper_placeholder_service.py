@@ -1,5 +1,6 @@
 import json
 import re
+import hashlib
 from decimal import Decimal
 from pathlib import Path
 
@@ -42,6 +43,8 @@ class PaperPlaceholderService:
                 project = self.store.get_project(project_id)
                 path = Path(project["workspace_path"]) / artifact["relative_path"]
                 try:
+                    if hashlib.sha256(path.read_bytes()).hexdigest() != artifact["sha256"]:
+                        raise ValueError
                     records = json.loads(path.read_text(encoding="utf-8"))
                     record = next(
                         item for item in records
@@ -66,7 +69,11 @@ class PaperPlaceholderService:
             ):
                 raise ValueError("Unresolvable paper placeholder")
             experiment = self.store.get_experiment(artifact["source_experiment_id"])
-            if not experiment or experiment["status"] != "completed":
+            if (
+                not experiment
+                or experiment["project_id"] != project_id
+                or experiment["status"] != "completed"
+            ):
                 raise ValueError("Unresolvable paper placeholder")
             claims.append({
                 "placeholder": match.group(0), "claim_type": kind,

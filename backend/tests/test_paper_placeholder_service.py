@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 
@@ -52,3 +53,39 @@ def test_rejects_unknown_or_incomplete_experiment(paper_context):
 
     with pytest.raises(ValueError, match="Unresolvable paper placeholder"):
         resolver.resolve_markdown(project["project_id"], "{{metric:exp-9999.validation_rmse}}")
+
+
+def test_rejects_metric_artifact_changed_after_registration(paper_context):
+    project, store, _ = paper_context
+    metrics_path = Path(project["workspace_path"]) / "experiments/exp-0001/metrics.json"
+    metrics_path.write_text(json.dumps([
+        {"name": "rmse", "split": "validation", "value": 999},
+    ]), encoding="utf-8")
+    resolver = PaperPlaceholderService(store, ArtifactService(store))
+
+    with pytest.raises(ValueError, match="Unresolvable paper placeholder"):
+        resolver.resolve_markdown(
+            project["project_id"], "{{metric:exp-0001.validation_rmse}}"
+        )
+
+
+def test_rejects_figure_linked_to_another_projects_experiment(paper_context, tmp_path):
+    project, store, _ = paper_context
+    other_workspace = tmp_path / "other-workspace"
+    figure_path = Path(project["workspace_path"]) / "experiments/exp-0001/figure.png"
+    figure_path.write_bytes(b"figure")
+    other = store.create_project("Other", "other", str(other_workspace), None)
+    store.create_experiment("exp-0002", other["project_id"], {
+        "experiment_id": "exp-0002", "seed": 42, "target": "sales",
+        "features": ["price"], "model": {"kind": "baseline", "parameters": {}},
+        "metrics": [{"name": "rmse", "direction": "minimize"}],
+    }, "b" * 64)
+    store.update_experiment_status("exp-0002", "completed")
+    artifact = ArtifactService(store).register(
+        project["project_id"], "experiment_figure", "experiments/exp-0001/figure.png",
+        source_experiment_id="exp-0002",
+    )
+    resolver = PaperPlaceholderService(store, ArtifactService(store))
+
+    with pytest.raises(ValueError, match="Unresolvable paper placeholder"):
+        resolver.resolve_markdown(project["project_id"], f"{{{{figure:{artifact['artifact_id']}}}}}")
